@@ -1,4 +1,4 @@
-# Spikely
+# Nevaio
 
 Full guidance for coding agents working in this repo lives in
 [`docs/agent-guide.md`](docs/agent-guide.md) - read it in full before doing

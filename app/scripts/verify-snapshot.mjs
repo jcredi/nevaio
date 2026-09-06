@@ -13,13 +13,13 @@
  * a published run seems wrong.
  *
  * Usage: npm run verify -- [outDir]        (defaults to ./shots)
- *        SPIKELY_URL=http://localhost:5173 npm run verify
+ *        NEVAIO_URL=http://localhost:5173 npm run verify
  */
 import { chromium } from "playwright";
 import { mkdir, writeFile } from "node:fs/promises";
 
 const OUT = process.argv[2] ?? "shots";
-const URL = process.env.SPIKELY_URL ?? "https://spikely.netlify.app";
+const URL = process.env.NEVAIO_URL ?? "https://nevaio.netlify.app";
 
 const VIEWS = [
   ["1-prealps-cloud-case", { center: [9.6, 45.9], zoom: 11 }],

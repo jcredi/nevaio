@@ -7,6 +7,18 @@ Versioned from `0.1.0` (2026-08-25), the first deploy.
 
 ## [Unreleased]
 
+### Changed
+- **Renamed the product from Spikely to Nevaio (2026-09-07)**, the user's
+  pick from a naming brainstorm. Cosmetic only - no behavior, data
+  semantics, or architecture changed. Netlify (`nevaio.netlify.app`) and the
+  R2 CORS policy were updated directly by the user; this repo's docs, page
+  title, and dev tooling were updated to match. Historical dated entries
+  referencing the old `spikely.netlify.app` domain are left as-is (they
+  describe what was literally live at that past moment); the Cloudflare R2
+  bucket itself stays named `spikely-snow` (no in-place rename in R2, and
+  not worth a full object migration for a name nobody outside this repo
+  sees). See `docs/worklog.md` and `docs/spec.md` (Amendment v1.8).
+
 ### Added
 - Place search (spec section 6.1): a floating search bar
   (`app/src/ui/searchBar.ts`) supporting search by name (Nominatim, decided

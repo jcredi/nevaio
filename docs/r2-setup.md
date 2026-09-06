@@ -29,7 +29,7 @@ it does not build a historical archive.
    [
      {
        "AllowedOrigins": [
-         "https://spikely.netlify.app",
+         "https://nevaio.netlify.app",
          "http://localhost:5173",
          "http://127.0.0.1:5173"
        ],
@@ -68,7 +68,7 @@ Add three repository variables (they are configuration, not credentials):
 | Variable | Value |
 | --- | --- |
 | `R2_ACCOUNT_ID` | Cloudflare account ID containing the bucket |
-| `R2_BUCKET` | Bucket name, for example `spikely-snow` |
+| `R2_BUCKET` | Bucket name, for example `spikely-snow` (the app was renamed to Nevaio on 2026-09-07, but R2 has no in-place bucket rename - the existing bucket is still literally called `spikely-snow`, and renaming it would mean creating a new bucket and migrating every object, for a name nobody outside this repo ever sees. Not worth doing unless the bucket itself is rebuilt for another reason) |
 | `R2_PUBLIC_BASE_URL` | Public origin without a trailing slash, initially `https://…r2.dev` and later the custom domain |
 
 The workflow has read-only repository permission. Its R2 token can write only
@@ -114,9 +114,9 @@ the same current-date full-area run can be started locally:
 
 ```sh
 python -m pipeline.preview \
-  --raw-dir /tmp/spikely-gfsc/raw \
-  --work-dir /tmp/spikely-gfsc/work \
-  --output-dir /tmp/spikely-gfsc/output \
+  --raw-dir /tmp/nevaio-gfsc/raw \
+  --work-dir /tmp/nevaio-gfsc/work \
+  --output-dir /tmp/nevaio-gfsc/output \
   --publish-r2 --keep-runs 7
 ```
 

@@ -39,9 +39,9 @@ Build a local full-area preview without publishing it:
 
 ```sh
 recon/.venv/bin/python -m pipeline.preview \
-  --raw-dir /tmp/spikely-gfsc/raw \
-  --work-dir /tmp/spikely-gfsc/work \
-  --output-dir /tmp/spikely-gfsc/output
+  --raw-dir /tmp/nevaio-gfsc/raw \
+  --work-dir /tmp/nevaio-gfsc/work \
+  --output-dir /tmp/nevaio-gfsc/output
 ```
 
 The GitHub Actions entry point is `Publish latest GFSC snapshot`. It runs daily

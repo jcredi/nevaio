@@ -11,7 +11,7 @@ import { chromium } from "playwright";
 import { mkdir } from "node:fs/promises";
 
 const OUT = process.argv[2] ?? "screenshots";
-const URL = process.env.SPIKELY_URL ?? "http://localhost:5173";
+const URL = process.env.NEVAIO_URL ?? "http://localhost:5173";
 
 const VIEWS = [
   ["1-whole-tile", { center: [11.02, 46.44], zoom: 8.7 }],

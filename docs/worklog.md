@@ -1,5 +1,79 @@
 # Working session log
 
+## 2026-09-07 - Renamed Spikely -> Nevaio
+
+**Did:** Asked for a better app name than "Spikely" and proposed a broad,
+grouped brainstorm: descriptive options (Snowline, SnowTrail, Snowfield),
+alpine/mountaineering vocabulary (Névé, Firn, Nevaio, Cresta, Vetta, Passo),
+freshness/honesty-themed options (SnowSight, ClearSnow, SnowWatch), and
+gear-themed options keeping some DNA from "Spikely" (Crampon(s), IceSpike).
+Flagged names to avoid and why: anything implying live/real-time data
+(fights the app's own honesty-about-staleness design) or safety/avalanche/
+depth (explicit spec section 9.1/14 non-goals). Checked the top 4-5 picks
+with a web search for an existing competing app of the same name before
+recommending; none collided. User picked **Nevaio** (Italian for a
+persistent snow patch - fits the Alps + Italian Apennines MVP scope).
+
+User then renamed the Netlify site directly (now `nevaio.netlify.app`),
+which broke the snow layer - diagnosed live rather than guessing: `curl`
+against the R2 manifest with `Origin: https://nevaio.netlify.app` initially
+returned no CORS header (the bucket's CORS policy still only allowlisted
+`spikely.netlify.app`), confirming the cause before the user fixed it
+themselves in the Cloudflare dashboard. Re-ran `npm run verify` against the
+live site afterward: manifest loads (58 tiles, run `20260906T210131Z`), and
+the only failed requests are the same 9 known low-snow-season empty-tile
+omissions already documented, not a regression.
+
+Then renamed the rest of the project to match, per the user's explicit
+"rename everywhere, including GitHub" request. `grep -rliE spikely`
+(excluding `node_modules`/`.git`/`dist`) found 16 files.
+
+**Decided:**
+- **Historical/dated content is never rewritten**, only added to - the same
+  policy this file already applies to itself. `CHANGELOG.md` entries,
+  earlier `docs/worklog.md` entries, and `docs/spec.md`/`docs/plan.md`
+  amendment notes describing a specific past verification (e.g. "verified
+  end-to-end on `https://spikely.netlify.app`" on 2026-08-27) describe what
+  was literally true at that moment; rewriting the URL there would be
+  revisionist. Only "living" text - titles, current-status lines, active
+  config/instructions, dev tooling - was updated to Nevaio. New dated
+  entries (this one; `docs/spec.md` Amendment v1.8; a `CHANGELOG.md`
+  `[Unreleased]` bullet) record the rename itself instead.
+- **The Cloudflare R2 bucket itself stays `spikely-snow`, not renamed.** R2
+  has no in-place bucket rename - doing this "properly" means creating a new
+  bucket, copying every object, and repointing `R2_BUCKET`/
+  `R2_PUBLIC_BASE_URL`, for a name nobody outside this repo ever sees. Added
+  a clarifying note in `docs/r2-setup.md` instead so a future reader isn't
+  confused finding a bucket called `spikely-snow` in a project called
+  Nevaio.
+- **The GitHub repository rename is a manual step for the user.** `gh` is
+  not installed in this environment, so it can't be done from here; GitHub
+  Settings (or the user's own `gh`/API access) is the path. Once done, the
+  local `origin` remote needs `git remote set-url origin
+  git@github.com:jcredi/nevaio.git` (not run yet - pointing the remote at a
+  name that doesn't exist yet would just break `fetch`/`push` until the
+  rename actually happens).
+- **The local project directory** (`/Users/jacopo.credi/Projects/spikely`)
+  is left alone - not something to rename out from under the session
+  actively operating in it (and the user's open editor tabs). Manual
+  follow-up, whenever convenient.
+
+**Rejected:** nothing structural - this was a scoped cosmetic rename, not a
+redesign. The main judgment call (what counts as "history" vs. "current
+text") is recorded above precisely so it doesn't need re-litigating if more
+`spikely` references turn up later.
+
+**Verified:** `npm run build` (from `app/`) clean after `package.json`'s
+`name` change and an `npm install` to sync `package-lock.json`. `grep -rliE
+spikely` afterward lists exactly the expected set: `PROMPT_TO_RESUME.md` and
+`SECURITY_AUDIT_REPORT.md` (both untracked, generic brand mentions updated,
+timestamped findings preserved), `CHANGELOG.md`/`docs/worklog.md` (historical
+entries), `docs/spec.md`/`docs/plan.md` (historical amendment/narrative
+prose), and `docs/r2-setup.md` (the intentional bucket-name note) - nothing
+missed by accident.
+
+---
+
 ## 2026-09-06 - "Freshness" -> "observation age" wording fix, a full visual redesign, and a real overlap bug found along the way
 
 **Did:** Two requests from the user after seeing the new legend: the

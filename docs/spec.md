@@ -1,8 +1,17 @@
-# Spikely MVP Product Specification
+# Nevaio MVP Product Specification
 
-**Status:** Draft v1.7 - snow-cover visualization revised: opacity and color are now independent channels, and the AS-OF age ceiling is 30 days
-**Date:** 2026-09-06  
+**Status:** Draft v1.8 - product renamed from Spikely to Nevaio
+**Date:** 2026-09-07  
 **Product stage:** Planning only
+
+**Amendment (v1.8):** Product renamed from Spikely to Nevaio (2026-09-07), the
+user's pick from a naming brainstorm - see `docs/worklog.md` for the full
+candidate list and reasoning. Cosmetic only: no product behavior, data
+semantics, or architecture changed. `docs/agent-guide.md`, `README.md`, and
+the frontend's page title were updated to match; historical dated entries in
+this spec, `CHANGELOG.md`, and `docs/worklog.md` that reference the old
+`spikely.netlify.app` domain describe what was literally live at that past
+moment and are left as-is rather than rewritten.
 
 **Palette revision (2026-09-06):** Sky to Indigo replaces Mint to Amethyst in section 5.2 because mint blends into green topo terrain. Age bands and opacity are unchanged.
 
