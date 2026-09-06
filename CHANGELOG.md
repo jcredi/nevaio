@@ -14,6 +14,14 @@ Versioned from `0.1.0` (2026-08-25), the first deploy.
   (`app/src/search/coordinates.ts`, decimal degrees, resolved client-side
   with no network call). Selecting a result flies the map to it and drops a
   marker. See `docs/worklog.md` (2026-09-06).
+- Search results show a small type icon (peak, hut/shelter, pass, camp site,
+  trail, parking, settlement, or a generic pin) derived from Nominatim's
+  `category`/`type` fields.
+
+### Fixed
+- `app/src/search/nominatim.ts` read a `class` field that doesn't exist in
+  Nominatim's `jsonv2` response (it's `category`) - always `undefined`,
+  silently, since nothing rendered it until the type-icon feature above.
 
 ### Changed
 - Replace Mint to Amethyst with Sky to Indigo for snow observation age, improving separation from green topo terrain. Age bands and coverage opacity are unchanged; 953 raster tiles regenerated and published for the same 2026-09-06 observations.

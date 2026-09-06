@@ -20,6 +20,41 @@ function resultLabel(result: SearchResult): string {
   return result.displayName;
 }
 
+const TRAIL_TYPES = new Set(["path", "track", "footway", "bridleway"]);
+
+/** A small glyph hinting at what kind of place a result is (spec section 4.2). */
+function resultIcon(result: SearchResult): string {
+  if (result.kind === "coordinate") {
+    return "📍";
+  }
+  const { category, type } = result;
+  if (category === "natural" && (type === "peak" || type === "volcano")) {
+    return "🏔️";
+  }
+  if (category === "natural" && type === "saddle") {
+    return "⛰️";
+  }
+  if (
+    (category === "tourism" && (type === "alpine_hut" || type === "wilderness_hut")) ||
+    (category === "amenity" && type === "shelter")
+  ) {
+    return "🛖";
+  }
+  if (category === "tourism" && type === "camp_site") {
+    return "⛺";
+  }
+  if (category === "highway" && TRAIL_TYPES.has(type)) {
+    return "🥾";
+  }
+  if (category === "amenity" && type === "parking") {
+    return "🅿️";
+  }
+  if (category === "place") {
+    return "🏘️";
+  }
+  return "📍";
+}
+
 /**
  * Zoom level from a result's bounding-box span, rather than a hardcoded
  * per-OSM-type table - a tight bbox (a peak, a hut) zooms in close, a wide
@@ -93,7 +128,17 @@ export function createSearchBar(map: Map): HTMLElement {
       const item = document.createElement("li");
       item.className = "search-bar__result";
       item.classList.toggle("search-bar__result--active", index === highlightedIndex);
-      item.textContent = resultLabel(result);
+
+      const icon = document.createElement("span");
+      icon.className = "search-bar__result-icon";
+      icon.textContent = resultIcon(result);
+      icon.setAttribute("aria-hidden", "true");
+
+      const label = document.createElement("span");
+      label.className = "search-bar__result-label";
+      label.textContent = resultLabel(result);
+
+      item.append(icon, label);
       // mousedown, not click: fires before a touch/click would otherwise
       // blur the input and let closeDropdown() race it.
       item.addEventListener("mousedown", (event) => {

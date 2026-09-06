@@ -1,5 +1,71 @@
 # Working session log
 
+## 2026-09-06 - Search result type icons, and a real Nominatim response bug found along the way
+
+**Did:** User tried the new search feature and asked for two usability
+improvements: typing "Adamello" should surface the Adamello peak first (or at
+least sooner), and results should show an icon for what kind of place each
+one is (peak, pass, town, etc.).
+
+Investigated the ranking complaint first by querying Nominatim's raw API
+directly for "Adamello" (`curl`, `format=jsonv2`). At `limit=6` the actual
+peak ("Monte Adamello", `natural`/`peak`) doesn't appear at all - the top
+results are an administrative village and its town hall, both named after the
+massif, plus assorted unrelated amenities. Raising `limit=20` confirmed the
+peak exists in Nominatim's results but ranks 10th by its own `importance`
+score (0.35, versus 0.56 for the village) - Nominatim's importance metric
+favors administrative/amenity entries over named natural features and has no
+concept of "this is a hiking app." Proposed re-ranking client-side (fetch
+more results than displayed, then reorder by a curated mountaineering-class
+priority table) but the user explicitly said not to hack Nominatim's score -
+only build the icons. Left ranking exactly as Nominatim returns it.
+
+While building the icon feature, found and fixed a real latent bug: 
+`app/src/search/nominatim.ts`'s `GeocodeResult`/`NominatimResponseItem` types
+had a `class` field mapped from `item.class` - but Nominatim's `jsonv2`
+response actually names that field `category`, not `class` (an older,
+non-jsonv2 Nominatim response format used `class`). `item.class` was
+therefore always `undefined`, silently, since nothing rendered it before now
+(only `type` and `boundingbox` were actually used, for zoom calculation).
+Renamed the field to `category` throughout and verified via direct `curl`
+that the real API response carries `category`/`type` (e.g. `natural`/`peak`,
+`place`/`village`), not `class`/`type`.
+
+Added `resultIcon()` in `app/src/ui/searchBar.ts`: a small curated
+`category`/`type` -> emoji map covering the mountaineering-relevant classes
+from spec section 4.2 (peak/volcano, saddle, alpine/wilderness hut or
+shelter, camp site, trail, parking, and settlements), falling back to a
+generic pin for anything else (administrative boundaries, restaurants,
+townhalls, bus stops, etc.) - the same "everything else" bucket that
+crowded out the Adamello peak above. Rendered as a `search-bar__result-icon`
+span before each result's label.
+
+**Decided:**
+- Icons only, no client-side re-ranking of Nominatim results - the user's
+  explicit call after seeing the actual ranking problem demonstrated live.
+  Revisit if this keeps coming up in practice; for now the fix is scoped to
+  what was asked.
+- Emoji glyphs rather than an icon font/SVG set - zero new assets or build
+  changes, legible at the small size tested, and this is exactly the kind of
+  small visible step the project favors over infrastructure for a cosmetic
+  improvement.
+
+**Rejected:**
+- Client-side re-ranking (fetch a larger `limit`, sort by a mountaineering-
+  class priority tier, slice to display count) - diagnosed and prototyped as
+  the fix for the ranking complaint, but the user asked to skip it. The
+  diagnosis (real peak ranks 10th by Nominatim's own importance at
+  `limit=20`) stays here in case ranking is revisited later.
+
+**Verified:** `npm run build` clean. Dev server on port 5173, driven by a
+temporary Playwright script (not committed): "Gran Paradiso" shows a
+mountain icon, "Courmayeur" shows a settlement icon on its `place`/`town`
+result, "Adamello" shows a mix of pin and camp-site icons matching its actual
+(unranked) result set - confirming icons reflect the real `category`/`type`
+Nominatim returns rather than always falling back to the generic pin.
+
+---
+
 ## 2026-09-06 - Try Sky to Indigo for observation age
 
 **Changed:** User selected Sky to Indigo after finding mint snow hard to

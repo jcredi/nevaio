@@ -143,8 +143,24 @@ body {
 }
 
 .search-bar__result {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   padding: 0.625rem 0.75rem;
   cursor: pointer;
+}
+
+.search-bar__result-icon {
+  flex: none;
+  font-size: 1.125rem;
+  line-height: 1;
+}
+
+.search-bar__result-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .search-bar__result--active,
