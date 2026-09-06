@@ -23,3 +23,9 @@ export const initialView = {
 export const snowManifestUrl =
   import.meta.env.VITE_SNOW_MANIFEST_URL || "/snow/latest.json";
 export const fallbackSnowOverlayUrl = "/snow/gfsc_32TPS_20260206.json";
+
+// Approximate Alps + Italian Apennines bounding box (west, south, east,
+// north), used only to bias place-search results (spec section 6.1) toward
+// the MVP geographic scope - not a hard filter, so exact correctness here
+// doesn't matter.
+export const searchBiasBounds: [number, number, number, number] = [5, 40, 16, 48];

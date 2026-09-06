@@ -11,6 +11,61 @@ This file is what *we* did and why, across sessions.
 
 ---
 
+## 2026-09-06 - Place search (spec section 6.1) built on Nominatim
+
+**Did:** Resumed from `docs/plan.md`'s "Next, in order" item 2 - the snow
+layer is no longer the bottleneck, so moved on to the rest of `docs/spec.md`
+in vertical slices, starting with search (section 6), since it has no open
+blocker unlike the OSM object panel (section 7, blocked on section 15 item 3)
+or routing (section 8, blocked on several other section 15 items). Built a
+standalone floating search bar (`app/src/ui/searchBar.ts`) rather than a
+MapLibre `IControl` like `SnowControl` - section 10 wants a prominent,
+near-full-width, touch-friendly element on mobile, which MapLibre's
+corner-anchored `ctrl-group` styling isn't built for. Two independent input
+paths: a decimal-degree coordinate pattern (`app/src/search/coordinates.ts`)
+resolved entirely client-side with no network call, and everything else sent
+to Nominatim's public `/search` endpoint (`app/src/search/nominatim.ts`),
+debounced (350ms) with `AbortController` cancellation of stale in-flight
+requests, biased (not restricted) to an approximate Alps+Apennines bounding
+box via `viewbox`/`bounded=0`. Selecting a result flies the map there
+(`zoomForBoundingBox` derives a zoom level from the result's bbox span
+instead of a hardcoded per-OSM-type table, so it works for any class/type
+Nominatim returns) and drops a single reused `maplibregl.Marker`.
+
+**Decided:**
+- **Nominatim over MapTiler Geocoding** for section 15 item 5 (still formally
+  open) - asked the user directly given the real trade-off (MapTiler would
+  reuse the already-required API key and likely get a clearer rate-limit
+  story; Nominatim is free, keyless, and OSM-native, matching where the
+  mountaineering objects themselves come from). User chose Nominatim,
+  accepting its anonymous-endpoint usage-policy ceiling as the MVP starting
+  point - self-hosting or switching provider is the documented revisit
+  trigger if usage grows past what that endpoint allows.
+- Zoom-from-bounding-box-span rather than a lookup table keyed on OSM
+  `class`/`type` - simpler and works uniformly across peaks, huts, villages,
+  and anything else Nominatim returns, without needing to enumerate types.
+- Decimal-degree coordinates only, no DMS - not required by section 6.1 and
+  keeps this slice small.
+
+**Rejected:**
+- MapTiler Geocoding (see above) - a real alternative, not a strawman, but
+  the user preferred the OSM-native, keyless option for the MVP.
+- A MapLibre `IControl` for the search bar, matching `SnowControl` - would
+  confine it to a corner `ctrl-group`, working against section 10's
+  mobile-first, near-full-width intent for the app's primary search entry
+  point.
+
+**Verified:** `npm run build` clean. Ran the dev server on port 5173 and
+drove it with a temporary Playwright script (not committed): searching
+"Gran Paradiso" renders a dropdown, selecting it flies the map to the peak
+and drops a marker exactly on it (screenshot-confirmed); typing
+`45.832, 7.281` skips the dropdown and goes straight there on Enter; the
+clear button removes the marker; the existing MapTiler/OSM + Copernicus
+attribution already satisfies Nominatim's attribution requirement, no
+separate string needed.
+
+---
+
 ## 2026-09-06 - Zoom gap fixed, cron confirmed, snow encoding revised after reviewing an alternative implementation
 
 **Did:** Closed out items 1 and 2 carried forward from 2026-08-28, in order.

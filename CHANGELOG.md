@@ -7,6 +7,14 @@ Versioned from `0.1.0` (2026-08-25), the first deploy.
 
 ## [Unreleased]
 
+### Added
+- Place search (spec section 6.1): a floating search bar
+  (`app/src/ui/searchBar.ts`) supporting search by name (Nominatim, decided
+  for MVP - spec section 15 item 5) and by coordinates
+  (`app/src/search/coordinates.ts`, decimal degrees, resolved client-side
+  with no network call). Selecting a result flies the map to it and drops a
+  marker. See `docs/worklog.md` (2026-09-06).
+
 ### Changed
 - **Snow-layer visual encoding (spec 5.2/5.4, amended 2026-09-06):** opacity
   and color are now independent channels instead of one combined alpha.

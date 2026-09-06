@@ -7,6 +7,7 @@ import {
 } from "./map/config";
 import { addSnowOverlay } from "./map/snowOverlay";
 import { SnowControl } from "./ui/snowControl";
+import { createSearchBar } from "./ui/searchBar";
 import "./style.css";
 
 const map = new maplibregl.Map({
@@ -23,6 +24,7 @@ const map = new maplibregl.Map({
 });
 
 map.addControl(new maplibregl.NavigationControl(), "top-right");
+document.body.append(createSearchBar(map));
 
 map.on("load", async () => {
   try {

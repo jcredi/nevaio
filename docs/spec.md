@@ -476,7 +476,13 @@ Snow/freshness encoding, quality and categorical-code handling, staleness, prolo
 2. Exact definition of route "snow-covered percentage."
 3. Which OSM object classes are interactive by default at each zoom level.
 4. Basemap/vector/terrain provider.
-5. Geocoding/search provider.
+5. **Decided for MVP (2026-09-06):** Nominatim's free, keyless public search
+   endpoint, chosen over reusing the existing MapTiler API key for
+   MapTiler's own Geocoding API - OSM-native (matching where the
+   mountaineering objects in section 4.2 already come from), at the cost of
+   the anonymous endpoint's own usage-policy rate ceiling. Revisit
+   (self-host, or switch provider) if usage outgrows that ceiling. See
+   `docs/worklog.md` (2026-09-06).
 6. Hiking routing provider.
 7. Elevation/DEM source.
 8. **Decided for MVP (2026-08-26, revised same day; completed 2026-08-28):** frontend on Netlify (done, see section 12); data pipeline is a GitHub Actions job rendering one "latest conditions" tile set, publishing an immutable run plus an atomic `latest.json` pointer to Cloudflare R2 (not a static Netlify republish - see `docs/worklog.md`, 2026-08-26, for the Netlify Blobs/static-republish alternatives considered and rejected). Implemented, live on production (`https://spikely.netlify.app`), and visually verified end-to-end (2026-08-27, again 2026-08-28). As of 2026-08-28 the job composes the **full section 9.2 AS-OF rule** over a 15-day product window per tile rather than the single newest product, and runs on a **daily `04:35 UTC` schedule** keeping the newest seven runs in R2; the four never-published tiles were removed from the tile set after confirming they are absent from HR-WSI's own grid, so a missing tile now fails the run rather than publishing a partial map. Reasoning and measurements: `docs/worklog.md` (2026-08-28). **Still open:** a custom domain in front of the `r2.dev` URL (optional, pre-launch). Separately still open for later: the storage/serving architecture needed to bring back arbitrary historical AS-OF map dates (section 5.3) - the daily job renders only "today", discarding each day's composite once the next replaces it. Leading candidate when full historical support is revisited: extend this same R2 archive with a per-day compact raster plus a small on-demand tile-rendering service reusing the frozen section 9.2 selection logic, cached aggressively since a historical (date, tile) result never changes once computed. Note that the daily job already downloads the whole 15-day window, so archiving each day's per-tile composite is a smaller step from here than it was from the newest-product-only preview.
