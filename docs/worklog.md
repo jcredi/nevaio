@@ -1,5 +1,42 @@
 # Working session log
 
+## 2026-09-06 - Snow-layer legend
+
+**Did:** The user noticed the web app had no legend explaining the snow
+overlay's visual encoding (spec section 5.2: opacity = coverage %, color =
+freshness tier) and asked for one. Added it to the existing
+`SnowControl` (`app/src/ui/snowControl.ts`) rather than a new floating
+element, since that control is already the map's "what does the snow layer
+mean" UI (toggle + AS-OF summary) and a legend belongs there rather than as
+separate clutter. Two rows: a coverage gradient bar (a CSS `linear-gradient`
+with stops at 0%, 50% (58.8% alpha - the exact `150/255` from the frozen
+piecewise alpha rule, not a plain linear approximation), 100%, labeled `0%`
+to `100%`) and four color swatches for the freshness tiers, labeled `0-3d`
+through `15-30d`.
+
+**Decided:**
+- Hardcode the four Sky-to-Indigo hex values in `snowControl.ts` rather than
+  invent a shared config between the Python pipeline and the TypeScript
+  frontend - there's no existing shared-config mechanism between the two,
+  spec section 5.2 already freezes these exact values, and past changes to
+  this palette (see the Sky-to-Indigo entry above) already require touching
+  multiple files by hand. Commented the duplication clearly
+  (`pipeline/tiles.py`'s `_FRESHNESS_COLORS`) so a future palette change
+  doesn't miss it again.
+- Reproduce the exact alpha curve (0/150/255 at 0/50/100%) in the gradient's
+  midpoint stop rather than a plain 0-to-100% linear fade - free precision,
+  and the legend should show the real rule, not an approximation of it.
+- Always-visible, not a collapsible/expandable section - MVP success
+  criterion 2 ("distinguish fresh observations from stale or unavailable
+  observations") is core, not a secondary detail worth hiding behind a tap.
+
+**Verified:** `npm run build` clean. Dev server on port 5173, Playwright
+screenshots (not committed) at both a desktop (1000x800) and mobile
+(390x844) viewport: the legend renders clearly, readably, and doesn't
+visually collide with the search bar added earlier this session.
+
+---
+
 ## 2026-09-06 - Search result type icons, and a real Nominatim response bug found along the way
 
 **Did:** User tried the new search feature and asked for two usability

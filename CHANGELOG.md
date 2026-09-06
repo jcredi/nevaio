@@ -17,6 +17,9 @@ Versioned from `0.1.0` (2026-08-25), the first deploy.
 - Search results show a small type icon (peak, hut/shelter, pass, camp site,
   trail, parking, settlement, or a generic pin) derived from Nominatim's
   `category`/`type` fields.
+- Snow-layer legend (`app/src/ui/snowControl.ts`): explains both visual
+  channels from spec section 5.2 - a coverage gradient bar and four
+  freshness-tier color swatches (0-3d through 15-30d).
 
 ### Fixed
 - `app/src/search/nominatim.ts` read a `class` field that doesn't exist in
