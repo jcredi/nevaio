@@ -16,10 +16,10 @@ from pipeline.tiles import ORIGIN_SHIFT, render_rgba, write_xyz_tiles
 # The 4 frozen freshness-tier colors from pipeline.tiles._FRESHNESS_COLORS,
 # spelled out here so a test failure shows which tier broke rather than an
 # opaque import of the production constant.
-MINT = (0x8E, 0xEB, 0xC6)  # tier 0, 0-3 days: mint
-LIGHT_BLUE = (0x7A, 0xC2, 0xE1)  # tier 1, 4-7 days
-PERIWINKLE = (0x69, 0x69, 0xD3)  # tier 2, 8-14 days
-AMETHYST = (0xA4, 0x59, 0xC5)  # tier 3, 15+ days: amethyst
+SKY_BLUE = (0x38, 0xBD, 0xF8)  # tier 0, 0-3 days: sky blue
+BLUE = (0x51, 0x85, 0xED)  # tier 1, 4-7 days
+VIOLET = (0x69, 0x57, 0xCE)  # tier 2, 8-14 days
+INDIGO = (0x71, 0x3A, 0x9C)  # tier 3, 15+ days: indigo
 
 
 def composite(state: int, *, fsc: int = NO_VALUE, age_days: int = NO_AGE, shape=(1, 1)) -> AsOfComposite:
@@ -37,13 +37,13 @@ def composite(state: int, *, fsc: int = NO_VALUE, age_days: int = NO_AGE, shape=
 class RenderRgbaTests(unittest.TestCase):
     def test_alpha_ramp_at_frozen_stops_is_driven_by_coverage_alone(self) -> None:
         c = composite(PixelState.VALID, fsc=0, age_days=0)
-        np.testing.assert_array_equal(render_rgba(c)[0, 0], [*MINT, 0])
+        np.testing.assert_array_equal(render_rgba(c)[0, 0], [*SKY_BLUE, 0])
 
         c = composite(PixelState.VALID, fsc=50, age_days=0)
-        np.testing.assert_array_equal(render_rgba(c)[0, 0], [*MINT, 150])
+        np.testing.assert_array_equal(render_rgba(c)[0, 0], [*SKY_BLUE, 150])
 
         c = composite(PixelState.VALID, fsc=100, age_days=0)
-        np.testing.assert_array_equal(render_rgba(c)[0, 0], [*MINT, 255])
+        np.testing.assert_array_equal(render_rgba(c)[0, 0], [*SKY_BLUE, 255])
 
     def test_freshness_selects_color_not_alpha(self) -> None:
         # Fixed at full coverage (alpha 255 throughout) so only color varies.
@@ -52,10 +52,10 @@ class RenderRgbaTests(unittest.TestCase):
         tier2 = render_rgba(composite(PixelState.VALID, fsc=100, age_days=10))[0, 0]
         tier3 = render_rgba(composite(PixelState.VALID, fsc=100, age_days=20))[0, 0]
 
-        np.testing.assert_array_equal(tier0, [*MINT, 255])
-        np.testing.assert_array_equal(tier1, [*LIGHT_BLUE, 255])
-        np.testing.assert_array_equal(tier2, [*PERIWINKLE, 255])
-        np.testing.assert_array_equal(tier3, [*AMETHYST, 255])
+        np.testing.assert_array_equal(tier0, [*SKY_BLUE, 255])
+        np.testing.assert_array_equal(tier1, [*BLUE, 255])
+        np.testing.assert_array_equal(tier2, [*VIOLET, 255])
+        np.testing.assert_array_equal(tier3, [*INDIGO, 255])
 
     def test_cloud_water_stale_and_nodata_are_all_transparent(self) -> None:
         for state in (PixelState.CLOUD, PixelState.WATER, PixelState.STALE, PixelState.NODATA):
@@ -91,7 +91,7 @@ class WriteXyzTilesTests(unittest.TestCase):
             self.assertEqual(written, [out_dir / "0" / "0" / "0.png"])
             tile = np.array(Image.open(written[0]).convert("RGBA"))
             self.assertEqual(tile.shape, (256, 256, 4))
-            self.assertTrue((tile == [*MINT, 255]).all())
+            self.assertTrue((tile == [*SKY_BLUE, 255]).all())
 
     def test_full_world_source_covers_all_four_z1_tiles(self) -> None:
         grid = _world_grid()
@@ -132,7 +132,7 @@ class WriteXyzTilesTests(unittest.TestCase):
 
             self.assertEqual(written, [out_dir / "1" / "0" / "0.png"])
             tile = np.array(Image.open(written[0]).convert("RGBA"))
-            self.assertTrue((tile[0:128, 0:128] == [*MINT, 255]).all())
+            self.assertTrue((tile[0:128, 0:128] == [*SKY_BLUE, 255]).all())
             self.assertTrue((tile[128:, :] == 0).all())
             self.assertTrue((tile[:, 128:] == 0).all())
 

@@ -192,8 +192,8 @@ def build_preview(
         "notice": (
             "Each pixel shows the newest valid GFSC observation on or before "
             f"{as_of_date.isoformat()}, searching back up to 30 days per spec "
-            "section 9.2. Color shows how old that observation is (mint = most "
-            "recent, amethyst = up to 30 days old); a transparent area means no "
+            "section 9.2. Color shows how old that observation is (sky blue = most "
+            "recent, indigo = up to 30 days old); a transparent area means no "
             "valid observation was found there in that window (cloud, water, "
             "or no data)."
         ),

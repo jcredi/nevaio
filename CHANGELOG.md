@@ -16,6 +16,7 @@ Versioned from `0.1.0` (2026-08-25), the first deploy.
   marker. See `docs/worklog.md` (2026-09-06).
 
 ### Changed
+- Replace Mint to Amethyst with Sky to Indigo for snow observation age, improving separation from green topo terrain. Age bands and coverage opacity are unchanged; 953 raster tiles regenerated and published for the same 2026-09-06 observations.
 - **Snow-layer visual encoding (spec 5.2/5.4, amended 2026-09-06):** opacity
   and color are now independent channels instead of one combined alpha.
   Opacity encodes snow-cover percentage alone (linear 0-255, no floor at 0%);

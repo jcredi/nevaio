@@ -56,17 +56,15 @@ def _build_alpha_lut() -> NDArray[np.uint8]:
 _ALPHA_LUT = _build_alpha_lut()
 
 # color = freshness tier (spec 9.2 age bands, tier indices from
-# asof.freshness_tier): mint for a 0-3 day observation, fading through two
-# intermediate tiers to amethyst for 15-30 days ("Mint to Amethyst", picked
-# 2026-09-06 from 6 candidate ramps rendered on real data). Only meaningful
-# where alpha > 0 (state VALID); freshness_tier's tier for any other pixel is
-# never rendered, so it doesn't need special-casing here.
+# asof.freshness_tier): Sky to Indigo, selected 2026-09-06 to distinguish
+# snow from green topo terrain. Only meaningful where alpha > 0 (state
+# VALID); freshness_tier's tier for any other pixel is never rendered.
 _FRESHNESS_COLORS = np.array(
     [
-        (0x8E, 0xEB, 0xC6),  # tier 0, 0-3 days: mint
-        (0x7A, 0xC2, 0xE1),  # tier 1, 4-7 days
-        (0x69, 0x69, 0xD3),  # tier 2, 8-14 days
-        (0xA4, 0x59, 0xC5),  # tier 3, 15-30 days: amethyst
+        (0x38, 0xBD, 0xF8),  # tier 0, 0-3 days: sky blue
+        (0x51, 0x85, 0xED),  # tier 1, 4-7 days
+        (0x69, 0x57, 0xCE),  # tier 2, 8-14 days
+        (0x71, 0x3A, 0x9C),  # tier 3, 15-30 days: indigo
     ],
     dtype=np.uint8,
 )

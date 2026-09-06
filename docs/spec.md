@@ -4,6 +4,8 @@
 **Date:** 2026-09-06  
 **Product stage:** Planning only
 
+**Palette revision (2026-09-06):** Sky to Indigo replaces Mint to Amethyst in section 5.2 because mint blends into green topo terrain. Age bands and opacity are unchanged.
+
 **Amendment (v1.7):** Revised the section 5.2 visual encoding after review of an
 alternative implementation surfaced a real ambiguity: the frozen v1.2 encoding
 multiplied a snow-cover-derived alpha by a freshness multiplier into one
@@ -162,7 +164,7 @@ two independent channels, so a faint pixel always means one thing (little
 snow), never an ambiguity between "little snow" and "old observation":
 
 - **opacity = snow-cover percentage:** piecewise-linear alpha from `0` at 0%, through `150` at 50%, to `255` at 100% (out of 255), rounded to the nearest 8-bit integer. There is no non-zero floor at 0%: a confirmed 0%-snow pixel is fully transparent, visually indistinguishable on the map from cloud/water/stale/no-data (section 5.4). The distinction survives in point/object details and the historical chart, not the raster itself.
-- **color = freshness tier**, four discrete steps ("Mint to Amethyst," chosen from 6 candidate ramps rendered on real winter data): `#8EEBC6` for an observation age of 0-3 calendar days, `#7AC2E1` for 4-7 days, `#6969D3` for 8-14 days, and `#A459C5` for 15-30 days. Age is defined in section 9.2; day 31 onward is not rendered (see section 9.2's Stale rule).
+- **color = freshness tier**, four discrete steps ("Sky to Indigo," selected to stand out against green topo terrain): `#38BDF8` for an observation age of 0-3 calendar days, `#5185ED` for 4-7 days, `#6957CE` for 8-14 days, and `#713A9C` for 15-30 days. Age is defined in section 9.2; day 31 onward is not rendered (see section 9.2's Stale rule).
 
 Quality tier does not change color or opacity; its separate treatment is in section 5.4. Cloud, water, and no-data use categorical handling rather than this ramp - all four render fully transparent (opacity 0), with no distinct color.
 
@@ -368,7 +370,7 @@ For each pixel:
 1. If the newest available product on or before `D` identifies the pixel as inland water (`210`), return **Water** immediately.
 2. Consider products with product date on or before `D`. A candidate is valid only when GF is 0-100, GF-QA is 0-3, `AT` is usable and no later than the end of `D`, and its observation age is at most 30 days (raised from 14 on 2026-09-06 - see below). Quality tiers 0-3 are equally eligible.
 3. Select the candidate with the greatest `AT`. Break an `AT` tie by better quality tier (lower numeric GF-QA), then by the later product date. This makes the result independent of file or query ordering.
-4. Render the selected value with the freshness color from section 5.2: mint at 0-3 days, through two intermediate tiers, to amethyst at 15-30 days.
+4. Render the selected value with the freshness color from section 5.2: sky blue at 0-3 days, through two intermediate tiers, to indigo at 15-30 days.
 5. If no candidate exists, return no snow value. Preserve the newest product's reason as **Cloud** for `205` or **No data** for `255`; no product or malformed/inconsistent metadata is **No data**. If valid-form percentages exist but their usable acquisitions are all older than 30 days, return **Stale** with the most recent acquisition age. Do not search or carry forward beyond 30 days.
 
 The backward search is required because median same-day valid coverage was only 25-63% across the reconnaissance samples and one tile changed from 97% valid to 90% no-data in five days. The ceiling (originally 14 days, raised to 30 on 2026-09-06 after measuring the real-data benefit first) keeps a genuinely useful backward search available through ordinary multi-week cloudy spells, while still making anything older genuinely unavailable instead of presenting an indefinite carry-forward as current evidence. The 2026-09-06 measurement found the gain from extending past 14 days is concentrated almost entirely in exactly those multi-week cloudy spells - negligible (+1 to +4 percentage points) on ordinary days, but substantial (+33 to +59 percentage points on sampled tile-dates) when a tile had been cloud-bound for two-plus weeks; full measurement in `docs/worklog.md` (2026-09-06).

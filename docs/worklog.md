@@ -1,5 +1,29 @@
 # Working session log
 
+## 2026-09-06 - Try Sky to Indigo for observation age
+
+**Changed:** User selected Sky to Indigo after finding mint snow hard to
+separate from green topo terrain. Updated the raster renderer and existing
+color assertions to `#38BDF8`, `#5185ED`, `#6957CE`, `#713A9C` for the
+unchanged 0-3, 4-7, 8-14, and 15-30 day bands. Updated manifest tooltip wording,
+the current specification, and plan status. Coverage opacity is unchanged.
+
+**Rejected:** Keeping mint as the freshest tier because it blends into the
+basemap's vegetation colors. Other proposed palettes remain untried.
+
+**Validation:** All 52 pipeline unit tests pass, including RGBA and XYZ output
+checks. Subsequently found all 58 saved AS-OF composites in the previous
+session's temporary directory and re-rendered the same 2026-09-06 observations.
+All 953 tiles have byte-identical alpha/coverage and the exact intended RGB
+mapping. Published to R2 as `20260906T210131Z`; the live browser verification
+loaded that run and captured the new palette. The same nine omitted-empty-tile
+404s occur before and after (already documented below). Kept the previous
+published run for rollback. Publication used only the palette renderer;
+unrelated place-search work was excluded.
+
+---
+
+
 A dated, narrative record of what was done, decided, and rejected each session -
 newest first. `git log` has the diffs; this has the reasoning that produced them,
 especially the roads *not* taken (a rejected approach usually costs real time to
