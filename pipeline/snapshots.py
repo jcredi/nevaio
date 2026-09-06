@@ -11,7 +11,7 @@ from affine import Affine
 from rasterio.transform import array_bounds
 from rasterio.warp import transform_bounds
 
-from .asof import AsOfComposite, freshness_multiplier
+from .asof import AsOfComposite
 from .mosaic import TileComposite, mosaic_to_grid
 from .raster_io import RasterGrid
 from .tiles import ORIGIN_SHIFT, TILE_SIZE, write_xyz_tiles
@@ -80,7 +80,6 @@ def load_snapshot(path: Path) -> TileComposite:
             age_days=age_days,
             source_product_day=data["source_product_day"].astype(np.int32),
             state=state,
-            freshness=freshness_multiplier(age_days) * (state == 0),
         )
         return TileComposite(str(data["tile"]), grid, composite)
 

@@ -7,6 +7,24 @@ Versioned from `0.1.0` (2026-08-25), the first deploy.
 
 ## [Unreleased]
 
+### Changed
+- **Snow-layer visual encoding (spec 5.2/5.4, amended 2026-09-06):** opacity
+  and color are now independent channels instead of one combined alpha.
+  Opacity encodes snow-cover percentage alone (linear 0-255, no floor at 0%);
+  color encodes freshness alone, as 4 discrete tiers from mint (0-3 days) to
+  amethyst (15-30 days), chosen from 6 candidate ramps rendered on real
+  winter data. Cloud no longer gets a distinct violet indicator - it renders
+  fully transparent, the same as water/stale/no-data (the distinction
+  survives in point/object details and the historical chart, not the map
+  raster). `pipeline/tiles.py`'s `render_rgba` was rewritten accordingly;
+  `AsOfComposite.freshness` (a stored multiplier) was removed in favor of
+  computing the freshness tier from `age_days` at render time.
+- **AS-OF age ceiling raised from 14 to 30 days** (`pipeline/asof.py`
+  `MAX_AGE_DAYS`, `pipeline/config.py` `ASOF_WINDOW_DAYS` 15->31), measured on
+  real winter data first: the gain is concentrated in multi-week cloudy
+  spells (up to +59 percentage points of valid coverage on one sampled
+  tile-date), negligible on ordinary days. See `docs/worklog.md` (2026-09-06).
+
 ### Fixed
 - `app/src/map/config.ts` `initialView.zoom` raised from `6.3` to `8.3`. The
   snow tile pyramid starts at `PREVIEW_MIN_ZOOM = 8`

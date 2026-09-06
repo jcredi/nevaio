@@ -36,7 +36,6 @@ def composite(
         age_days=np.where(valid, 1, -1).astype(np.int32),
         source_product_day=np.where(valid, 20_489, -1).astype(np.int32),
         state=state,
-        freshness=np.where(valid, 1.0, 0.0).astype(np.float32),
     )
 
 

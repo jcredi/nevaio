@@ -19,7 +19,7 @@ from numpy.typing import NDArray
 CLOUD = 205
 WATER = 210
 NODATA = 255
-MAX_AGE_DAYS = 14
+MAX_AGE_DAYS = 30
 
 NO_VALUE = np.uint8(255)
 NO_AGE = np.int32(-1)
@@ -54,7 +54,9 @@ class AsOfComposite:
     and age remain populated for STALE pixels so the UI can report when the
     last usable acquisition occurred without presenting its FSC as current.
     `source_product_day` is a Unix-day integer, or -1 when no source product
-    supplied a value.
+    supplied a value. Rendering derives its freshness color directly from
+    `age_days` (see `freshness_tier`); there is no separate stored field for
+    it, since age_days is already exactly what that needs.
     """
 
     as_of_date: date
@@ -64,7 +66,6 @@ class AsOfComposite:
     age_days: NDArray[np.int32]
     source_product_day: NDArray[np.int32]
     state: NDArray[np.uint8]
-    freshness: NDArray[np.float32]
 
 
 def _unix_day(value: date) -> int:
@@ -76,15 +77,25 @@ def _next_day_epoch(value: date) -> int:
     return int(next_day.timestamp())
 
 
-def freshness_multiplier(age_days: NDArray[np.integer] | int) -> NDArray[np.float32]:
-    """Return the exact age-to-opacity multiplier from spec section 5.2."""
+def freshness_tier(age_days: NDArray[np.integer] | int) -> NDArray[np.uint8]:
+    """Return the exact age-to-freshness-tier mapping from spec section 5.2.
+
+    Tier 0 (0-3 days) through tier 3 (15+ days) select the rendered
+    freshness color; they never affect opacity, which is driven by the
+    snow-cover percentage alone. Tier 3 has no upper bound - an age past the
+    30-day ceiling (which only occurs on STALE pixels) is still "the oldest
+    tier", not a wraparound to "freshest". The -1 sentinel for "no
+    observation" falls back to tier 0, which is harmless: that only occurs on
+    pixels that are never VALID, so `tiles.render_rgba` always renders them
+    at alpha 0 regardless of color.
+    """
 
     age = np.asarray(age_days)
-    result = np.zeros(age.shape, dtype=np.float32)
-    result[(age >= 0) & (age <= 3)] = 1.0
-    result[(age >= 4) & (age <= 7)] = 0.75
-    result[(age >= 8) & (age <= MAX_AGE_DAYS)] = 0.45
-    return result
+    tier = np.zeros(age.shape, dtype=np.uint8)
+    tier[(age >= 4) & (age <= 7)] = 1
+    tier[(age >= 8) & (age <= 14)] = 2
+    tier[age >= 15] = 3
+    return tier
 
 
 def _validate(products: Sequence[DailyProduct]) -> tuple[int, ...]:
@@ -121,7 +132,7 @@ def compose_as_of(products: Sequence[DailyProduct], as_of_date: date) -> AsOfCom
     """Apply the frozen AS-OF rule to aligned daily GFSC arrays.
 
     Candidates must have GF 0-100, GF-QA 0-3, a non-zero AT no later than the
-    end of the AS-OF day, and age <=14 days. Selection is newest AT, then better
+    end of the AS-OF day, and age <=30 days. Selection is newest AT, then better
     quality, then newer product date. The input sequence order never affects the
     result. The newest product's water code is terminal for that pixel.
     """
@@ -145,7 +156,6 @@ def compose_as_of(products: Sequence[DailyProduct], as_of_date: date) -> AsOfCom
             age_days,
             source_product_day,
             state,
-            freshness_multiplier(age_days),
         )
 
     as_of_day = _unix_day(as_of_date)
@@ -236,5 +246,4 @@ def compose_as_of(products: Sequence[DailyProduct], as_of_date: date) -> AsOfCom
         age_days,
         source_product_day,
         state,
-        freshness_multiplier(age_days) * (state == PixelState.VALID),
     )

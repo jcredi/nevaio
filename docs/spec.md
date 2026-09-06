@@ -1,8 +1,28 @@
 # Spikely MVP Product Specification
 
-**Status:** Draft v1.6 - MVP data pipeline live in production, composing the full section 9.2 AS-OF rule on a daily schedule
-**Date:** 2026-08-28  
+**Status:** Draft v1.7 - snow-cover visualization revised: opacity and color are now independent channels, and the AS-OF age ceiling is 30 days
+**Date:** 2026-09-06  
 **Product stage:** Planning only
+
+**Amendment (v1.7):** Revised the section 5.2 visual encoding after review of an
+alternative implementation surfaced a real ambiguity: the frozen v1.2 encoding
+multiplied a snow-cover-derived alpha by a freshness multiplier into one
+channel, so a faint pixel could mean "little snow" or "old observation"
+indistinguishably. Opacity now encodes snow-cover percentage alone (linear
+0-255 alpha over 0-100%, no non-zero floor at 0%); color now encodes
+freshness alone, as 4 discrete tiers from mint (0-3 days) to amethyst (15-30
+days), chosen from 6 candidate ramps rendered on real winter data. Cloud
+(section 5.4) no longer gets a distinct violet indicator - it renders fully
+transparent like water/stale/no-data, consistent with how those three states
+already worked; the distinction survives only in point/object details and the
+historical chart, not the map raster itself. Separately, and prompted by the
+same review, the section 9.2 AS-OF age ceiling was raised from 14 to 30 days
+after measuring the real-data benefit first: the gain is concentrated
+specifically in multi-week cloudy spells (up to +59 percentage points of
+valid coverage on one sampled tile-date), recovering observations that are
+genuinely 13-19+ days old, not immediately-fresher data. Full reasoning,
+rejected alternatives, and the palette comparison are in `docs/worklog.md`
+(2026-09-06).
 
 **Amendment (v1.6):** The production pipeline now implements section 9.2 in
 full. It loads every complete GFSC product in the 15-day AS-OF window per MGRS
@@ -136,13 +156,15 @@ The map must visually communicate at least two quantities:
 1. fractional snow cover percentage;
 2. freshness/age of the observation used for that pixel.
 
-For a valid GFSC percentage `s` from 0 through 100, the MVP rendering is fixed as follows:
+For a valid GFSC percentage `s` from 0 through 100, the MVP rendering (revised
+2026-09-06 - see the v1.7 amendment above for why) fixes opacity and color as
+two independent channels, so a faint pixel always means one thing (little
+snow), never an ambiguity between "little snow" and "old observation":
 
-- **color = snow-cover percentage:** piecewise-linear interpolation in sRGB from `#82A0BE` at 0%, through `#C8DEF0` at 50%, to `#FFFFFF` at 100%, rounding each channel to the nearest 8-bit integer;
-- **base alpha = snow-cover legibility:** the same interpolation over alpha values `26`, `150`, and `224` out of 255 at 0%, 50%, and 100%; this preserves a subtle tint for measured 0% snow while letting larger snow fractions read strongly;
-- **freshness = an alpha multiplier:** `1.00` for an observation age of 0-3 calendar days, `0.75` for 4-7 days, `0.45` for 8-14 days, and `0` from day 15 onward. Final alpha is the rounded product of base alpha and this multiplier.
+- **opacity = snow-cover percentage:** piecewise-linear alpha from `0` at 0%, through `150` at 50%, to `255` at 100% (out of 255), rounded to the nearest 8-bit integer. There is no non-zero floor at 0%: a confirmed 0%-snow pixel is fully transparent, visually indistinguishable on the map from cloud/water/stale/no-data (section 5.4). The distinction survives in point/object details and the historical chart, not the raster itself.
+- **color = freshness tier**, four discrete steps ("Mint to Amethyst," chosen from 6 candidate ramps rendered on real winter data): `#8EEBC6` for an observation age of 0-3 calendar days, `#7AC2E1` for 4-7 days, `#6969D3` for 8-14 days, and `#A459C5` for 15-30 days. Age is defined in section 9.2; day 31 onward is not rendered (see section 9.2's Stale rule).
 
-Age is defined in section 9.2. Quality tier does not change color or opacity; its separate treatment is in section 5.4. Cloud, water, and no-data use categorical handling rather than this ramp.
+Quality tier does not change color or opacity; its separate treatment is in section 5.4. Cloud, water, and no-data use categorical handling rather than this ramp - all four render fully transparent (opacity 0), with no distinct color.
 
 Raster reprojection and map rendering must use nearest-neighbour resampling. GFSC mixes percentage values with categorical codes, so linear resampling would invent sub-60 m detail and plausible-looking percentages at category boundaries. The basemap's existing hillshade must remain above the snow layer; terrain relief must not be recovered by weakening the snow encoding.
 
@@ -176,12 +198,12 @@ The MVP treatment is:
 
 - GF values 0-100 with a quality tier 0-3 and usable `AT` are valid. High, medium, low, and minimal tiers are all retained for map rendering and analysis; tier alone never hides or attenuates a value. The tier must be preserved and displayed by name in point/history details and included in route-quality summaries. This is necessary because a real forested sample was tier 3 on every valid day.
 - QA flags are retained as metadata but do not exclude a valid percentage in the MVP.
-- Cloud/cloud-shadow (`205`) is not a snow value. If AS-OF fallback finds no usable earlier value, render it as violet `#A855F7` at alpha `0.45` and label it **Cloud**. Neutral grey is forbidden because it was confusable with rock/scree on the selected basemap.
+- Cloud/cloud-shadow (`205`) is not a snow value. If AS-OF fallback finds no usable earlier value, render the snow layer transparent (revised 2026-09-06 - previously a distinct violet `#A855F7`; the map raster no longer visually distinguishes cloud from water/stale/no-data, only opacity=coverage and color=freshness are encoded there) and label it **Cloud** in point/object details and the historical chart.
 - Inland water (`210`) is a terminal mask, not 0% snow: do not search earlier products for a snow value, render the snow layer transparent, and report **Water** in details and analysis.
-- No-data (`255`), a missing product, an unusable `AT`, or inconsistent GF/GF-QA category codes is unavailable, not 0% snow: render the snow layer transparent and report **No data**. A valid 0% pixel remains distinguishable by the ramp's blue tint.
-- A structurally valid percentage whose newest usable `AT` is more than 14 days old is hidden and reported as **Stale - last observation N days old**, not collapsed into cloud, no-data, or 0% snow.
+- No-data (`255`), a missing product, an unusable `AT`, or inconsistent GF/GF-QA category codes is unavailable, not 0% snow: render the snow layer transparent and report **No data**. A valid 0% pixel is *not* distinguishable from these on the map raster (both are fully transparent, per section 5.2's revised opacity rule) - only point/object details and the historical chart tell them apart.
+- A structurally valid percentage whose newest usable `AT` is more than 30 days old is hidden and reported as **Stale - last observation N days old**, not collapsed into cloud, no-data, or 0% snow.
 
-Cloud and no-data remain separate states throughout storage, APIs, charts, and UI even though both can trigger AS-OF fallback. They were observed as distinct multi-day runs in real data and must not be collapsed into one generic missing code.
+Cloud and no-data remain separate states throughout storage, APIs, point/object details, and the historical chart even though both can trigger AS-OF fallback and now render identically (fully transparent) on the map raster itself. They were observed as distinct multi-day runs in real data and must not be collapsed into one generic missing code anywhere except that shared raster appearance.
 
 ## 6. Place search and selectable OSM objects
 
@@ -344,12 +366,12 @@ All dates and acquisition timestamps are compared in UTC. For an AS-OF calendar 
 For each pixel:
 
 1. If the newest available product on or before `D` identifies the pixel as inland water (`210`), return **Water** immediately.
-2. Consider products with product date on or before `D`. A candidate is valid only when GF is 0-100, GF-QA is 0-3, `AT` is usable and no later than the end of `D`, and its observation age is at most 14 days. Quality tiers 0-3 are equally eligible.
+2. Consider products with product date on or before `D`. A candidate is valid only when GF is 0-100, GF-QA is 0-3, `AT` is usable and no later than the end of `D`, and its observation age is at most 30 days (raised from 14 on 2026-09-06 - see below). Quality tiers 0-3 are equally eligible.
 3. Select the candidate with the greatest `AT`. Break an `AT` tie by better quality tier (lower numeric GF-QA), then by the later product date. This makes the result independent of file or query ordering.
-4. Render the selected value with the age multiplier from section 5.2: normal at 0-3 days, aging at 4-7 days, and strongly de-emphasized/stale at 8-14 days.
-5. If no candidate exists, return no snow value. Preserve the newest product's reason as **Cloud** for `205` or **No data** for `255`; no product or malformed/inconsistent metadata is **No data**. If valid-form percentages exist but their usable acquisitions are all older than 14 days, return **Stale** with the most recent acquisition age. Do not search or carry forward beyond 14 days.
+4. Render the selected value with the freshness color from section 5.2: mint at 0-3 days, through two intermediate tiers, to amethyst at 15-30 days.
+5. If no candidate exists, return no snow value. Preserve the newest product's reason as **Cloud** for `205` or **No data** for `255`; no product or malformed/inconsistent metadata is **No data**. If valid-form percentages exist but their usable acquisitions are all older than 30 days, return **Stale** with the most recent acquisition age. Do not search or carry forward beyond 30 days.
 
-The backward search is required because median same-day valid coverage was only 25-63% across the reconnaissance samples and one tile changed from 97% valid to 90% no-data in five days. The 14-day ceiling keeps the complete observed 14-day forest gap usable, but makes anything older genuinely unavailable instead of presenting an indefinite carry-forward as current evidence.
+The backward search is required because median same-day valid coverage was only 25-63% across the reconnaissance samples and one tile changed from 97% valid to 90% no-data in five days. The ceiling (originally 14 days, raised to 30 on 2026-09-06 after measuring the real-data benefit first) keeps a genuinely useful backward search available through ordinary multi-week cloudy spells, while still making anything older genuinely unavailable instead of presenting an indefinite carry-forward as current evidence. The 2026-09-06 measurement found the gain from extending past 14 days is concentrated almost entirely in exactly those multi-week cloudy spells - negligible (+1 to +4 percentage points) on ordinary days, but substantial (+33 to +59 percentage points on sampled tile-dates) when a tile had been cloud-bound for two-plus weeks; full measurement in `docs/worklog.md` (2026-09-06).
 
 ### 9.3 MGRS tile overlaps and UTM-zone seams
 
@@ -460,6 +482,7 @@ Snow/freshness encoding, quality and categorical-code handling, staleness, prolo
 8. **Decided for MVP (2026-08-26, revised same day; completed 2026-08-28):** frontend on Netlify (done, see section 12); data pipeline is a GitHub Actions job rendering one "latest conditions" tile set, publishing an immutable run plus an atomic `latest.json` pointer to Cloudflare R2 (not a static Netlify republish - see `docs/worklog.md`, 2026-08-26, for the Netlify Blobs/static-republish alternatives considered and rejected). Implemented, live on production (`https://spikely.netlify.app`), and visually verified end-to-end (2026-08-27, again 2026-08-28). As of 2026-08-28 the job composes the **full section 9.2 AS-OF rule** over a 15-day product window per tile rather than the single newest product, and runs on a **daily `04:35 UTC` schedule** keeping the newest seven runs in R2; the four never-published tiles were removed from the tile set after confirming they are absent from HR-WSI's own grid, so a missing tile now fails the run rather than publishing a partial map. Reasoning and measurements: `docs/worklog.md` (2026-08-28). **Still open:** a custom domain in front of the `r2.dev` URL (optional, pre-launch). Separately still open for later: the storage/serving architecture needed to bring back arbitrary historical AS-OF map dates (section 5.3) - the daily job renders only "today", discarding each day's composite once the next replaces it. Leading candidate when full historical support is revisited: extend this same R2 archive with a per-day compact raster plus a small on-demand tile-rendering service reusing the frozen section 9.2 selection logic, cached aggressively since a historical (date, tile) result never changes once computed. Note that the daily job already downloads the whole 15-day window, so archiving each day's per-tile composite is a smaller step from here than it was from the newest-product-only preview.
 9. **Decided for MVP (2026-08-26):** operating-cost target is free where possible, up to EUR 20/month if it substantially simplifies things (see section 12).
 10. Whether raw FSCOG/FSCTOC (20 m) should be added later as an optional higher-resolution layer for terrain where 60 m GFSC proves too coarse.
+11. **Noted 2026-09-06, detail deferred:** the route planner's snow/elevation profile (sections 8.4-8.5) must clearly and prominently display observation freshness/quality, not merely "where practical" as currently worded - the user wants this treated as a firm requirement once routing is built, not an optional extra. Exact treatment (per-point badges, a color-coded profile band, a separate freshness track, etc.) to be decided when section 8 is actually implemented; see `docs/worklog.md` (2026-09-06).
 
 ## 16. MVP success criteria
 

@@ -21,7 +21,7 @@ from PIL import Image
 from affine import Affine
 from rasterio.warp import Resampling, reproject, transform_bounds
 
-from .asof import AsOfComposite, PixelState
+from .asof import AsOfComposite, freshness_tier
 from .raster_io import RasterGrid
 
 TILE_SIZE = 256
@@ -32,44 +32,57 @@ TILE_SIZE = 256
 ORIGIN_SHIFT = 20_037_508.342789244
 _WORLD_SPAN = 2 * ORIGIN_SHIFT
 
-# Frozen visual encoding, docs/spec.md section 5.2: piecewise-linear sRGB from
-# #82A0BE at 0%, through #C8DEF0 at 50%, to #FFFFFF at 100%; alpha 26/150/224
-# at the same stops. Index 101-255 (categorical GF codes, NO_VALUE) render
-# transparent here and are overridden below for CLOUD.
-_STOPS = (0.0, 0.5, 1.0)
+# Frozen visual encoding, docs/spec.md section 5.2 (amended 2026-09-06):
+# opacity and color are two independent channels rather than one combined
+# alpha, so a pixel's faintness always means one thing (little snow), never
+# "little snow, or maybe just old" ambiguity.
+#
+# alpha = snow-cover percentage: piecewise-linear 0 at 0%, 150 at 50%, 255 at
+# 100%. Index 101-255 (categorical GF codes, NO_VALUE, including every
+# non-VALID state per AsOfComposite's "fsc/quality use 255 where state is not
+# VALID" convention) maps to alpha 0 - cloud, water, stale, and no-data all
+# render fully transparent with no separate visual code, and a confirmed 0%
+# pixel is indistinguishable from them on the map itself (spec 5.4).
+_ALPHA_STOPS = (0.0, 0.5, 1.0)
 
 
-def _build_base_lut() -> NDArray[np.uint8]:
-    lut = np.zeros((256, 4), dtype=np.uint8)
+def _build_alpha_lut() -> NDArray[np.uint8]:
+    lut = np.zeros(256, dtype=np.uint8)
     f = np.linspace(0.0, 1.0, 101)
-    lut[0:101, 0] = np.round(np.interp(f, _STOPS, [0x82, 0xC8, 0xFF]))
-    lut[0:101, 1] = np.round(np.interp(f, _STOPS, [0xA0, 0xDE, 0xFF]))
-    lut[0:101, 2] = np.round(np.interp(f, _STOPS, [0xBE, 0xF0, 0xFF]))
-    lut[0:101, 3] = np.round(np.interp(f, _STOPS, [26, 150, 224]))
+    lut[0:101] = np.round(np.interp(f, _ALPHA_STOPS, [0, 150, 255]))
     return lut
 
 
-_BASE_LUT = _build_base_lut()
+_ALPHA_LUT = _build_alpha_lut()
 
-# docs/spec.md section 5.4: cloud is violet #A855F7 at a fixed alpha 0.45,
-# independent of freshness - unlike a valid observation it has no age to age.
-_CLOUD_RGBA = np.array((0xA8, 0x55, 0xF7, round(0.45 * 255)), dtype=np.uint8)
+# color = freshness tier (spec 9.2 age bands, tier indices from
+# asof.freshness_tier): mint for a 0-3 day observation, fading through two
+# intermediate tiers to amethyst for 15-30 days ("Mint to Amethyst", picked
+# 2026-09-06 from 6 candidate ramps rendered on real data). Only meaningful
+# where alpha > 0 (state VALID); freshness_tier's tier for any other pixel is
+# never rendered, so it doesn't need special-casing here.
+_FRESHNESS_COLORS = np.array(
+    [
+        (0x8E, 0xEB, 0xC6),  # tier 0, 0-3 days: mint
+        (0x7A, 0xC2, 0xE1),  # tier 1, 4-7 days
+        (0x69, 0x69, 0xD3),  # tier 2, 8-14 days
+        (0xA4, 0x59, 0xC5),  # tier 3, 15-30 days: amethyst
+    ],
+    dtype=np.uint8,
+)
 
 
 def render_rgba(composite: AsOfComposite) -> NDArray[np.uint8]:
-    """Colorize a composite's fsc/state/freshness fields per spec 5.2/5.4.
+    """Colorize a composite's fsc/age fields per spec 5.2/5.4/9.2.
 
-    Water, stale, and no-data all render fully transparent (spec 5.4: "render
-    the snow layer transparent"); only their category is distinguished
-    elsewhere (point/history details, not this raster).
+    Water, cloud, stale, and no-data all render fully transparent (spec 5.4);
+    only their category is distinguished elsewhere (point/history details,
+    not this raster).
     """
 
-    base = _BASE_LUT[composite.fsc]
-    alpha = np.round(base[..., 3].astype(np.float32) * composite.freshness)
-    rgba = base.copy()
-    rgba[..., 3] = np.clip(alpha, 0, 255).astype(np.uint8)
-    rgba[composite.state == PixelState.CLOUD] = _CLOUD_RGBA
-    return rgba
+    alpha = _ALPHA_LUT[composite.fsc]
+    rgb = _FRESHNESS_COLORS[freshness_tier(composite.age_days)]
+    return np.dstack([rgb, alpha])
 
 
 def _tile_transform(z: int, x: int, y: int) -> tuple[Affine, tuple[float, float, float, float]]:

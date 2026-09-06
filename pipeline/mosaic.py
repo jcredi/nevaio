@@ -21,7 +21,6 @@ from .asof import (
     NO_VALUE,
     AsOfComposite,
     PixelState,
-    freshness_multiplier,
 )
 from .raster_io import RasterGrid
 
@@ -157,7 +156,6 @@ def mosaic_to_grid(tiles: Sequence[TileComposite], target_grid: RasterGrid) -> M
         age_days=age_days,
         source_product_day=source_product_day,
         state=state,
-        freshness=freshness_multiplier(age_days) * (state == PixelState.VALID),
     )
     return Mosaic(composite=composite, source_tile=source_tile, tile_names=tile_names)
 
@@ -189,7 +187,6 @@ def _warp_composite(tile: TileComposite, target_grid: RasterGrid) -> AsOfComposi
         age_days=_warp(source.age_days, tile.grid, target_grid, NO_AGE),
         source_product_day=_warp(source.source_product_day, tile.grid, target_grid, NO_PRODUCT_DAY),
         state=_warp(source.state, tile.grid, target_grid, PixelState.NODATA),
-        freshness=np.zeros((target_grid.height, target_grid.width), dtype=np.float32),
     )
 
 

@@ -106,13 +106,13 @@ class PreviewHelpersTests(unittest.TestCase):
                 )
 
             local.assert_called_once_with(
-                root / "raw", ("32TPS", "33TUM"), date(2026, 2, 10), 15
+                root / "raw", ("32TPS", "33TUM"), date(2026, 2, 10), 31
             )
             # The whole window reaches the loader, not just its newest member.
             self.assertEqual([call.args[0] for call in load.call_args_list], [first, second])
             self.assertEqual(metadata["sourceTiles"], ["32TPS", "33TUM"])
             self.assertEqual(metadata["mode"], "asof-window")
-            self.assertEqual(metadata["asOfWindowDays"], 15)
+            self.assertEqual(metadata["asOfWindowDays"], 31)
             self.assertEqual(metadata["sourceProductCounts"], {"32TPS": 2, "33TUM": 1})
             self.assertEqual(metadata["sourceProductTotal"], 3)
             # productDates reports each tile's newest contributing product.

@@ -11,7 +11,7 @@ This file is what *we* did and why, across sessions.
 
 ---
 
-## 2026-09-06 - Fixed the initial-zoom gap, confirmed nine days of unattended daily publishes
+## 2026-09-06 - Zoom gap fixed, cron confirmed, snow encoding revised after reviewing an alternative implementation
 
 **Did:** Closed out items 1 and 2 carried forward from 2026-08-28, in order.
 
@@ -78,6 +78,186 @@ ever matters more than it does now.
   if a future decision explicitly wants the wider single-glance overview back
   (it would need a real memory/timing test on a full-area run before shipping
   it to the daily cron, not just a local smoke test).
+
+---
+
+*Snow-cover encoding revised, and the AS-OF ceiling raised, after reviewing
+an alternative implementation.* The user had asked a separate LLM (Lovable)
+to build the same product independently and shared its architecture writeup
+(`LOVABLE.md`, gitignored by convention, not part of this repo's history) for
+critical review. Most of it doesn't transfer: it switched from Copernicus
+GFSC (60 m) to NASA GIBS/MODIS-VIIRS (~500 m) specifically to avoid needing
+server-side credentialed access - a problem this repo already solved
+(`pipeline/fetch.py` fetches server-side via GitHub Actions, never from the
+browser), so adopting it would be a pure resolution regression. Its server-
+functions architecture (a live TanStack Start server decoding tiles per
+request) is a heavier, costlier footprint than this repo's static
+GH-Actions-to-R2 pipeline, a deliberate prior decision (spec section 15 item
+8). Its "freshness stack" (4 fixed-day-offset layers at fixed opacities) is a
+blunter approximation of what `pipeline/asof.py`'s per-pixel backward search
+already does more precisely. Three things *did* transfer, one of them
+substantial:
+
+1. Its provider choices for three still-open section 15 decisions
+   (Nominatim for search, Overpass for OSM objects, Open-Meteo for
+   elevation/DEM) are free, keyless, and worth starting from rather than
+   surveying cold when sections 6/7/15-item-7 are built.
+2. GIBS ships palette-index PNGs where the palette index *is* the exact
+   science value - recoverable losslessly. This repo's published XYZ tiles do
+   not have that property: `tiles.py`'s `render_rgba` bakes `fsc` and
+   freshness into a rounded, interpolated RGBA color for display, which
+   cannot be inverted back to an exact FSC%/age/quality. That's fine for the
+   map today, but it means **there is currently no way to point-sample exact
+   snow data for the section 7 object panel + historical chart** - the very
+   next planned feature. Recorded as a blocking prerequisite in
+   `docs/plan.md` rather than designed further this session (see below).
+3. Its own cloud/no-data handling is internally inconsistent in a way worth
+   learning from rather than repeating: it renders confirmed 0%-snow, "no
+   observation in window," and "persistent cloud" all identically
+   (transparent) on the map, while its own writeup claims "no data is never
+   rendered as no snow, enforced everywhere" - true only in its click-through
+   panel, not the map itself. Useful as a concrete example of the tradeoff
+   discussed below, not as a design to copy uncritically.
+
+That third point reopened a question the frozen spec had already answered
+once (section 5.4, Amendment v1.2: cloud renders as a distinct violet
+`#A855F7`, chosen specifically *because* a neutral/absent treatment was
+confusable with rock/scree). The user's own instinct, unprompted, was the
+opposite of the frozen choice: hide cloud entirely, and go further - show
+"our best estimate" using opacity for coverage and a color scale for
+freshness, rather than the frozen ramp's single alpha channel doing both
+jobs at once. That is a real improvement the frozen encoding didn't have:
+under the old rule, alpha was `base_alpha(fsc) * freshness_multiplier(age)`,
+so a faint pixel could mean *either* "little snow" *or* "old observation" -
+indistinguishable by looking. Decoupling them into two independent channels
+(opacity = coverage only, color = freshness only) removes that ambiguity
+entirely, and turned out to be simpler to implement than the old multiplied
+scheme, not just visually clearer.
+
+Worked through the resulting design questions one at a time rather than
+guessing at all of them:
+
+- **Cloud:** removed the distinct violet indicator entirely. A pixel with no
+  usable observation anywhere in the AS-OF window - cloud, water, stale, or
+  no-data - now renders fully transparent, uniformly. The distinction between
+  those states still exists in storage/APIs/point details/the historical
+  chart (spec 5.4 still requires it there); only the map raster itself no
+  longer shows it. This does trade away some at-a-glance honesty (a hiker
+  can no longer tell "confirmed snow-free" from "unknown" without clicking
+  through), accepted deliberately by the user given cloud's real-data
+  prevalence is now only ~3.22% post-AS-OF-fix (was ~19.5% before), a much
+  smaller cost than when 5.4 was first written.
+- **Confirmed 0% snow:** also fully transparent, no floor tint (the old ramp
+  kept alpha 26/255 specifically so a genuine 0% reading stayed visually
+  distinct from missing data). Explicitly asked and explicitly accepted: the
+  simpler "opacity = coverage %, full stop" rule wins over that residual
+  distinction.
+- **Freshness tiers:** kept the existing 3 age brackets (0-3/4-7/8-14 days)
+  from spec 9.2 rather than a continuous gradient (discrete tiers stay easy
+  to read at a glance and to legend), then added a 4th (15-30 days) once the
+  ceiling itself moved - simplest option, zero change to the first three
+  boundaries.
+- **AS-OF age ceiling, 14 -> 30 days:** the user proposed this to fit the
+  "best estimate, always" framing, then asked for it to be measured on real
+  data first rather than assumed, matching how the original 15-day window
+  was justified on 2026-08-28. Wrote a one-off comparison script
+  (`compose_as_of` under `MAX_AGE_DAYS=14` vs `30`, same real winter archive
+  used for the original AS-OF measurement) and got a genuinely uneven
+  result, not a uniform improvement:
+
+  | tile | AS-OF | 14-day valid | 30-day valid | gain |
+  | --- | --- | --- | --- | --- |
+  | 32TPS | 2026-02-20 | 39.7% | 98.4% | +58.8pp |
+  | 32TPS | 2026-03-10 | 85.6% | 89.4% | +3.9pp |
+  | 32TPS | 2026-04-01 | 97.7% | 99.2% | +1.4pp |
+  | 33TUG | 2026-02-20 | 17.6%\* | 24.1%\* | +6.5pp\* |
+  | 33TUG | 2026-03-10 | 77.9% | 84.4% | +6.5pp |
+  | 33TUG | 2026-04-01 | 51.4% | 83.4% | +32.0pp |
+
+  (\*33TUG/2026-02-20's 30-day window is truncated by the recon archive's own
+  start date, so that row understates the true 30-day figure.) Dug into the
+  32TPS/2026-02-20 outlier specifically: 2026-02-01 through 02-07 was a
+  genuinely clear week (~97% valid daily), followed by persistent cloud
+  02-08 through 02-20; the 14-day window's edge lands at 02-07 and just
+  misses that clear week, while 30 days pulls it in at 13-19 days old. The
+  gain is concentrated almost entirely in exactly these multi-week cloudy
+  spells - negligible (+1 to +4pp) on ordinary days, substantial (+33 to
+  +59pp) when a tile had been cloud-bound for two-plus weeks - which is also
+  arguably the situation where showing a real, recent-ish (if aging)
+  observation is most defensible against showing nothing. User confirmed
+  proceeding with the full 30 days after seeing this.
+- **Palette:** rendered the real 32TPS/2026-02-20 composite (the clearest
+  demonstration case, spanning all 4 tiers at once) under 6 candidate 4-stop
+  ramps as a published Artifact
+  (`https://claude.ai/code/artifact/791294b5-cc52-4330-a31c-3492d995b742`) -
+  swatches plus the same real tile under each - rather than describing
+  colors in words. First pass used a muted icy-to-violet ramp the user found
+  too dim; regenerated with 6 brighter, more saturated options spanning
+  aquamarine/cyan/mint/electric variants. User picked **C, "Mint to
+  Amethyst"**: `#8EEBC6` (0-3d) -> `#7AC2E1` (4-7d) -> `#6969D3` (8-14d) ->
+  `#A459C5` (15-30d).
+
+**Implemented:** `pipeline/asof.py` (`MAX_AGE_DAYS` 14->30; `freshness_tier`
+replaces `freshness_multiplier`, returning a tier index 0-3 instead of an
+opacity multiplier, tier 3 unbounded above rather than clamped at the old
+ceiling so a STALE pixel's age never wraps back to "freshest"; the
+`AsOfComposite.freshness` field is removed entirely - `tiles.render_rgba` now
+derives the tier from `age_days`, already a field on the composite, instead
+of carrying a redundant precomputed one). `pipeline/mosaic.py` and
+`pipeline/snapshots.py` updated for the removed field. `pipeline/tiles.py`
+rewritten: `_ALPHA_LUT` (256-entry, coverage-only, 0/150/255 at 0/50/100%,
+index 101-255 - every non-VALID state per the `fsc=255-where-not-VALID`
+convention - maps to alpha 0) replaces the old combined color+alpha LUT;
+`_FRESHNESS_COLORS` (4 RGB rows) replaces the old cloud special-case
+entirely, since routing every non-VALID state through the same `fsc=255`
+alpha-0 path made the explicit `PixelState.CLOUD` check unnecessary.
+`pipeline/config.py` `ASOF_WINDOW_DAYS` 15->31. `pipeline/preview.py`'s
+published manifest `notice` text rewritten to describe color-as-freshness
+instead of "drawn progressively more faintly." All touched tests updated (52
+pipeline tests passing, including 3 new ones: day-30 still valid at the
+oldest tier, day-31 correctly stale, confirmed-0%-is-transparent). Spec
+sections 5.2, 5.4, and 9.2 amended (v1.7) to match exactly. Not yet pushed as
+of writing this entry - see the next entry for the verification/publish step.
+
+**Decided:**
+- Decouple opacity (coverage) and color (freshness) into independent
+  channels rather than patching the old combined-alpha scheme, because the
+  ambiguity it removes ("faint = little snow" vs "faint = old") is a real
+  correctness improvement, not just a restyle.
+- Remove cloud's distinct violet indicator, accepting the map-level honesty
+  cost given cloud's real prevalence has dropped to ~3.22% since the AS-OF
+  window shipped - a materially different cost than when 5.4 froze the
+  opposite choice.
+- Raise the AS-OF ceiling to 30 days, but only after measuring the real
+  benefit first (repeating the same discipline as the original 15-day
+  decision) - the gain turned out genuinely concentrated in multi-week cloudy
+  spells rather than uniform, which is itself useful context for anyone
+  revisiting this number later.
+- Keep the existing 3 age-tier boundaries unchanged and just append a 4th,
+  rather than rebalancing all 4 - zero risk to categories the team already
+  understands.
+- Pick the color palette by rendering real data and looking at it, not by
+  describing colors in prose - produced a materially better result (the
+  first draft palette was too muted; seeing it made that obvious in a way
+  hex codes alone would not have).
+
+**Rejected:**
+- Adopting NASA GIBS/MODIS-VIIRS as a data source (Lovable's choice) - a
+  resolution regression (500 m vs 60 m) that solves a browser-credential
+  problem this repo doesn't have.
+- A live server-functions architecture for on-demand tile decoding (Lovable's
+  choice) - heavier and costlier than the existing static GH-Actions-to-R2
+  pipeline, for no benefit this repo needs today.
+- Client-side tile recoloring (Lovable's technique) - unnecessary complexity
+  given the color ramp is frozen and already baked server-side.
+- A non-zero opacity floor for confirmed 0% snow - considered (it would keep
+  0% distinguishable from missing data on the map itself, matching the old
+  ramp's intent) but the user preferred the simpler unconditional rule.
+- Designing/building the section 7 historical-chart data architecture this
+  session - the direction (precomputed per-object time series, no new
+  server) is decided and recorded in `docs/plan.md`, but building it is
+  blocked on section 15 item 3 (which OSM object classes are in scope),
+  which is its own feature-design session.
 
 ---
 

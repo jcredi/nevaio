@@ -34,10 +34,12 @@ MVP_MGRS_TILES: tuple[str, ...] = (
 )
 
 # Spec section 9.2 accepts an observation whose acquisition time (AT) is at most
-# 14 calendar days before the AS-OF date. A GFSC product's per-pixel AT is never
-# later than its own product date, so products dated D-14 through D are exactly
-# the set that can contribute a valid pixel for AS-OF date D - a 15-day window.
-ASOF_WINDOW_DAYS = 15
+# 30 calendar days before the AS-OF date (raised from 14 on 2026-09-06 - see
+# docs/worklog.md for the real-data measurement behind the change). A GFSC
+# product's per-pixel AT is never later than its own product date, so products
+# dated D-30 through D are exactly the set that can contribute a valid pixel
+# for AS-OF date D - a 31-day window.
+ASOF_WINDOW_DAYS = 31
 
 PREVIEW_MIN_ZOOM = 8
 PREVIEW_MAX_ZOOM = 11

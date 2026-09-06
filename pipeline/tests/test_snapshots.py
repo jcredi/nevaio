@@ -26,7 +26,6 @@ def tile() -> TileComposite:
         age_days=np.array([[1, -1], [-1, 15]], dtype=np.int32),
         source_product_day=np.array([[20_494, -1], [-1, 20_480]], dtype=np.int32),
         state=state,
-        freshness=np.array([[1, 0], [0, 0]], dtype=np.float32),
     )
     return TileComposite("32TPS", grid, composite)
 
@@ -45,7 +44,6 @@ class SnapshotTests(unittest.TestCase):
         self.assertEqual(info.bounds_3857, (0.0, 0.0, 120.0, 120.0))
         for field in ("fsc", "quality", "acquisition_time", "age_days", "source_product_day", "state"):
             np.testing.assert_array_equal(getattr(restored.composite, field), getattr(original.composite, field))
-        np.testing.assert_array_equal(restored.composite.freshness, [[1, 0], [0, 0]])
 
     def test_xyz_range_honors_exact_tile_edges(self) -> None:
         half = ORIGIN_SHIFT

@@ -1,6 +1,6 @@
 """Production GFSC processing code."""
 
-from .asof import AsOfComposite, DailyProduct, PixelState, compose_as_of, freshness_multiplier
+from .asof import AsOfComposite, DailyProduct, PixelState, compose_as_of, freshness_tier
 from .raster_io import (
     LoadedTile,
     ProductTriplet,
@@ -16,7 +16,7 @@ __all__ = [
     "DailyProduct",
     "PixelState",
     "compose_as_of",
-    "freshness_multiplier",
+    "freshness_tier",
     "LoadedTile",
     "ProductTriplet",
     "RasterGrid",

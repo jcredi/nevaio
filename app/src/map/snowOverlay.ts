@@ -16,7 +16,7 @@ export type SnowTileManifest = {
   runId: string;
   mode: "asof-window";
   asOfDate: string;
-  /** Product dates composed per spec section 9.2; 15 covers its 14-day ceiling. */
+  /** Product dates composed per spec section 9.2; 31 covers its 30-day ceiling. */
   asOfWindowDays?: number;
   tiles: string[];
   minzoom: number;

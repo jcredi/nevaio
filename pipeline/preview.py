@@ -1,7 +1,7 @@
 """Build and optionally publish a full-area GFSC snapshot for one AS-OF date.
 
 Composition follows spec section 9.2 in full: every complete product in the
-15-day AS-OF window is loaded per MGRS tile and ``pipeline.asof`` picks, per
+31-day AS-OF window is loaded per MGRS tile and ``pipeline.asof`` picks, per
 pixel, the newest valid acquisition. Because a product's per-pixel acquisition
 time is never later than its own product date, the newest product still wins
 wherever it holds a valid pixel - the older window members only fill what it
@@ -135,7 +135,7 @@ def build_preview(
     missing_tiles = sorted(set(normalized_tiles) - triplets.keys())
     if len(missing_tiles) > max_missing_tiles:
         # Every tile in the MVP set is one HR-WSI genuinely publishes daily, so
-        # a tile with nothing at all across a 15-day window is an anomaly, not
+        # a tile with nothing at all across a 31-day window is an anomaly, not
         # ordinary catalogue lag. Failing before publishing leaves latest.json
         # pointing at the previous good run rather than silently shipping a
         # partial map; raise --max-missing-tiles to publish anyway.
@@ -191,9 +191,11 @@ def build_preview(
         "sourceProductTotal": sum(window_sizes.values()),
         "notice": (
             "Each pixel shows the newest valid GFSC observation on or before "
-            f"{as_of_date.isoformat()}, searching back up to 14 days per spec "
-            "section 9.2. Older observations are drawn progressively more "
-            "faintly; cloud and no-data mean no valid observation was found."
+            f"{as_of_date.isoformat()}, searching back up to 30 days per spec "
+            "section 9.2. Color shows how old that observation is (icy = most "
+            "recent, violet = up to 30 days old); a transparent area means no "
+            "valid observation was found there in that window (cloud, water, "
+            "or no data)."
         ),
     }
     run_dir.mkdir(parents=True, exist_ok=True)
@@ -220,7 +222,7 @@ def main() -> None:
         default=ASOF_WINDOW_DAYS,
         help=(
             "Product dates to consider, ending at --as-of. The default "
-            f"({ASOF_WINDOW_DAYS}) is what spec section 9.2's 14-day "
+            f"({ASOF_WINDOW_DAYS}) is what spec section 9.2's 30-day "
             "acquisition-age ceiling implies; 1 reproduces the old "
             "newest-product-only preview."
         ),

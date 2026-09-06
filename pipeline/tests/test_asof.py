@@ -12,7 +12,7 @@ from pipeline.asof import (
     DailyProduct,
     PixelState,
     compose_as_of,
-    freshness_multiplier,
+    freshness_tier,
 )
 
 
@@ -71,10 +71,22 @@ class ComposeAsOfTests(unittest.TestCase):
 
         np.testing.assert_array_equal(result.fsc, [[33, 100]])
         np.testing.assert_array_equal(result.age_days, [[14, 14]])
-        np.testing.assert_allclose(result.freshness, [[0.45, 0.45]])
+        np.testing.assert_array_equal(freshness_tier(result.age_days), [[2, 2]])
 
-    def test_day_fifteen_is_hidden_and_reported_stale(self) -> None:
-        as_of = date(2026, 2, 22)
+    def test_day_thirty_is_still_valid_at_the_oldest_freshness_tier(self) -> None:
+        as_of = date(2026, 3, 10)
+        acquisition = date(2026, 2, 8)
+        old_product = product(as_of, [[100]], [[3]], [[at(acquisition)]])
+
+        result = compose_as_of([old_product], as_of)
+
+        self.assertEqual(int(result.state[0, 0]), PixelState.VALID)
+        self.assertEqual(int(result.fsc[0, 0]), 100)
+        self.assertEqual(int(result.age_days[0, 0]), 30)
+        self.assertEqual(int(freshness_tier(result.age_days)[0, 0]), 3)
+
+    def test_day_thirty_one_is_hidden_and_reported_stale(self) -> None:
+        as_of = date(2026, 3, 10)
         acquisition = date(2026, 2, 7)
         stale_product = product(as_of, [[100]], [[3]], [[at(acquisition)]])
 
@@ -82,8 +94,7 @@ class ComposeAsOfTests(unittest.TestCase):
 
         self.assertEqual(int(result.state[0, 0]), PixelState.STALE)
         self.assertEqual(int(result.fsc[0, 0]), NODATA)
-        self.assertEqual(int(result.age_days[0, 0]), 15)
-        self.assertEqual(float(result.freshness[0, 0]), 0.0)
+        self.assertEqual(int(result.age_days[0, 0]), 31)
 
     def test_keeps_cloud_nodata_and_water_distinct(self) -> None:
         as_of = date(2026, 2, 10)
@@ -143,12 +154,12 @@ class ComposeAsOfTests(unittest.TestCase):
             compose_as_of([misaligned], day)
 
 
-class FreshnessMultiplierTests(unittest.TestCase):
+class FreshnessTierTests(unittest.TestCase):
     def test_exact_thresholds(self) -> None:
-        ages = np.array([-1, 0, 3, 4, 7, 8, 14, 15], dtype=np.int32)
-        np.testing.assert_allclose(
-            freshness_multiplier(ages),
-            [0, 1, 1, 0.75, 0.75, 0.45, 0.45, 0],
+        ages = np.array([-1, 0, 3, 4, 7, 8, 14, 15, 30, 31], dtype=np.int32)
+        np.testing.assert_array_equal(
+            freshness_tier(ages),
+            [0, 0, 0, 1, 1, 2, 2, 3, 3, 3],
         )
 
 

@@ -49,11 +49,11 @@ class ConfigTests(unittest.TestCase):
             set(MVP_MGRS_TILES) & {"33SVD", "33SXB", "33TTF", "33TUE"}, set()
         )
 
-    def test_asof_window_covers_the_full_14_day_age_ceiling(self) -> None:
-        # Spec section 9.2 accepts an acquisition up to 14 days old, and a
+    def test_asof_window_covers_the_full_30_day_age_ceiling(self) -> None:
+        # Spec section 9.2 accepts an acquisition up to 30 days old, and a
         # product's AT never postdates its product date, so product dates
-        # D-14..D - 15 days inclusive - are exactly the contributing set.
-        self.assertEqual(ASOF_WINDOW_DAYS, 15)
+        # D-30..D - 31 days inclusive - are exactly the contributing set.
+        self.assertEqual(ASOF_WINDOW_DAYS, 31)
 
 
 class SelectLatestProductsTests(unittest.TestCase):
