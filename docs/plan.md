@@ -1,6 +1,6 @@
 # Current plan
 
-**Status:** Real GFSC pipeline live in production, running the frozen section 9.2 AS-OF rule over a now-30-day window on a daily 04:35 UTC schedule, published to R2 and visually verified on `https://spikely.netlify.app`. Nine consecutive days of unattended scheduled publishes confirmed (2026-09-06), the initial-zoom gap that hid the snow layer on first load is fixed, and the snow-cover visual encoding was revised (opacity=coverage, color=freshness, sky-to-indigo palette). The MVP snow layer is functionally complete; the next work is the rest of the app (search, object panel, routing).
+**Status:** Real GFSC pipeline live in production, running the frozen section 9.2 AS-OF rule over a now-30-day window on a daily 04:35 UTC schedule, published to R2 and visually verified on `https://spikely.netlify.app`. Nine consecutive days of unattended scheduled publishes confirmed (2026-09-06), the initial-zoom gap that hid the snow layer on first load is fixed, and the snow-cover visual encoding was revised (opacity=coverage, color=freshness, sky-to-indigo palette). The MVP snow layer is functionally complete; place search (spec section 6.1) is also built on Nominatim; the next work is the OSM object panel and A-to-B routing.
 **Date:** 2026-09-06
 
 ## Why this replaces the original reconnaissance plan
