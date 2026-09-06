@@ -10,8 +10,9 @@ build/
 .netlify/
 *.tsbuildinfo
 
-# local verification screenshots (npm run shot)
+# local verification screenshots (npm run shot / npm run verify)
 app/screenshots/
+app/shots/
 
 # environment / secrets
 .env

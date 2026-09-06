@@ -34,9 +34,10 @@ above `PREVIEW_MIN_ZOOM`, not exactly at the boundary). MVP success criterion
 area" (singular), which a z8.3 view centered on the Aosta Valley/Gran
 Paradiso area satisfies directly, without touching the pipeline at all.
 `npm run build` and the 51 pipeline tests both still pass (the pipeline was
-untouched). Pushed and will re-run `npm run verify` once Netlify's
-auto-deploy has picked it up, to confirm the initial page load now requests
-at least one snow tile (previously 0 of 24).
+untouched). Pushed, and re-ran `npm run verify` against the live site once
+Netlify's auto-deploy picked it up: the initial page load now requests 21
+real snow tiles from R2 (`.../tiles/9/267-269/182-184.png`), all `200`, up
+from 0 of 24 before.
 
 *Nine days of unattended scheduling (item 2).* Listed the
 `publish-latest-preview.yml` workflow runs via the GitHub API: all 10 most
