@@ -7,6 +7,14 @@ Versioned from `0.1.0` (2026-08-25), the first deploy.
 
 ## [Unreleased]
 
+### Fixed
+- `app/src/map/config.ts` `initialView.zoom` raised from `6.3` to `8.3`. The
+  snow tile pyramid starts at `PREVIEW_MIN_ZOOM = 8`
+  (`pipeline/config.py`), so a first-time visitor previously saw the "Snow
+  cover" control checked and no snow layer at all until zooming in - 22 of 24
+  first-load requests were basemap tiles and none were snow tiles. See
+  `docs/worklog.md` (2026-09-06).
+
 ### Changed
 - The published snow map now applies the **full spec section 9.2 AS-OF rule**
   instead of one newest product per MGRS tile: `pipeline/preview.py` composes

@@ -11,6 +11,75 @@ This file is what *we* did and why, across sessions.
 
 ---
 
+## 2026-09-06 - Fixed the initial-zoom gap, confirmed nine days of unattended daily publishes
+
+**Did:** Closed out items 1 and 2 carried forward from 2026-08-28, in order.
+
+*The initial-zoom gap (item 1).* `docs/plan.md` framed this as a decision
+between two candidate fixes: open the map at z8+, or extend the tile pyramid
+down to z6-7. Looked at both before choosing. Extending the pyramid is
+possible without a frontend change - `snowOverlay.ts` already reads
+`minzoom`/`maxzoom` off the manifest rather than hardcoding them - but
+`snapshots.py`'s metatile renderer defines one metatile grid per base zoom
+level, sized `TILE_SIZE * 2**(max_zoom - min_zoom)`. Dropping `min_zoom` from
+8 to 6 would grow that from 2048x2048 to 8192x8192 pixels, and each of
+`AsOfComposite`'s eight per-pixel fields (`acquisition_time` alone is 8 bytes)
+means roughly 1.7 GB for one metatile's destination arrays plus another ~1.3
+GB transiently per source tile warped into it - untested at that scale, in a
+GitHub Actions runner, for a genuine product-decision problem (whether users
+even want the wide overview) rather than a bug fix. Chose the z8+ fix instead:
+raised `app/src/map/config.ts` `initialView.zoom` from `6.3` to `8.3` (just
+above `PREVIEW_MIN_ZOOM`, not exactly at the boundary). MVP success criterion
+1 asks for understanding "where snow is currently present in a mountain
+area" (singular), which a z8.3 view centered on the Aosta Valley/Gran
+Paradiso area satisfies directly, without touching the pipeline at all.
+`npm run build` and the 51 pipeline tests both still pass (the pipeline was
+untouched). Pushed and will re-run `npm run verify` once Netlify's
+auto-deploy has picked it up, to confirm the initial page load now requests
+at least one snow tile (previously 0 of 24).
+
+*Nine days of unattended scheduling (item 2).* Listed the
+`publish-latest-preview.yml` workflow runs via the GitHub API: all 10 most
+recent scheduled runs since 2026-08-28 completed successfully, one per day,
+with no manual dispatches needed. R2's `latest.json` is at `runId
+20260906T085410Z`, `asOfDate 2026-09-06`, 58/58 tiles, confirming the pointer
+has advanced daily rather than sticking on the first run. Also listed the
+bucket's `runs/` prefixes directly (boto3, using the existing
+`pipeline/.env.r2.local` credentials in a subshell, never printed) and got
+back exactly 7 run IDs, `20260831T110934Z` through today's - `--keep-runs 7`
+is pruning correctly now that there have been enough runs to matter, not just
+in the one deliberate exercise on 2026-08-28.
+
+One thing not on the carried-forward list, worth flagging: actual run start
+times are landing 4-12 hours after the scheduled `04:35 UTC`
+(`08:31`-`16:51 UTC` across the 10 runs checked), not the ~1h40m margin the
+cron time was chosen for on 2026-08-28. This doesn't break correctness - the
+15-day AS-OF window absorbs a same-day delay of any size - but it does mean
+the "published before the European morning" framing from that decision isn't
+actually happening in practice. Not fixed this session: GitHub's own
+scheduled-workflow delays under load are outside this repo's control short of
+moving the trigger off GitHub's `schedule:` entirely (e.g. an external cron
+hitting `workflow_dispatch` via the API), which would be a bigger change than
+today's scope. Worth another look if it gets worse or if same-day freshness
+ever matters more than it does now.
+
+**Decided:**
+- Fix the initial zoom rather than extend the tile pyramid, given the
+  pyramid change is unvalidated at the scale it would need (memory, timing)
+  and the narrower fix satisfies MVP criterion 1's actual wording without
+  touching the pipeline.
+- Leave the `04:35 UTC` cron time as-is. The observed multi-hour delay is a
+  GitHub Actions platform behavior, not a bug in this repo's scheduling
+  choice, and does not affect data correctness given the 15-day AS-OF window.
+
+**Rejected:**
+- Extending `PREVIEW_MIN_ZOOM`/rendering z6-7, for now - see above. Revisit
+  if a future decision explicitly wants the wider single-glance overview back
+  (it would need a real memory/timing test on a full-area run before shipping
+  it to the daily cron, not just a local smoke test).
+
+---
+
 ## 2026-08-28 - The 4 missing tiles explained, section 9.2 AS-OF implemented, daily cron enabled
 
 **Did:** Closed out the three carried-forward items from yesterday, in order,
