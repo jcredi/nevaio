@@ -216,8 +216,9 @@ published manifest `notice` text rewritten to describe color-as-freshness
 instead of "drawn progressively more faintly." All touched tests updated (52
 pipeline tests passing, including 3 new ones: day-30 still valid at the
 oldest tier, day-31 correctly stale, confirmed-0%-is-transparent). Spec
-sections 5.2, 5.4, and 9.2 amended (v1.7) to match exactly. Not yet pushed as
-of writing this entry - see the next entry for the verification/publish step.
+sections 5.2, 5.4, and 9.2 amended (v1.7) to match exactly. Pushed, then
+manually published a real full-area run rather than waiting for tomorrow's
+cron - see the production-verification note below.
 
 **Decided:**
 - Decouple opacity (coverage) and color (freshness) into independent
@@ -258,6 +259,35 @@ of writing this entry - see the next entry for the verification/publish step.
   server) is decided and recorded in `docs/plan.md`, but building it is
   blocked on section 15 item 3 (which OSM object classes are in scope),
   which is its own feature-design session.
+
+*Verified in production before waiting for tomorrow's cron.* Pushed the
+commit, then ran a full-area publish locally (`pipeline.preview
+--publish-r2 --keep-runs 7`, the same invocation the workflow uses) rather
+than waiting for the next scheduled 04:35 UTC run, given how much the
+rendered output changes. 1,736 source products (up from ~808 at the old
+14-day window, as expected from roughly doubling it), 58/58 tiles, published
+as `runId 20260906T203909Z`. `npm run verify` against the live site then
+flagged 9 of 47 tile requests as 404 - all within the exact z9 region
+(`267-269/182-185`) confirmed working after the morning's zoom fix, which
+was concerning enough to check before calling it done rather than after.
+Traced it to the underlying snapshots directly rather than guessing: the
+four MGRS tiles under that area (`32TMQ/MR/NQ/NR`) are 88-97% "valid"
+observations, but 98.7-99.99% of those valid pixels read a genuine 0%
+(current real Alpine conditions - early September, off-season). Under the
+new no-floor opacity rule that renders fully transparent, so
+`write_xyz_tiles` correctly skips the whole tile as empty (a 404, not a
+bug) where the old floor-alpha rule would have served an imperceptible tile
+anyway - the two are visually indistinguishable to a human eye either way,
+so this is a byte-savings side effect of the 0%-floor decision, not a
+functional regression. Confirmed real snow still renders correctly
+elsewhere in the same run by rendering `32TNS` (the tile with the most
+current snow) directly from its snapshot: clear mint-colored high-elevation
+patches with a few amethyst flecks from the 30-day fallback, transparent
+everywhere else - exactly the expected pattern for early-September glacier
+remnants. Fixed one remaining wording mismatch found along the way:
+`preview.py`'s published `notice` text still said "icy/violet" from before
+the palette was finalized (the actual render colors were already correct,
+only the tooltip text lagged).
 
 ---
 
