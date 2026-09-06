@@ -81,6 +81,11 @@ export function createSearchBar(map: Map): HTMLElement {
   const inputRow = document.createElement("div");
   inputRow.className = "search-bar__input-row";
 
+  const icon = document.createElement("span");
+  icon.className = "search-bar__icon";
+  icon.textContent = "🔍";
+  icon.setAttribute("aria-hidden", "true");
+
   const input = document.createElement("input");
   input.type = "search";
   input.className = "search-bar__input";
@@ -95,7 +100,7 @@ export function createSearchBar(map: Map): HTMLElement {
   clearButton.textContent = "×";
   clearButton.hidden = true;
 
-  inputRow.append(input, clearButton);
+  inputRow.append(icon, input, clearButton);
 
   const resultsList = document.createElement("ul");
   resultsList.className = "search-bar__results";

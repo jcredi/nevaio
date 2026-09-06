@@ -1,5 +1,78 @@
 # Working session log
 
+## 2026-09-06 - "Freshness" -> "observation age" wording fix, a full visual redesign, and a real overlap bug found along the way
+
+**Did:** Two requests from the user after seeing the new legend: the
+"freshness" label reads ambiguously as "fresh snow" (new snowfall) rather
+than "how recent the observation is," and the app's floating UI should look
+more polished/modern, not just functional, even as an MVP.
+
+*Wording.* Changed `SnowControl`'s legend label from "Color = freshness" to
+"Color = observation age", matching the phrasing the pipeline's own manifest
+`notice` text already used ("Color shows how old that observation is") -
+that string was already unambiguous, so no pipeline change was needed, only
+the frontend's own label. Also tightened "Opacity = coverage" to "Opacity =
+snow coverage" for the same parallel clarity.
+
+*Visual redesign.* Rewrote `app/src/style.css` around a small set of design
+tokens (`--accent`/`--accent-strong` reusing the map's own Sky-to-Indigo
+freshest-tier color rather than an unrelated blue, plus shared radius/shadow/
+blur variables) and applied a cohesive frosted-glass treatment - translucent
+background, backdrop blur, soft layered shadow, larger consistent border
+radius - to every floating panel, including MapLibre's own default control
+groups (zoom buttons, attribution), not just the custom ones, so the whole
+app reads as one design rather than "our controls" plus "MapLibre's
+defaults." Specific changes: the "Snow cover" checkbox became a real
+animated toggle switch (`app/src/ui/snowControl.ts` now renders a visually-
+hidden checkbox plus a styled track/thumb sibling, using the CSS
+adjacent-sibling selector and the existing wrapping `<label>` for
+click/keyboard behavior - no new JS event handling needed); the legend's
+"Opacity ="/"Color =" labels became small uppercase tracked captions; the
+search bar gained a magnifying-glass icon, a pill shape, a focus-ring
+glow, and a rounded hover highlight per result row; and every panel gets a
+short fade/slide-in entrance animation on load.
+
+*The overlap bug.* While reviewing a mobile-viewport screenshot for the
+redesign, noticed the search bar and `SnowControl` have always visually
+overlapped on narrower viewports - the search bar's "Snow cover" toggle row
+was completely hidden underneath the search bar's opaque white background in
+every prior mobile screenshot this session; only the legend below it peeked
+out, because the snow control's total height exceeds the search bar's, so
+only the *excess* was visible below the search bar's bottom edge. Nobody had
+looked at a full, un-cropped mobile screenshot of the top-left corner until
+now - earlier verifications either cropped to `.snow-ctrl` alone or didn't
+inspect that specific region closely. The new translucent panels made the
+same overlap easier to spot (both layers partially visible through each
+other) rather than one fully hiding the other, which is what actually
+surfaced it. Fixed by pushing `.maplibregl-ctrl-top-left` down by a fixed
+`4rem` (clearing the search bar's collapsed pill height plus a small gap)
+rather than a viewport-width media query breakpoint - worked out that the
+two controls' widths (search bar capped at `24rem`, `SnowControl` roughly
+`235px`) only stop overlapping above roughly `870px` of viewport width, so a
+breakpoint-based fix would need to cover far more than just phones and is
+more fragile against future content-length changes on either control than
+an unconditional vertical offset is.
+
+**Decided:**
+- Reuse the map's own Sky-to-Indigo accent color for interactive UI accents
+  (toggle, focus rings, hover highlights) rather than an arbitrary blue -
+  ties the chrome's visual identity to the product's own data encoding.
+- Fix the overlap with an unconditional offset, not a media-query breakpoint
+  - simpler, and robust to control-width changes neither control's own CSS
+  rule needs to know about.
+- Emoji icons again (search glyph) rather than an icon font/SVG set, matching
+  the choice already made for search-result type icons earlier this session -
+  zero new assets, consistent icon language across the app.
+
+**Verified:** `npm run build` clean. Dev server on port 5173, Playwright
+screenshots (not committed) at desktop (1100x850) and mobile (390x844)
+viewports, before and after the overlap fix: confirmed the "Snow cover"
+toggle row is now fully visible and un-occluded on mobile, the redesigned
+panels render correctly at both sizes, and the search dropdown (tested with
+"Adamello") still shows correctly alongside the redesigned chrome.
+
+---
+
 ## 2026-09-06 - Snow-layer legend
 
 **Did:** The user noticed the web app had no legend explaining the snow

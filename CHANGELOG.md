@@ -21,10 +21,27 @@ Versioned from `0.1.0` (2026-08-25), the first deploy.
   channels from spec section 5.2 - a coverage gradient bar and four
   freshness-tier color swatches (0-3d through 15-30d).
 
+### Changed
+- Visual redesign of all floating map UI (`app/src/style.css`): a frosted-
+  glass treatment (translucent background, backdrop blur, layered shadow,
+  consistent radius) applied to every panel, including MapLibre's own
+  default control groups, tied together with an accent color reused from
+  the map's own Sky-to-Indigo freshness palette. The "Snow cover" checkbox is
+  now an animated toggle switch; the search bar gained an icon, a pill
+  shape, and a focus glow; panels get a short entrance animation.
+- Snow-layer legend wording: "Color = freshness" -> "Color = observation
+  age" ("freshness" read ambiguously as fresh snow, not observation recency)
+  and "Opacity = coverage" -> "Opacity = snow coverage".
+
 ### Fixed
 - `app/src/search/nominatim.ts` read a `class` field that doesn't exist in
   Nominatim's `jsonv2` response (it's `category`) - always `undefined`,
   silently, since nothing rendered it until the type-icon feature above.
+- The search bar and `SnowControl` have always visually overlapped on
+  narrower viewports - the "Snow cover" toggle row was fully hidden under
+  the search bar's opaque background. `.maplibregl-ctrl-top-left` now clears
+  the search bar's collapsed height unconditionally rather than at a
+  viewport-width breakpoint.
 
 ### Changed
 - Replace Mint to Amethyst with Sky to Indigo for snow observation age, improving separation from green topo terrain. Age bands and coverage opacity are unchanged; 953 raster tiles regenerated and published for the same 2026-09-06 observations.

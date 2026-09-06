@@ -18,7 +18,7 @@ function buildLegend(): HTMLElement {
 
   const coverageLabel = document.createElement("span");
   coverageLabel.className = "snow-ctrl__legend-label";
-  coverageLabel.textContent = "Opacity = coverage";
+  coverageLabel.textContent = "Opacity = snow coverage";
 
   const coverageBar = document.createElement("div");
   coverageBar.className = "snow-ctrl__opacity-bar";
@@ -32,9 +32,11 @@ function buildLegend(): HTMLElement {
   scaleMax.textContent = "100%";
   coverageScale.append(scaleMin, scaleMax);
 
+  // "Freshness" reads ambiguously as "fresh snow" (new snowfall) rather than
+  // "how recent the observation is" - spell out "observation age" instead.
   const freshnessLabel = document.createElement("span");
   freshnessLabel.className = "snow-ctrl__legend-label";
-  freshnessLabel.textContent = "Color = freshness";
+  freshnessLabel.textContent = "Color = observation age";
 
   const swatches = document.createElement("div");
   swatches.className = "snow-ctrl__swatches";
@@ -84,13 +86,21 @@ export class SnowControl implements IControl {
 
     const checkbox = document.createElement("input");
     checkbox.type = "checkbox";
+    checkbox.className = "snow-ctrl__toggle-input";
     checkbox.checked = this.overlay.isVisible();
     checkbox.addEventListener("change", () => this.overlay.setVisible(checkbox.checked));
+
+    // Visual switch track/thumb, styled from the (visually hidden but still
+    // focusable/clickable, per the wrapping <label>) checkbox above via the
+    // CSS adjacent-sibling selector - no separate click handler needed.
+    const switchTrack = document.createElement("span");
+    switchTrack.className = "snow-ctrl__switch";
+    switchTrack.setAttribute("aria-hidden", "true");
 
     const label = document.createElement("span");
     label.textContent = "Snow cover";
 
-    toggle.append(checkbox, label);
+    toggle.append(checkbox, switchTrack, label);
 
     const metaLine = document.createElement("p");
     metaLine.className = "snow-ctrl__meta";
