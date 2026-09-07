@@ -68,11 +68,184 @@ Take one real downloaded GFSC raster from Track B, reproject/tile it, and render
   **Next, in order:**
   1. Optional, pre-public-launch: attach a custom domain in front of the `r2.dev` URL (`docs/r2-setup.md` step 4). Needs the Cloudflare dashboard or an Admin-scoped token - the Object Read & Write token cannot set bucket-level config.
   2. Move on to the rest of `docs/spec.md` in vertical slices (OSM object panel + historical chart, A-to-B routing) - search is done, and the snow layer is no longer the bottleneck. When routing (section 8) is built, freshness/quality must be clearly and prominently shown on the route profile, not merely "where practical" as sections 8.4-8.5 currently read - see spec section 15 item 11 and `docs/worklog.md` (2026-09-06). When the OSM object panel + historical chart (section 7) is built, note the rendered map tiles cannot be used as its data source (the color/opacity encoding is lossy - it cannot be inverted back to exact FSC%/age/quality) - the architecture decided but not yet built is a precomputed per-object time series, batch-sampled per tile/date from the same rasters the daily pipeline already loads, backfilled once from Copernicus's own multi-year archive, published statically to R2 (no new running server). Blocked on section 15 item 3 (which OSM object classes are in scope). See `docs/worklog.md` (2026-09-06).
-  3. `recon/` stays for now: `.venv` is the pipeline's environment, `data/` is the only local winter archive (it is what made the AS-OF measurements above possible), and `make_overlay.py` is the provenance of the frontend's still-wired fallback image. The trigger for deleting it is removing that fallback, not the pipeline working.
+  3. Repository structure refactor - see the dedicated section below. Supersedes the earlier "`recon/` stays for now" holding position: the blocker was never the fallback image, it was that `recon/` bundles four things with four different lifecycles, so no single delete trigger could ever fire. Stage 1 unbundles it; the `.venv`, the winter archive, and the fallback overlay's provenance all survive the move.
 - **DONE - Frontend hosting.** `app/` deploys to Netlify (https://nevaio.netlify.app, renamed from spikely.netlify.app on 2026-09-07), connected to this GitHub repo and auto-deploying on every push to `main`. See `docs/agent-guide.md` for build config.
 - **DONE, revised same day - Data-pipeline hosting/storage architecture for MVP (2026-08-26).** GitHub Actions job -> immutable run + atomic `latest.json` pointer published to Cloudflare R2 -> app reads the manifest directly from R2. This supersedes the original same-day plan to republish static tiles through the Netlify deploy; see `docs/worklog.md` for both the original brainstorm and the same-day revision (R2 vs. Netlify Blobs vs. Netlify static republish).
 - Pick the rest of the stack: hosted routing API (for the A-to-B planner). Geocoder is decided (Nominatim, 2026-09-06).
 - Build out the rest of `docs/spec.md` in vertical slices: OSM object panel + historical chart, A-to-B routing + snow/elevation profile. Search (section 6) is done.
+
+## Repository structure refactor - planned, not started (2026-09-07)
+
+Agreed after a structural review of the whole tree. Nothing here is started;
+each stage is independently shippable and revertible. The ordering is by
+value-per-unit-risk, and stages 1-2 deliver most of the readability win with
+no behavioral change at all.
+
+### Why: `recon/` is four things with four lifecycles
+
+The folder is documented as temporary scaffolding to delete, but the delete
+trigger can never fire, because only one of its contents is actually
+reconnaissance:
+
+| Contents | Size | What it really is | Lifecycle |
+| --- | --- | --- | --- |
+| `.venv/` | 347 MB | The Python interpreter the pipeline runs in locally (3.14.7) | Permanent infra |
+| `data/` | 1.5 GB | The only local Jan-Apr 2026 winter GFSC archive (gitignored) | Permanent fixture cache |
+| `vendor/hrwsi/` | 15 MB | Vendored Copernicus S3 client, **fully superseded** by `pipeline/fetch.py` (which talks to `s3.WAW3-2.cloudferro.com` directly). Nothing imports it. | Dead code / provenance |
+| `make_overlay.py` | 336 lines | Generator of the committed fallback overlay. Nothing imports it, but its *output* is load-bearing. | Live, misfiled |
+| `findings.md` | 13 KB | Durable knowledge about the data | Docs |
+| `requirements.txt` | - | 7 unpinned deps, superset of the pipeline's | Superseded by the locks |
+
+So "delete `recon/`" was always the wrong operation, and that is why it kept
+getting deferred. The right one is to **unbundle it**, after which the residue
+genuinely is deletable.
+
+### The other four structural problems
+
+1. **The local Python environment is undeclared and mislocated.** CI is now
+   hash-locked and reproducible (`pipeline/requirements.in` ->
+   `requirements.txt`, plus the publisher's `requirements-publish.*`), but
+   local dev still runs Python 3.14.7 out of a venv inside a folder marked for
+   deletion, against CI's pinned 3.12. Every documented command hardcodes
+   `recon/.venv/bin/python -m unittest discover -s pipeline/tests -t .`, which
+   is why that path is repeated in five files and rots.
+2. **The dependency boundary that CI now enforces is invisible in the
+   layout.** The publish job deliberately installs boto3 only - no
+   rasterio/pillow/numpy - and `pipeline/__init__.py` was made lazy purely so
+   `import pipeline` would not drag the raster stack into the privileged job.
+   That lazy-import shim is a workaround for a package layout that cannot
+   express "these modules are safe for the publisher." The two surfaces are
+   already cleanly separable: publisher = `publish.py`,
+   `artifact_validation.py`, `config.py`; renderer = `asof.py`, `mosaic.py`,
+   `tiles.py`, `raster_io.py`, `snapshots.py`, `fetch.py`, `preview.py`.
+3. **`preview.py` is the production renderer.** Publication genuinely split
+   out of it during the F1 work, so the name is now doubly wrong: it renders,
+   on a daily cron, in production.
+4. **Frozen constants are duplicated across the language boundary by hand.**
+   The four freshness hexes live in both `pipeline/tiles.py`
+   (`_FRESHNESS_COLORS`) and `app/src/ui/snowControl.ts`, with a comment
+   admitting the manual sync; a third, divergent ramp sits in
+   `recon/make_overlay.py`'s `build_lut`. `PREVIEW_MIN_ZOOM = 8` in
+   `pipeline/config.py` is mirrored as prose next to `zoom: 8.3` in
+   `app/src/map/config.ts`. This is a correctness hazard - a palette change
+   silently desyncs the legend from the map - not a tidiness one.
+
+`app/` itself is fine: ~740 lines of TypeScript in a clean `map/` / `search/`
+/ `ui/` split. Leave it alone.
+
+### Target layout
+
+```
+nevaio/
+├── Makefile                    # NEW: the only place command paths are written
+├── README.md  CHANGELOG.md  LICENSE.md  AGENTS.md
+├── .venv/                      # MOVED from recon/, gitignored
+├── .github/workflows/
+├── app/                        # UNCHANGED
+├── data/gfsc-samples/          # MOVED from recon/data, gitignored
+├── pipeline/
+│   ├── requirements*.in/.txt   # unchanged; local env spec added
+│   ├── core/                   # pure, no I/O: asof.py  mosaic.py  encoding.py
+│   ├── io/                     # adapters: rasters.py  hrwsi.py  xyz.py  snapshots.py
+│   ├── publishing/             # boto3-only surface: r2.py  artifact_validation.py
+│   ├── config.py
+│   ├── render.py               # was preview.py
+│   └── tests/{core,io,publishing}/
+├── shared/snow-encoding.json   # NEW: single source for palette + zoom range
+├── tools/make_fallback_overlay.py   # was recon/make_overlay.py
+└── docs/
+    ├── spec.md  plan.md  worklog.md  agent-guide.md
+    ├── data-findings.md        # was recon/findings.md
+    ├── ops/{r2-setup.md, publishing-security.md, security-audit-2026-09.md}
+    └── archive/{original-reconnaissance-plan.md, hrwsi-vendored-client/}
+```
+
+`recon/` disappears entirely - by redistribution, not deletion.
+
+### Stage 1 - dissolve `recon/` (~1h, pure moves, no behavior change)
+
+- `recon/.venv` -> `.venv` at the repo root. **Recreate, do not move**: venvs
+  hardcode absolute paths in `bin/`.
+- `recon/data` -> `data/gfsc-samples/`, still gitignored. It is a fixture
+  archive, not recon output.
+- `recon/findings.md` -> `docs/data-findings.md`.
+- `recon/make_overlay.py` -> `tools/make_fallback_overlay.py`, docstring
+  rewritten: it is no longer "scaffolding with an end of life," it is the
+  documented provenance of a committed asset. Update the `note` string it
+  writes into the sidecar, and the matching comment in
+  `app/src/map/snowOverlay.ts`.
+- `recon/vendor/hrwsi/` -> `docs/archive/hrwsi-vendored-client/` with a
+  "superseded by `pipeline/fetch.py`" note, or simply delete it - upstream is
+  public and nothing imports it.
+- Delete `recon/requirements.txt`, `recon/.gitkeep`, `recon/.DS_Store`.
+- Move root `SECURITY_AUDIT_REPORT.md` -> `docs/ops/security-audit-2026-09.md`
+  (it is currently untracked; decide then whether it should be committed).
+
+### Stage 2 - declare the local environment and add a Makefile (~1h)
+
+CI is already reproducible; local is not. Add a local env spec that matches
+CI's Python 3.12 rather than 3.14.7. **Constraint:** the existing lock is
+compiled `--python-platform x86_64-unknown-linux-gnu`, so it cannot be
+installed directly on macOS arm64 - either compile a second platform lock
+from the same `.in` files, or accept an unlocked local resolve from the
+pinned `.in` versions and keep the hash-locked file as CI's alone.
+
+Then a root `Makefile`: `make setup`, `make test`, `make render`,
+`make publish-check`, `make dev`, `make build`. Every doc line that currently
+spells out an interpreter path collapses to `make test`. This is what stops
+Stage 1's path churn from recurring.
+
+### Stage 3 - split `pipeline/` along the dependency boundary (~2-3h)
+
+Mostly file moves plus import rewrites, with tests moving alongside. The one
+real split is `tiles.py` (164 lines), already two clean halves its own
+docstring describes: the LUT / `render_rgba` half is pure and goes to
+`core/encoding.py`; the slippy-map slicing half goes to `io/xyz.py`.
+
+The payoff is that the CI trust boundary becomes structural: `publishing/`
+must import nothing from `core/` or `io/`, which is a one-line test instead of
+a lazy-import shim in `__init__.py`. Rename `preview.py` -> `render.py`.
+
+Call sites to update: the two `python -m pipeline.{preview,publish}`
+invocations in `.github/workflows/publish-latest-preview.yml`,
+`pipeline/README.md`, and `pipeline/tests/test_workflow_security.py` (it
+resolves the workflow via `parents[2]` and asserts on the publisher lock's
+contents). Re-run the publisher-isolation check afterwards - a bad move here
+would silently re-admit the raster stack into the privileged job.
+
+### Stage 4 - kill the cross-language duplication (~1h)
+
+`shared/snow-encoding.json` holding the four tier hexes, the alpha stops, and
+the zoom range. `core/encoding.py` loads it; `app/src/ui/snowControl.ts`
+imports it (Vite handles JSON natively); `app/src/map/config.ts` derives its
+zoom floor from it instead of a prose comment. Add one pipeline test asserting
+the JSON matches what `render_rgba` actually emits. This is the only stage
+touching behavior-adjacent code, so it goes last.
+
+### Explicitly rejected
+
+- **Renaming `app/` to `web/` or `frontend/`.** Netlify's base directory is
+  `app`, set in the dashboard with no committed `netlify.toml`. Pure churn
+  plus a manual dashboard step, for nothing.
+- **src-layout (`pipeline/src/nevaio_pipeline/`).** Correct for a distributed
+  library, overhead for one app CI runs as `python -m` from the repo root.
+  Revisit only if the pipeline is ever installed elsewhere.
+- **A monorepo tool** (Nx, Turborepo, pnpm workspaces). Two apps, two
+  languages. A Makefile covers it.
+- **A `pyproject.toml` replacing the `.in`/`.txt` locks.** The hash-locked,
+  wheel-only, two-surface split from the F1 security work is deliberate and
+  more constrained than a plain pyproject would be. Keep it.
+- **Splitting `pipeline/tests/` finer than the three surfaces, or breaking up
+  `snowControl.ts`.** Both are already the right size.
+- **Touching the content of `docs/spec.md`, `plan.md`, or `worklog.md`.**
+  Stages 1-4 change paths in them, nothing else.
+
+This cuts against the standing "small, visible, working steps over broad
+refactors" ground rule. It is justified here because the disorder now costs
+real safety margin rather than aesthetics - an undeclared local interpreter
+and a hand-synced palette are latent bugs - but stages 1 and 2 are the part
+that pays for itself immediately. Stages 3 and 4 can wait for the next time
+that code is open anyway.
 
 ## Explicitly not doing yet
 

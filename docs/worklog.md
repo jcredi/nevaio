@@ -1,5 +1,55 @@
 # Working session log
 
+## 2026-09-07 - Repository structure review; refactor plan recorded
+
+**Did:** Reviewed the whole tree for readability/maintainability and wrote the
+resulting four-stage refactor plan into `docs/plan.md` ("Repository structure
+refactor"). No code moved - this session only inspected and recorded.
+
+The framing question was "why do we still have the old `recon/` folder," and
+the answer turned out to be structural rather than neglect: `recon/` holds
+four things with four different lifecycles - the local Python interpreter
+(`.venv`, 347 MB, Python 3.14.7), the 1.5 GB winter GFSC fixture archive, a
+dead vendored Copernicus S3 client (fully superseded by `pipeline/fetch.py`,
+imported by nothing), and the live generator of the committed fallback overlay
+- plus `findings.md` and a stale requirements file. Because they share one
+folder, no single delete trigger could ever fire, which is exactly why the
+"delete `recon/` when the pipeline replaces it" note has been carried forward
+unactioned since 2026-08-25. The plan unbundles rather than deletes.
+
+Three further problems were found while looking: the local environment is
+undeclared and runs 3.14.7 against CI's hash-locked 3.12; the dependency
+boundary the F1 security work now enforces (publisher installs boto3 only) is
+invisible in the flat package layout, which is why `pipeline/__init__.py`
+needed lazy exports as a workaround; and the four freshness hex values are
+hand-synced across `pipeline/tiles.py` and `app/src/ui/snowControl.ts`, with a
+third divergent ramp in `recon/make_overlay.py`.
+
+**Validated:** Nothing to validate - no code changed. Claims in the plan were
+checked against the tree: `grep` confirms nothing imports `make_overlay.py` or
+`recon/vendor/hrwsi/`; `pipeline/fetch.py` reaches
+`s3.WAW3-2.cloudferro.com`/`HRWSI` directly via boto3; the duplicated hexes
+are at `pipeline/tiles.py:64-67` and `app/src/ui/snowControl.ts:8-11`.
+
+**Decided/rejected:** Unbundle `recon/` instead of deleting it - the `.venv`,
+the winter archive, and the fallback overlay's provenance are all load-bearing
+and simply misfiled. Rejected renaming `app/` (Netlify's base directory is set
+to `app` in the dashboard, with no committed `netlify.toml` - pure churn plus
+a manual dashboard step). Rejected a Python src-layout and any monorepo tool
+(Nx/Turborepo/pnpm workspaces) as overhead for two apps in two languages.
+Rejected replacing the `.in`/`.txt` dependency locks with a `pyproject.toml`:
+the hash-locked, wheel-only, two-surface split from today's F1 work is
+deliberately more constrained than a plain pyproject would be. Noted but not
+resolved: the existing lock is compiled for `x86_64-unknown-linux-gnu`, so a
+single lock cannot serve both CI and local macOS arm64 - Stage 2 has to pick
+between a second platform lock and an unlocked local resolve.
+
+Also noted that this plan cuts against the standing "small, visible, working
+steps over broad refactors" ground rule, and accepted on the grounds that
+stages 1-2 are behavior-free and the remaining disorder now costs safety
+margin (undeclared interpreter, hand-synced palette) rather than aesthetics.
+Stages 3-4 are explicitly allowed to wait.
+
 ## 2026-09-07 - Renamed Spikely -> Nevaio
 
 **Did:** Asked for a better app name than "Spikely" and proposed a broad,
