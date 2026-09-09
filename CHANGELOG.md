@@ -8,6 +8,15 @@ Versioned from `0.1.0` (2026-08-25), the first deploy.
 ## [Unreleased]
 
 ### Security
+- Validate the snow manifest and fallback sidecar at runtime (F6). Tile URL
+  templates must resolve to the same origin and run directory as the manifest
+  that offered them - the manifest URL is build-time configuration, so it is
+  the trust anchor - and may not carry credentials, a query string, or another
+  scheme. Zooms, bounds, counts, identifiers and string lengths are bounded,
+  and inconsistent counts are refused. When the live snapshot is missing or
+  rejected, the snow control now says so instead of presenting the archived
+  reconnaissance sample as current data. `npm test` covers the validator
+  headlessly (21 cases).
 - Bound and type-restrict pipeline inputs (F2): GFSC layers are opened as
   GTiff only, which refuses the VRT-disguised-as-`.tif` external read the
   audit demonstrated, and are validated for shape, 60 m axis-aligned

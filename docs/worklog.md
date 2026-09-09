@@ -1,5 +1,45 @@
 # Working session log
 
+## 2026-09-09 - F6 manifest validation
+
+The frontend now validates the snow metadata it fetches
+(`app/src/map/manifestSchema.ts`) before any of it reaches MapLibre. The design
+question was where to get the allowlist of acceptable tile hosts from. Rejected
+a hardcoded R2 hostname in the frontend, which would have to be kept in sync
+with the CSP, the pipeline and the F10 custom-domain migration in three
+places. Used the manifest URL itself as the trust anchor instead: it comes from
+build-time configuration rather than from the network, so requiring every tile
+URL to resolve to the same origin *and* the same directory, under
+`runs/<the manifest's own runId>/tiles/`, needs no extra configuration and
+survives the custom-domain move untouched. The deployed CSP remains the
+independent second layer.
+
+Also refused: embedded URL credentials, query strings and fragments, scheme
+changes (so `data:`/`javascript:` templates cannot get through), protocol-
+relative hosts, path traversal out of the run directory, and a template naming
+a different run than the manifest does. Zooms, bounds, counts, identifier
+formats and string lengths are bounded, and contradictory counts
+(sourceTileCount above requestedSourceTileCount) are rejected.
+
+Per the audit's point about not silently presenting stale data as ordinary
+data, `SnowOverlay` now carries `isSample`, and the snow control renders an
+amber "Live data unavailable - showing an old sample tile" line when the
+fallback is in use. A rejected manifest logs at error level, not warn: a
+malformed published document is a louder event than a missing one.
+
+Tests run headlessly under Node 26, which executes the TypeScript directly, so
+the validator needed no bundler or browser harness - `npm test`, 21 cases.
+Test files are excluded from the browser build's tsc pass rather than pulling
+@types/node into the app.
+
+Verification: 21 validator tests pass; the real live `latest.json` from R2 and
+the checked-in sidecar both validate, which matters more than the negative
+cases - a validator that rejected production would be worse than none. tsc and
+the Vite build are clean. Not yet verified: how the sample-data warning
+actually looks, because the production MapTiler key now correctly refuses
+localhost and no development key exists yet.
+
+
 ## 2026-09-09 - F2 input boundaries
 
 Restricted and bounded what the renderer will parse. The audit's demonstrated

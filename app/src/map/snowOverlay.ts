@@ -1,34 +1,14 @@
 import type { Map } from "maplibre-gl";
 
-/** Sidecar written by recon/make_overlay.py alongside the fallback PNG. */
-export type SnowImageMeta = {
-  image: string;
-  product: string;
-  tile: string;
-  date: string;
-  coordinates: [[number, number], [number, number], [number, number], [number, number]];
-  bounds: [number, number, number, number];
-};
+import {
+  ManifestError,
+  validateImageMeta,
+  validateTileManifest,
+  type SnowImageMeta,
+  type SnowTileManifest,
+} from "./manifestSchema";
 
-/** AS-OF snapshot manifest published atomically by pipeline.preview. */
-export type SnowTileManifest = {
-  schemaVersion: number;
-  runId: string;
-  mode: "asof-window";
-  asOfDate: string;
-  /** Product dates composed per spec section 9.2; 31 covers its 30-day ceiling. */
-  asOfWindowDays?: number;
-  tiles: string[];
-  minzoom: number;
-  maxzoom: number;
-  bounds: [number, number, number, number];
-  sourceTileCount: number;
-  requestedSourceTileCount?: number;
-  missingSourceTiles?: string[];
-  sourceProductTotal?: number;
-  tileCount: number;
-  notice: string;
-};
+export type { SnowImageMeta, SnowTileManifest };
 
 export const SOURCE_ID = "gfsc-snow";
 export const LAYER_ID = "gfsc-snow";
@@ -40,31 +20,20 @@ export type SnowOverlay = {
   summary: string;
   title: string;
   bounds: [number, number, number, number];
+  /**
+   * True when this is the checked-in reconnaissance sample rather than a live
+   * publication. The audit (F6) asked for this to be visible: silently showing
+   * a months-old single-tile sample as if it were today's snow is worse than
+   * saying the data is unavailable.
+   */
+  isSample: boolean;
   setVisible: (visible: boolean) => void;
   isVisible: () => boolean;
 };
 
-function resolveTemplate(template: string, manifestUrl: string): string {
-  const placeholders = ["z", "x", "y"].map(
-    (key) => [`{${key}}`, `__${key.toUpperCase()}__`],
-  );
-  let protectedTemplate = template;
-  for (const [token, placeholder] of placeholders) {
-    protectedTemplate = protectedTemplate.replaceAll(token, placeholder);
-  }
-  let resolved = new URL(
-    protectedTemplate,
-    new URL(manifestUrl, window.location.href),
-  ).href;
-  for (const [token, placeholder] of placeholders) {
-    resolved = resolved.replaceAll(placeholder, token);
-  }
-  return resolved;
-}
-
 function finishOverlay(
   map: Map,
-  info: Pick<SnowOverlay, "date" | "summary" | "title" | "bounds">,
+  info: Pick<SnowOverlay, "date" | "summary" | "title" | "bounds" | "isSample">,
 ): SnowOverlay {
   const beforeId = INSERT_BEFORE.find((id) => map.getLayer(id));
   map.addLayer(
@@ -93,26 +62,24 @@ function finishOverlay(
   };
 }
 
-async function loadTileManifest(manifestUrl: string): Promise<SnowTileManifest> {
+async function loadTileManifest(manifestUrl: string) {
   const response = await fetch(manifestUrl, { cache: "no-cache" });
   if (!response.ok) {
     throw new Error(`Failed to load snow manifest: ${response.status} ${manifestUrl}`);
   }
-  const manifest: SnowTileManifest = await response.json();
-  if (manifest.schemaVersion !== 1 || !manifest.tiles?.length) {
-    throw new Error(`Unsupported snow manifest: ${manifestUrl}`);
-  }
-  return manifest;
+  // Validated before any value reaches the map, so a poisoned manifest cannot
+  // choose the browser's request destinations (audit F6).
+  return validateTileManifest(await response.json(), manifestUrl, window.location.href);
 }
 
 function addTilePreview(
   map: Map,
   manifest: SnowTileManifest,
-  manifestUrl: string,
+  tileUrls: string[],
 ): SnowOverlay {
   map.addSource(SOURCE_ID, {
     type: "raster",
-    tiles: manifest.tiles.map((template) => resolveTemplate(template, manifestUrl)),
+    tiles: tileUrls,
     tileSize: 256,
     minzoom: manifest.minzoom,
     maxzoom: manifest.maxzoom,
@@ -124,6 +91,7 @@ function addTilePreview(
       ? `${manifest.sourceTileCount}/${manifest.requestedSourceTileCount} source tiles`
       : `${manifest.sourceTileCount} source tiles`;
   return finishOverlay(map, {
+    isSample: false,
     date: manifest.asOfDate,
     // The control already renders the AS-OF date, so don't repeat it here; the
     // notice tooltip carries the "newest valid observation, up to 14 days back"
@@ -139,14 +107,18 @@ async function addImageFallback(map: Map, sidecarUrl: string): Promise<SnowOverl
   if (!response.ok) {
     throw new Error(`Failed to load fallback snow metadata: ${response.status} ${sidecarUrl}`);
   }
-  const meta: SnowImageMeta = await response.json();
-  const imageUrl = new URL(meta.image, new URL(sidecarUrl, window.location.href)).href;
+  const { meta, imageUrl } = validateImageMeta(
+    await response.json(),
+    sidecarUrl,
+    window.location.href,
+  );
   map.addSource(SOURCE_ID, {
     type: "image",
     url: imageUrl,
     coordinates: meta.coordinates,
   });
   return finishOverlay(map, {
+    isSample: true,
     date: meta.date,
     summary: `sample tile ${meta.tile}`,
     title: meta.product,
@@ -160,12 +132,18 @@ export async function addSnowOverlay(
   manifestUrl: string,
   fallbackSidecarUrl: string,
 ): Promise<SnowOverlay> {
-  let manifest: SnowTileManifest;
+  let validated: Awaited<ReturnType<typeof loadTileManifest>>;
   try {
-    manifest = await loadTileManifest(manifestUrl);
+    validated = await loadTileManifest(manifestUrl);
   } catch (error) {
-    console.warn("Snow preview unavailable; using the checked-in sample", error);
+    // A rejected manifest is a louder event than a missing one: it means the
+    // published metadata is malformed or has been tampered with.
+    if (error instanceof ManifestError) {
+      console.error("Snow manifest rejected by validation", error);
+    } else {
+      console.warn("Snow preview unavailable; using the checked-in sample", error);
+    }
     return addImageFallback(map, fallbackSidecarUrl);
   }
-  return addTilePreview(map, manifest, manifestUrl);
+  return addTilePreview(map, validated.manifest, validated.tileUrls);
 }

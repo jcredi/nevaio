@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "shot": "node scripts/screenshot.mjs",
     "verify": "node scripts/verify-snapshot.mjs",
-    "check-csp": "node scripts/check-csp.mjs"
+    "check-csp": "node scripts/check-csp.mjs",
+    "test": "node --test \"src/**/*.test.ts\""
   },
   "dependencies": {
     "maplibre-gl": "^4.7.1"

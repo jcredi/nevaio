@@ -8,6 +8,9 @@
   --accent-strong: #0ea5e9;
   --text-primary: #0f172a;
   --text-secondary: #64748b;
+  /* Amber, for the "you are not looking at live data" notice (audit F6). It
+     has to read as a caveat next to --text-secondary without shouting. */
+  --text-warning: #b45309;
   --panel-bg: rgba(255, 255, 255, 0.78);
   --panel-border: rgba(255, 255, 255, 0.6);
   --panel-blur: 20px;
@@ -171,6 +174,15 @@ body {
   font-weight: 400;
   color: var(--text-secondary);
   white-space: nowrap;
+}
+
+.snow-ctrl__warning {
+  margin: 0.25rem 0 0 2.875rem;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: var(--text-warning);
+  /* Unlike the meta line this may wrap: it must stay readable, not be clipped. */
+  max-width: 13rem;
 }
 
 .snow-ctrl__legend {

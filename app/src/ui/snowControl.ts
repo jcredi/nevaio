@@ -107,7 +107,22 @@ export class SnowControl implements IControl {
     metaLine.textContent = `${formatProductDate(this.overlay.date)} · ${this.overlay.summary}`;
     metaLine.title = this.overlay.title;
 
-    this.container.append(toggle, metaLine, buildLegend());
+    this.container.append(toggle, metaLine);
+
+    // The live publication was unavailable or failed validation, so what is on
+    // screen is the checked-in reconnaissance sample: one tile, months old.
+    // Say so plainly rather than letting it pass as today's snow (audit F6).
+    if (this.overlay.isSample) {
+      const warning = document.createElement("p");
+      warning.className = "snow-ctrl__warning";
+      warning.textContent = "Live data unavailable - showing an old sample tile";
+      warning.title =
+        "The published snapshot could not be loaded or did not pass validation. " +
+        "This is a single archived tile, not current snow cover.";
+      metaLine.after(warning);
+    }
+
+    this.container.append(buildLegend());
     return this.container;
   }
 
