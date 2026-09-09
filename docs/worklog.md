@@ -1,5 +1,38 @@
 # Working session log
 
+## 2026-09-09 - Refactored pipeline verified end to end in production
+
+Run #15 (`workflow_dispatch`, `a754d13`) published successfully - the first CI
+execution of the stage-2 package layout, and the thing that turns "the tests
+pass locally" into evidence.
+
+What it proved, in order: the render job's test step passed on a clean runner
+under the new `-t pipeline` discovery, including the subprocess isolation test
+with its deliberately bare environment; `python -m nevaio_pipeline.render`
+resolved through `PYTHONPATH=pipeline/src` with the package never pip-installed;
+and the publish job on its separate runner validated the artifact and swapped
+the pointer. R2's `latest.json` moved from `20260909T193729Z` to
+`20260909T220225Z`, 58/58 source tiles, 979 tiles, no missing tiles.
+
+Then confirmed where it actually matters, in a real browser against production:
+the served manifest is the new `runId`, tiles load from that run's directory,
+the control reads "9 Sept 2026 - 58 source tiles" with no warning. Netlify had
+shipped the frontend half from the same push - the deleted sample PNG returns
+404 and the bundle contains no reference to it - so the fallback removal and the
+pipeline repackaging were both live simultaneously without either breaking.
+
+**Noted for later, not fixed:** the pipeline publishes only tiles that contain
+data, but MapLibre requests the full grid inside the manifest's `bounds`, so
+empty cells 404 - five in one production viewport. Long-standing and harmless
+in itself; the cost is that a genuine error can hide in the noise. Both
+candidate fixes are recorded in `docs/plan.md` rather than argued here.
+
+Self-inflicted annoyance worth remembering: polling the GitHub API every 20-25
+seconds from two watchers hit the unauthenticated rate limit mid-run. Checking
+R2's public `latest.json` answered the question directly and would have been the
+better instrument from the start - the pointer moving *is* the success
+condition, and it needs no credentials.
+
 ## 2026-09-09 - Snow fallback removed; the reconnaissance archive deleted
 
 The owner took the deferred product decision recorded in REFACTOR.md: drop the

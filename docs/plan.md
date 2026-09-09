@@ -76,12 +76,6 @@ routing.
   publish a 1x1 transparent PNG for empty cells (simple, more objects in R2),
   or narrow the published `bounds`/per-zoom coverage so the grid matches what
   actually exists (cheaper at runtime, more pipeline work). Not urgent.
-- **Nothing exercises the publish workflow's new module paths until it runs.**
-  Stage 2 renamed the entry points to `nevaio_pipeline.render` / `.publish` and
-  moved the package to `pipeline/src/`. The YAML parses, `test_workflow_security`
-  asserts the new module name, and both entry points run locally - but the first
-  real proof is a GitHub Actions run. Worth watching the next 04:35 UTC job, or
-  triggering a manual dispatch, rather than assuming.
 - **The recovery path is unrehearsed** - revoke the publication key, restore
   trusted code, rebuild dependencies, republish known-good data.
 
