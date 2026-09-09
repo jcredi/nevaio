@@ -68,6 +68,14 @@ routing.
   pre-launch). Owner console work; needs an Admin-scoped Cloudflare token.
   `app/public/_headers` pins the bucket host in its CSP and must change in the
   same commit - see [`r2-setup.md`](r2-setup.md) step 4.
+- **Snow tile 404s make the browser console noisy.** The pipeline publishes
+  only tiles that contain data, but MapLibre requests the full grid inside the
+  manifest's `bounds`, so every empty cell 404s - five in one production
+  viewport on 2026-09-09. Functionally harmless and long-standing; the cost is
+  that a real error can hide in the noise. Options when it is worth doing:
+  publish a 1x1 transparent PNG for empty cells (simple, more objects in R2),
+  or narrow the published `bounds`/per-zoom coverage so the grid matches what
+  actually exists (cheaper at runtime, more pipeline work). Not urgent.
 - **Nothing exercises the publish workflow's new module paths until it runs.**
   Stage 2 renamed the entry points to `nevaio_pipeline.render` / `.publish` and
   moved the package to `pipeline/src/`. The YAML parses, `test_workflow_security`
