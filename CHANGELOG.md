@@ -8,6 +8,16 @@ Versioned from `0.1.0` (2026-08-25), the first deploy.
 ## [Unreleased]
 
 ### Security
+- Investigated and **declined** the maplibre-gl upgrade that `npm audit` asks
+  for (GHSA-jrc7-96c5-q579, critical, affects all versions <= 6.4.0 including
+  the 4.7.1 in use). 6.x renders no basemap at all - it reads the MapTiler
+  TileJSON and then requests zero vector tiles, silently - and no patched
+  release exists outside 6.x. The advisory's sink is HTML MapLibre renders
+  itself, which this app never feeds attacker-controlled content, and the new
+  CSP blocks the script execution an injection would need. Staying on 4.7.1 is
+  a deliberate, documented decision rather than an oversight; see
+  `docs/agent-guide.md` and `docs/worklog.md` for the measurements and the
+  conditions that would change it.
 - Move place search off the public OSMF Nominatim endpoint to MapTiler
   Geocoding (F11, spec amendment v1.9). That endpoint's policy prohibits
   client-side autocomplete and caps the whole application at one request per

@@ -1,5 +1,53 @@
 # Working session log
 
+## 2026-09-09 - maplibre-gl upgrade attempted, measured, and rejected
+
+`npm audit` reports a critical advisory against maplibre-gl
+(GHSA-jrc7-96c5-q579, XSS sanitizer bypass in `DOM.sanitize()`) affecting every
+version <= 6.4.0, which includes the 4.7.1 this app uses. The upgrade to 6.9.0
+was started on the strength of that severity label before asking whether the
+vulnerability was reachable here. That was the wrong order, and the user
+challenged it; the pinned 4.7.1 was the version every visual check in this repo
+had been done against, and it turned out to be load-bearing.
+
+**Reachability.** `DOM.sanitize()` guards HTML that MapLibre renders itself:
+popups, HTML markers, attribution. This app opens no popups, creates markers
+with no HTML, and its custom attribution is a literal string in main.ts. The
+only remote HTML near that sink is MapTiler's own attribution from style.json,
+so reaching the bug requires MapTiler to be compromised - and the CSP shipped
+earlier today (`script-src 'self'`, no unsafe-inline) blocks the script
+execution an injection would then need.
+
+**Cost of the upgrade.** 6.x does not render this basemap at all. Measured by
+counting requests and rendered features against the real MapTiler style: 4.7.1
+fetches 54 vector tiles and renders 2279 features; 6.0.0, 6.4.1 and 6.9.0 fetch
+the TileJSON, then request zero `.pbf` tiles and render nothing. No console
+error, no map error event, no failed request - the map just comes up blank
+under a working snow overlay, which is exactly the failure most likely to reach
+production unnoticed. 5.x renders correctly but is inside the same advisory
+range, so it is not an option either.
+
+**Decision: stay on 4.7.1**, documented in docs/agent-guide.md so a future
+session does not reflexively "fix" the audit warning. Revisit when a 6.x
+release renders this style, or if the app gains popups or starts rendering
+remote HTML - either changes the reachability analysis.
+
+Two incidental findings worth keeping. First, under 6.x the `load` event never
+fires for this style, because the MapTiler style's unused sources
+(terrain-rgb, maptiler_planet) never report themselves loaded; anything built
+on `map.on("load")` would silently never run. Second, `app/scripts/screenshot.mjs`
+waits on `map.loaded() && map.areTilesLoaded()`, so it would hang forever under
+6.x - noted in case the upgrade is retried.
+
+Also verified on the shipping 4.7.1 build, which is what F6 and F11 now rest
+on: 54 vector tiles, 2279 rendered features, the snow overlay present, the
+"Live data unavailable" sample warning showing for the fallback, and a search
+for "Rifugio Payer" returning the hut first with its hut icon and flying the
+map to 10.543/46.528 at zoom 15 with one marker. The MapTiler key now accepts
+localhost (the user added it while fixing F9), which is what made this
+verification possible at all.
+
+
 ## 2026-09-09 - F11 place search moved to MapTiler Geocoding
 
 The audit's F11 was not just a rate-limit warning: the OSMF Nominatim policy
