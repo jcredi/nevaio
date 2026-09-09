@@ -1,0 +1,2 @@
+# No raster/native image processing dependencies in the privileged job.
+boto3==1.43.79

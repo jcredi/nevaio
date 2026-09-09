@@ -1,0 +1,8 @@
+# Reviewed direct render dependencies; regenerate requirements.txt with hashes.
+boto3==1.43.79
+numpy==2.5.2
+pillow==12.3.0
+rasterio==1.5.1
+
+# Parse the workflow in security regression tests (render job only).
+PyYAML==6.0.3

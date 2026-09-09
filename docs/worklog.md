@@ -1,5 +1,22 @@
 # Working session log
 
+## 2026-09-09 - F1 workflow activation approved
+
+The user confirmed that the GitHub environment is configured, then explicitly
+approved committing and pushing the prepared F1 changes to main. Re-ran all
+70 tests successfully before activation; git diff --check also passes.
+Environment settings are user-confirmed, not independently API-verified:
+this session has no authenticated GitHub management client.
+
+The remaining activation steps are removing the repository-level copies of
+R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY (keeping the production-r2 environment
+copies), then running and checking a full-area publication. Until these are
+verified, do not describe F1 as operationally closed. Pushing main also triggers
+Netlify's normal build. The audit report and local resume file stay untracked;
+no credentials are included in the commit. F2 and other remaining findings
+have not been authorized for implementation yet.
+
+
 ## 2026-09-07 - Repository structure review; refactor plan recorded
 
 **Did:** Reviewed the whole tree for readability/maintainability and wrote the
@@ -49,6 +66,55 @@ steps over broad refactors" ground rule, and accepted on the grounds that
 stages 1-2 are behavior-free and the remaining disorder now costs safety
 margin (undeclared interpreter, hand-synced palette) rather than aesthetics.
 Stages 3-4 are explicitly allowed to wait.
+
+## 2026-09-07 - Security audit F1: isolate publication credentials
+
+**Did:** With the user's explicit approval for F1 implementation/testing only,
+prepared a split render/publish workflow. Renderer has no R2 credentials;
+publisher runs on a fresh GitHub-hosted runner, downloads data outside its
+source checkout and injects environment secrets only at publication. Both
+jobs are restricted to main, and publication names `production-r2` (the owner
+must configure its branch rule and migrate the secrets). Pinned official
+Actions SHAs; generated hashed, wheel-only Python 3.12 dependency locks for
+render/test (16 packages) and publisher (7). No shared pip cache.
+
+Added standard-library artifact validation, a check-only/publish CLI and
+regression tests. Validation rejects links, unexpected paths/metadata,
+inconsistent coverage, oversized inputs and invalid PNGs before any S3
+client is created. This also fixes the generic unsafe upload behavior from
+F3 as a necessary part of the F1 transfer boundary. Receipt verification now
+checks that public latest.json equals this run's publication. A new isolation
+test caught eager package exports importing the native raster stack in the
+publisher; lazy exports preserve the API without that import side effect.
+
+**Validated:** 70 tests pass in a fresh Python 3.12 environment; actionlint
+1.7.12 passes (external shellcheck/pyflakes disabled). A separate environment
+with only the seven publisher dependencies successfully ran --check-only
+without credentials or native raster imports. Linux x86_64/Python 3.12 wheels
+were resolved and their lock hashes checked, but no Linux runner was executed.
+OSV returned zero known advisory matches for the 16 locked packages. Tests
+cover malformed/oversized PNGs, bounded decompression, metadata poisoning,
+symlinks/hardlinks, unsafe paths, credential scopes and upload failure before
+pointer/prune. The installed affine version emits existing pending-deprecation
+warnings; no production raster semantics were changed.
+
+**Decided/rejected:** Step-only secret scoping in the original job would allow
+malicious render software to persist into the publication step, so use separate
+runners. Do not import or execute transferred code. Do not install Pillow/GDAL
+just to validate output in the privileged job; validate the bounded renderer
+PNG format with the standard library. Do not enable required human reviewers
+by default because that would stop unattended daily updates. Do not claim
+validated files prove honest snow pixels or eliminate publisher supply-chain
+risk. Keep the audit report unchanged as requested.
+
+**Open:** Changes are local only: no commit/push, GitHub settings, R2 writes or
+deployment. Owner must create production-r2, allow exactly branch main, copy
+R2 secrets there, then remove repository copies when the revised workflow is
+activated. See docs/publishing-security.md for the safe migration sequence.
+F1 is not operationally closed until that configuration and a live run are
+verified. F2 and the other findings still need their own approval/work.
+The directory and git remote now both use nevaio; the old resume note's rename
+follow-ups had already been completed by the user.
 
 ## 2026-09-07 - Renamed Spikely -> Nevaio
 

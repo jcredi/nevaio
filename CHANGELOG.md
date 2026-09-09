@@ -7,6 +7,18 @@ Versioned from `0.1.0` (2026-08-25), the first deploy.
 
 ## [Unreleased]
 
+### Security
+- F1 workflow activation approved after the owner configured the GitHub
+  environment (2026-09-09); removal of repository secret copies and a
+  successful live publication remain required to finish activation.
+- Isolate daily GFSC rendering from R2 publication on fresh runners. Only the
+  publication step receives environment-scoped R2 credentials; pin Actions
+  and hash-lock separate render/publisher dependencies. Validate PNG/JSON
+  artifacts before uploading, reject links/unexpected files, and verify the
+  public pointer matches the current publication. Requires the GitHub
+  `production-r2` environment migration in `docs/publishing-security.md`
+  before activation. No remote deployment was performed (2026-09-07).
+
 ### Changed
 - **Renamed the product from Spikely to Nevaio (2026-09-07)**, the user's
   pick from a naming brainstorm. Cosmetic only - no behavior, data

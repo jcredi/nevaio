@@ -55,3 +55,9 @@ The schedule is set from measured behavior, not assumption: HR-WSI publishes
 GFSC strictly daily, and a product dated `D` becomes fetchable at roughly
 `D+1 00:15-03:00 UTC`. Multi-day processing backlogs do happen, but the 15-day
 window absorbs them without a special case.
+
+## Secure publication
+
+See [publication security](../docs/publishing-security.md) for the split
+render/publish workflow, required GitHub environment migration, hash-locked
+dependency updates and credential-free artifact verification.

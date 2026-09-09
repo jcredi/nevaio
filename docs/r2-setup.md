@@ -54,9 +54,15 @@ and [CORS](https://developers.cloudflare.com/r2/buckets/cors/).
 
 ## GitHub Actions configuration
 
-Open **GitHub repository > Settings > Secrets and variables > Actions**.
+**Security migration:** follow [publication security setup](publishing-security.md)
+before activating the separated workflow. Production credentials now belong
+to the `production-r2` environment restricted to `main`, not repository secrets.
 
-Add two repository secrets:
+
+Open **GitHub repository > Settings > Environments > production-r2**
+for secrets. Repository variables remain under **Secrets and variables > Actions**.
+
+Add two secrets in the **production-r2 environment**:
 
 | Secret | Value |
 | --- | --- |
@@ -103,9 +109,10 @@ curl --fail --show-error "${R2_PUBLIC_BASE_URL}/latest.json"
 ```
 
 The workflow fetches the published `latest.json` back from R2 as an end-to-end
-check, then retains it and the immutable run's `run.json` as a small GitHub
-artifact for seven days. Raw GeoTIFFs and rendered PNGs remain only on the
-ephemeral runner and in R2 respectively; they are not committed to Git.
+check, then retains it and the publication receipt as a small GitHub artifact for
+seven days. Rendered PNGs and run metadata are also transferred between jobs
+as a GitHub artifact retained for one day. Raw GeoTIFFs stay on the render
+runner; rendered PNGs are published to R2. None are committed to Git.
 
 ## Local publication (optional)
 

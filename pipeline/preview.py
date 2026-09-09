@@ -21,6 +21,7 @@ from typing import Sequence
 from rasterio.transform import array_bounds
 from rasterio.warp import transform_bounds
 
+from .artifact_validation import snapshot_notice
 from .asof import compose_as_of
 from .config import (
     ASOF_WINDOW_DAYS,
@@ -189,14 +190,7 @@ def build_preview(
         "productDates": product_dates,
         "sourceProductCounts": window_sizes,
         "sourceProductTotal": sum(window_sizes.values()),
-        "notice": (
-            "Each pixel shows the newest valid GFSC observation on or before "
-            f"{as_of_date.isoformat()}, searching back up to 30 days per spec "
-            "section 9.2. Color shows how old that observation is (sky blue = most "
-            "recent, indigo = up to 30 days old); a transparent area means no "
-            "valid observation was found there in that window (cloud, water, "
-            "or no data)."
-        ),
+        "notice": snapshot_notice(as_of_date.isoformat()),
     }
     run_dir.mkdir(parents=True, exist_ok=True)
     (run_dir / "run.json").write_text(json.dumps(metadata, indent=2) + "\n")

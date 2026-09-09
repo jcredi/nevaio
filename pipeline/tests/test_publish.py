@@ -7,6 +7,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from pipeline.publish import _prune_old_runs, _required_env, publish_to_r2
+from pipeline.tests.artifact_fixture import make_run, RUN_ID
 
 
 class FakePaginator:
@@ -67,15 +68,11 @@ class PublishTests(unittest.TestCase):
             "R2_SECRET_ACCESS_KEY": "secret",
         }
         with tempfile.TemporaryDirectory() as tmp:
-            run_dir = Path(tmp)
-            tile = run_dir / "tiles" / "8" / "1" / "2.png"
-            tile.parent.mkdir(parents=True)
-            tile.write_bytes(b"png")
-            (run_dir / "run.json").write_text("{}")
+            run_dir, metadata = make_run(Path(tmp))
             with patch.dict("os.environ", env, clear=True), patch(
                 "pipeline.publish.boto3.client", return_value=client
             ) as make_client:
-                latest = publish_to_r2(run_dir, {"runId": "run-1", "asOfDate": "2026-02-10"})
+                latest = publish_to_r2(run_dir, metadata)
 
         make_client.assert_called_once_with(
             "s3",
@@ -88,7 +85,7 @@ class PublishTests(unittest.TestCase):
         # ordering that actually matters: every object precedes the pointer.
         self.assertEqual(
             sorted(call[2] for call in client.uploads),
-            ["runs/run-1/run.json", "runs/run-1/tiles/8/1/2.png"],
+            [f"runs/{RUN_ID}/run.json", f"runs/{RUN_ID}/tiles/8/1/2.png"],
         )
         self.assertEqual(client.calls[-1], "put")
         png = next(c for c in client.uploads if c[2].endswith(".png"))
@@ -99,8 +96,26 @@ class PublishTests(unittest.TestCase):
         self.assertEqual((put["Bucket"], put["Key"]), ("snow", "latest.json"))
         self.assertEqual(put["CacheControl"], "no-cache, max-age=0")
         committed = json.loads(put["Body"])
-        self.assertEqual(committed["tiles"], ["https://snow.example.test/runs/run-1/tiles/{z}/{x}/{y}.png"])
+        self.assertEqual(committed["tiles"], [f"https://snow.example.test/runs/{RUN_ID}/tiles/{{z}}/{{x}}/{{y}}.png"])
         self.assertEqual(latest, committed)
+        self.assertEqual(client.deletes, [])
+
+
+    def test_failed_upload_never_moves_pointer_or_prunes(self) -> None:
+        client = FakeS3Client()
+        env = {
+            "R2_ACCOUNT_ID": "account", "R2_BUCKET": "snow",
+            "R2_PUBLIC_BASE_URL": "https://snow.example.test/",
+            "R2_ACCESS_KEY_ID": "key", "R2_SECRET_ACCESS_KEY": "secret",
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir, metadata = make_run(Path(tmp))
+            with patch.dict("os.environ", env, clear=True), patch(
+                "pipeline.publish.boto3.client", return_value=client
+            ), patch.object(client, "upload_file", side_effect=IOError("upload failed")):
+                with self.assertRaises(IOError):
+                    publish_to_r2(run_dir, metadata, keep_runs=7)
+        self.assertEqual(client.puts, [])
         self.assertEqual(client.deletes, [])
 
 
@@ -151,12 +166,11 @@ class PruneOldRunsTests(unittest.TestCase):
             "R2_SECRET_ACCESS_KEY": "secret",
         }
         with tempfile.TemporaryDirectory() as tmp:
-            run_dir = Path(tmp)
-            (run_dir / "run.json").write_text("{}")
+            run_dir, metadata = make_run(Path(tmp), "20260824T000000Z")
             with patch.dict("os.environ", env, clear=True), patch(
                 "pipeline.publish.boto3.client", return_value=client
             ):
-                publish_to_r2(run_dir, {"runId": "20260824T000000Z"}, keep_runs=2)
+                publish_to_r2(run_dir, metadata, keep_runs=2)
 
         # Every delete must follow the latest.json put, so a failed prune can
         # never leave the app pointed at a run whose tiles are already gone.
