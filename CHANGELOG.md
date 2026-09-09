@@ -8,6 +8,26 @@ Versioned from `0.1.0` (2026-08-25), the first deploy.
 ## [Unreleased]
 
 ### Security
+- F1 activation verified end to end (2026-09-09): the manual `main` dispatch
+  ran rendering and publication on separate runners, validated the artifact
+  before secrets were exposed, published a full 58/58-tile run, and confirmed
+  the public pointer matched its own receipt. The `production-r2` environment
+  was independently confirmed to allow exactly one deployment branch, `main`.
+  F3's unsafe upload primitive is closed by the same validator, which both the
+  CI publisher and local `--publish-r2` now go through.
+- Browser security policy headers for the deployed app (F5): `app/public/_headers`
+  sets a `default-src 'none'` CSP allowlisting only MapTiler, the public snow
+  bucket and the geocoder, plus `nosniff`, `frame-ancestors 'none'`,
+  `Referrer-Policy`, a deny-by-default `Permissions-Policy` and COOP.
+  `npm run check-csp` replays those headers over the real build (or, with
+  `NEVAIO_URL`, the deployment) and fails on any CSP violation.
+- Upgraded Vite 5.4.21 to 8.2.2 (F4), clearing the dev-server path-traversal,
+  `server.fs.deny` bypass and esbuild cross-origin advisories, which have no
+  patched 5.x or 6.x release. The dev server now binds loopback only; LAN
+  exposure is a per-run opt-in via `npm run dev -- --host`.
+- Ignore every environment file shape by default, re-allowing only `*.example`
+  templates (F8), so a future `.env.production` or `.env.r2` cannot become
+  committable by omission. Tightened `pipeline/.env.r2.local` to mode 0600 (F7).
 - F1 workflow activation approved after the owner configured the GitHub
   environment (2026-09-09); removal of repository secret copies and a
   successful live publication remain required to finish activation.
@@ -32,6 +52,8 @@ Versioned from `0.1.0` (2026-08-25), the first deploy.
   sees). See `docs/worklog.md` and `docs/spec.md` (Amendment v1.8).
 
 ### Added
+- Deferred repository refactor implementation prompt in `REFACTOR.md`, with
+  staged migration, preservation constraints, and acceptance criteria (2026-09-09).
 - Place search (spec section 6.1): a floating search bar
   (`app/src/ui/searchBar.ts`) supporting search by name (Nominatim, decided
   for MVP - spec section 15 item 5) and by coordinates

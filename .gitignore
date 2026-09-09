@@ -14,10 +14,15 @@ build/
 app/screenshots/
 app/shots/
 
-# environment / secrets
+# environment / secrets - ignore every environment file by default (F8), then
+# re-allow only the sanitized templates that are meant to be committed. A new
+# .env.production / .env.r2 / .env.anything must not become committable just
+# because nobody remembered to extend this list.
 .env
-.env.local
-.env.*.local
+.env.*
+*.env
+!.env.example
+!.env.*.example
 
 # downloaded satellite data - don't commit raw rasters
 recon/data/

@@ -1,5 +1,80 @@
 # Working session log
 
+## 2026-09-09 - F1 verified; F4/F5/F7/F8 fixed
+
+Confirmed F1's activation from evidence rather than assumption. The manual
+`workflow_dispatch` run on `main` (sha f4ee604) succeeded on both jobs:
+rendering on one runner with no R2 credentials, then validation-before-secrets
+and publication on a second. The published run 20260909T193729Z covers 58/58
+source tiles with none missing, and the live `latest.json` matches it, so the
+receipt verification is real rather than vacuous. The GitHub API also confirmed
+that the `production-r2` environment has exactly one deployment branch policy -
+branch `main`, with no tag rule - which is the independent control the YAML
+guard cannot provide. The one F1 item that cannot be checked without an
+authenticated client is the removal of the repository-level R2 secret copies;
+the owner reports having deleted them.
+
+F3 needs no separate work: F1's artifact validator is on both the CI and local
+`--publish-r2` paths, so the "upload everything, follow symlinks" primitive is
+already gone. Recorded rather than reimplemented.
+
+Then a batch of the low-risk findings, by the owner's choice of batching:
+- F5: `app/public/_headers` with a `default-src 'none'` CSP. The allowlist was
+  derived from the actual style graph (fetched MapTiler's outdoor style and
+  walked it for hosts: only `api.maptiler.com` for data) rather than guessed.
+  `style-src` keeps `'unsafe-inline'` because MapLibre sets style attributes;
+  `script-src` deliberately does not get a matching concession, since a CSP
+  that allows arbitrary script defeats its own purpose. `worker-src blob:` is
+  required by MapLibre's worker construction.
+- F4: Vite 5.4.21 to 8.2.2. Staying on 5.x was rejected: the advisory ranges
+  include every 5.x and 6.x release, so no patch-level move exists. The dev
+  server binds 127.0.0.1 by default; `--host` still opts in, verified by
+  checking the listening socket both ways.
+- F8: ignore-all-then-allowlist environment rules, verified with
+  `git check-ignore` for both the secret shapes and the committed templates.
+- F7: `pipeline/.env.r2.local` set to 0600.
+
+New finding, not in the 2026-09-06 audit: maplibre-gl has a since-published
+**critical** advisory (GHSA-jrc7-96c5-q579, XSS sanitizer bypass in
+`DOM.sanitize()`, affecting <= 6.4.0). The app is on 4.7.1, so the fix is a
+two-major upgrade and is being handled as its own verified step, not folded
+into this batch.
+
+Verification: `npm run build` (tsc + Vite 8) clean; `npm run check-csp` reports
+no CSP violations with the MapTiler style, vector tiles, glyphs and workers all
+loading under `default-src 'none'`. The R2 legs cannot be exercised from
+localhost because the bucket's CORS policy allows only the production origin -
+which is the bucket behaving correctly - so the harness takes `NEVAIO_URL` to
+run the same checks against the deployment after these headers ship.
+
+Rejected: hardcoding a wildcard `https://*.r2.dev` in the CSP (it would allow
+any Cloudflare account's dev bucket, defeating the point of an origin
+allowlist). The specific bucket host is pinned instead, with a maintenance note
+in `_headers` that the F10 custom-domain migration must update it in the same
+change.
+
+Still open: F2 (raster driver/resource bounds), F6 (manifest validation),
+F9-F11, the maplibre upgrade, and the owner-side provider settings.
+
+
+## 2026-09-09 - Deferred refactor prompt recorded
+
+The user accepted the latest chat refactor direction but explicitly deferred
+implementation. Added root REFACTOR.md as a self-contained prompt for a future
+coding assistant, including prerequisites, stage ordering, data preservation,
+publisher isolation, contract packaging, and acceptance criteria. No source,
+data, environment, or deployment changes were made.
+
+The new prompt explicitly supersedes conflicting layout details in the older
+docs/plan.md proposal: installable mostly-flat Python package, frontend feature
+grouping, contracts/, and pipeline/.venv. Historical records stay unchanged;
+reconciling the older active plan is an implementation prerequisite. Automatic
+fallback removal remains a separately approved product change, not part of the
+structural migration. Refactoring must not interrupt security activation work.
+
+Validation: documentation-only change; checked whitespace/diff integrity. No
+application tests or live publishing required. Implementation remains deferred.
+
 ## 2026-09-09 - F1 workflow activation approved
 
 The user confirmed that the GitHub environment is configured, then explicitly
