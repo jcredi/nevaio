@@ -99,7 +99,7 @@ small fixtures; production uses the measured GFSC shape.
 
 Volume is bounded in `pipeline/config.py` and enforced in `pipeline/fetch.py`.
 A catalogue object over `MAX_LAYER_BYTES` (16 MiB, about 12x the largest of
-2320 real layers measured in `recon/data`) is dropped during grouping, which
+2320 real layers measured in `data/research`) is dropped during grouping, which
 makes its product incomplete so the tile falls back to another date in the
 window instead of failing the run; a tile left with no complete product still
 raises. `download_products` re-checks each object and refuses a run whose

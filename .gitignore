@@ -1,7 +1,7 @@
 # dependencies
 node_modules/
 .venv/
-recon/.venv/
+pipeline/.venv/
 __pycache__/
 
 # build output
@@ -24,8 +24,13 @@ app/shots/
 !.env.example
 !.env.*.example
 
+# Local data tree (see data/README.md). None of it is committed: research/ is
+# the durable winter GFSC archive, cache/ is disposable downloads, output/ is
+# generated artifacts. Only data/README.md itself is tracked.
+data/*
+!data/README.md
+
 # downloaded satellite data - don't commit raw rasters
-recon/data/
 *.tif
 *.tiff
 *.jp2
@@ -34,9 +39,11 @@ recon/data/
 app/public/snow/latest.json
 app/public/snow/runs/
 
-# vendored HR-WSI client's MGRS tile reference file (~16MB, easily re-fetched -
-# see recon/vendor/hrwsi/README.md)
-recon/vendor/hrwsi/MGRS_tiles.gpkg
+# HR-WSI MGRS tile reference file (~16MB, easily re-fetched - see
+# data/README.md). Research reference data, not a build input: production
+# discovery hardcodes its tile list in pipeline/config.py precisely so it does
+# not depend on this file.
+*.gpkg
 
 # personal Claude Code notes (not shared with the team)
 CLAUDE.local.md

@@ -15,7 +15,7 @@
  * app/public/_headers is the independent second layer.
  */
 
-/** Sidecar written by recon/make_overlay.py alongside the fallback PNG. */
+/** Sidecar written by pipeline/tools/make_sample_overlay.py alongside the fallback PNG. */
 export type SnowImageMeta = {
   image: string;
   product: string;

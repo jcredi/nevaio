@@ -29,16 +29,41 @@ recovered area is 8-14 days old, which the frozen section 5.2 ramp draws at
 `--window-days 1` reproduces the older newest-product-only behavior exactly,
 which is the useful control when a published run looks wrong.
 
-Run its tests from the repository root with the existing Python environment:
+## Local environment
+
+`pipeline/.venv`, on **Python 3.12** to match CI (`uv` fetches the interpreter;
+nothing is installed system-wide):
 
 ```sh
-recon/.venv/bin/python -m unittest discover -s pipeline/tests
+uv venv --python 3.12 pipeline/.venv
+uv pip install --python pipeline/.venv -r pipeline/requirements-dev.in
+```
+
+Three dependency surfaces, deliberately separate:
+
+| File | Used by | Hash-locked |
+|---|---|---|
+| `requirements.in` / `.txt` | the render job | yes, linux x86_64 |
+| `requirements-publish.in` / `.txt` | the publish job | yes, linux x86_64 |
+| `requirements-dev.in` | local development only | no |
+
+The two locks are compiled for linux x86_64 (see the `uv pip compile` command in
+each header), so they **cannot** be installed on a developer Mac - that is why a
+separate dev input exists rather than a missing one. It mirrors the render
+surface and adds only dev-tool dependencies. Do not add a tool's dependency to
+either lock to make a local script run; the publish environment staying minimal
+is a security property, not tidiness (see `docs/publishing-security.md`).
+
+Run the tests from the repository root:
+
+```sh
+pipeline/.venv/bin/python -m unittest discover -s pipeline/tests
 ```
 
 Build a local full-area preview without publishing it:
 
 ```sh
-recon/.venv/bin/python -m pipeline.preview \
+pipeline/.venv/bin/python -m pipeline.preview \
   --raw-dir /tmp/nevaio-gfsc/raw \
   --work-dir /tmp/nevaio-gfsc/work \
   --output-dir /tmp/nevaio-gfsc/output

@@ -1,0 +1,15 @@
+# Local development environment for pipeline/.venv.
+#
+# CI does NOT use this file. The hash-locked requirements.txt /
+# requirements-publish.txt are compiled for linux x86_64 (see the uv command in
+# their headers), so they cannot be installed on a developer's macOS/arm64
+# machine at all. Those locks stay the security-relevant contract for the jobs
+# that actually publish; this file is the local mirror of the render surface,
+# version-pinned via requirements.in but not hash-verified, because the hashes
+# are platform-specific and CI owns them.
+-r requirements.in
+
+# Sample-tool only: pipeline/tools/make_sample_overlay.py reprojects with
+# pyproj.Transformer. Deliberately NOT in requirements.in - the render and
+# publish environments must not grow a dependency only a dev tool needs.
+pyproj==3.7.2

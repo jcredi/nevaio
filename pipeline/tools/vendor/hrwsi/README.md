@@ -11,8 +11,10 @@ in this folder), commit as of 2026-08-25.
   curl -o MGRS_tiles.gpkg https://raw.githubusercontent.com/eea/clms-hrwsi-api-client-python/main/MGRS_tiles.gpkg
   ```
 
-Run with the `recon/.venv` interpreter, e.g.:
+Retained for provenance only - no production code imports this; `pipeline/fetch.py`
+has its own downloader. It is **not** installable from `pipeline/.venv`, which
+omits its geopandas/pyogrio/shapely/retry/tqdm dependencies. Historically run as:
 
 ```
-recon/.venv/bin/python recon/vendor/hrwsi/s3_hrwsi_downloader.py --help
+pipeline/.venv/bin/python pipeline/tools/vendor/hrwsi/s3_hrwsi_downloader.py --help
 ```

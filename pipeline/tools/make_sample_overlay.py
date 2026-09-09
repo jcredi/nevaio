@@ -15,21 +15,25 @@ Outputs two files into app/public/snow/:
 Then verifies itself: samples the original UTM GeoTIFF and the shipped PNG at
 the same lon/lat by two independent code paths and checks they agree.
 
-SCAFFOLDING - has a defined end of life. This is throwaway recon code that the
-app happens to depend on right now, not the data pipeline. Delete it (and the
-rest of recon/, keeping findings.md) once the real fetch/tile job exists. What
-should carry over into that job: the value codebook and base coverage LUT below, nearest-
-neighbour warping to EPSG:3857 at native resolution, the paletted-PNG encoding
-(~4x smaller, lossless), and the two-independent-paths alignment check as a
-regression test. What should not: one hardcoded product, one MGRS tile, one UTM
-zone, and writing straight into app/public/.
+DEVELOPER TOOL, not part of the published pipeline. It generates the archived
+sample overlay the frontend falls back to when the live snapshot manifest is
+unavailable, and it is the only thing that regenerates that committed asset.
+Everything worth carrying into the real pipeline already has: the value
+codebook, nearest-neighbour warping to EPSG:3857 at native resolution, the
+paletted-PNG encoding and the two-independent-paths alignment check.
+
+Deliberately still GF-only, so it has no AT-based observation-age multiplier -
+that difference from the production encoding is intentional and is recorded in
+docs/spec.md section 5.2. Do not "fix" it here.
 
 Usage:
-    recon/.venv/bin/python recon/make_overlay.py [path/to/..._GF.tif]
+    pipeline/.venv/bin/python pipeline/tools/make_sample_overlay.py \
+        [--input path/to/..._GF.tif] [--output-dir app/public/snow]
 """
 
 from __future__ import annotations
 
+import argparse
 import json
 import math
 import re
@@ -42,8 +46,8 @@ from PIL import Image
 from pyproj import Transformer
 from rasterio.warp import Resampling, calculate_default_transform, reproject
 
-REPO = Path(__file__).resolve().parent.parent
-OUT_DIR = REPO / "app" / "public" / "snow"
+REPO = Path(__file__).resolve().parents[2]
+DEFAULT_OUT_DIR = REPO / "app" / "public" / "snow"
 
 # Ortles-Cevedale, 6 Feb 2026. Picked by scanning all 580 downloaded products:
 # 97.2% valid, 0% nodata, 97 distinct percentage values, and ~21% snow-free
@@ -51,12 +55,13 @@ OUT_DIR = REPO / "app" / "public" / "snow"
 # basemap, which is what makes this a usable alignment test.
 DEFAULT_GF = (
     REPO
-    / "recon/data/ortles-cevedale-glaciers/result"
+    / "data/research/ortles-cevedale-glaciers/result"
     / "CLMS_WSI_GFSC_060m_T32TPS_20260206P7D_COMB_V102"
     / "CLMS_WSI_GFSC_060m_T32TPS_20260206P7D_COMB_V102_GF.tif"
 )
 
-# GF non-percentage codes, from the Product User Manual - see recon/findings.md.
+# GF non-percentage codes, from the Product User Manual - see
+# docs/research/gfsc-findings.md.
 CLOUD, WATER, NODATA = 205, 210, 255
 
 WEB_MERCATOR_R = 6378137.0
@@ -136,8 +141,36 @@ def coverage_stats(arr: np.ndarray) -> dict:
     }
 
 
-def main() -> int:
-    src_path = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else DEFAULT_GF
+def show(path: Path) -> str:
+    """Repo-relative where possible - --input may point anywhere."""
+    try:
+        return str(path.relative_to(REPO))
+    except ValueError:
+        return str(path)
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description=__doc__.split("\n\n")[0],
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "--input", type=Path, default=DEFAULT_GF,
+        help="GFSC ..._GF.tif to render (default: the Ortles-Cevedale sample "
+             "under data/research/, which is gitignored and may not be present)",
+    )
+    parser.add_argument(
+        "--output-dir", type=Path, default=DEFAULT_OUT_DIR,
+        help="directory to write the .png and .json into "
+             "(default: app/public/snow, the committed fallback asset)",
+    )
+    return parser.parse_args(argv)
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv)
+    src_path = args.input.resolve()
+    out_dir = args.output_dir.resolve()
     if not src_path.exists():
         print(f"error: no such file: {src_path}", file=sys.stderr)
         return 1
@@ -151,7 +184,7 @@ def main() -> int:
     date = f"{yyyy}-{mm}-{dd}"
     stem = f"gfsc_{tile}_{yyyy}{mm}{dd}"
 
-    print(f"source : {src_path.relative_to(REPO)}")
+    print(f"source : {show(src_path)}")
     dst, transform, width, height, src_meta, src_arr = warp_to_web_mercator(src_path)
     print(f"warped : {src_meta['crs']} {src_meta['size'][0]}x{src_meta['size'][1]} "
           f"@ {src_meta['res']:.0f} m  ->  EPSG:3857 {width}x{height} @ {transform.a:.2f} units")
@@ -166,8 +199,8 @@ def main() -> int:
               f"{transform.a * math.cos(math.radians(lat)):.1f} m")
 
     lut = build_lut()
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
-    png_path = OUT_DIR / f"{stem}.png"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    png_path = out_dir / f"{stem}.png"
     # Paletted rather than RGBA: GF only ever holds ~103 distinct values, so the
     # LUT *is* the palette and alpha rides along in a tRNS chunk. Byte-identical
     # to the RGBA encoding once the browser decodes it, at ~1/4 the size
@@ -198,16 +231,17 @@ def main() -> int:
         "coverage": stats,
         "outputPaddingPct": padding_pct,
         "note": (
-            "Generated by recon/make_overlay.py. Base coverage ramp is frozen "
+            "Generated by pipeline/tools/make_sample_overlay.py. Base coverage "
+            "ramp is frozen "
             "in docs/spec.md section 5.2; this GF-only artifact has no AT-based "
             "freshness multiplier."
         ),
     }
-    json_path = OUT_DIR / f"{stem}.json"
+    json_path = out_dir / f"{stem}.json"
     json_path.write_text(json.dumps(sidecar, indent=2) + "\n")
 
-    print(f"\nwrote  : {png_path.relative_to(REPO)}  ({png_path.stat().st_size / 1e6:.2f} MB)")
-    print(f"         {json_path.relative_to(REPO)}")
+    print(f"\nwrote  : {show(png_path)}  ({png_path.stat().st_size / 1e6:.2f} MB)")
+    print(f"         {show(json_path)}")
     print(f"\ncoverage of the product ({tile}, {date}):")
     for k, v in stats.items():
         print(f"  {k:16} {v}")

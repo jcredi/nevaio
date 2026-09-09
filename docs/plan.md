@@ -41,9 +41,15 @@ routing.
    than sections 8.4-8.5 currently read: observation freshness and quality must
    be shown clearly and prominently on the route profile, not "where
    practical". Spec section 15 item 11.
-4. **Repository structure refactor.** Accepted direction, deferred, not
-   authorized by being read: [`../REFACTOR.md`](../REFACTOR.md). Stages 1-2 are
-   pure moves and carry most of the readability win.
+4. **Repository structure refactor, stage 3 onward**
+   ([`../REFACTOR.md`](../REFACTOR.md)). Stage 1 (dissolve `recon/`) is done -
+   2026-09-09. Sequencing decided that day and worth not re-deriving: stage 3
+   regroups the frontend into feature folders and therefore must come *after*
+   the mobile pass above, because its own instruction is to "preserve
+   responsive styling" and that styling is currently broken - fix it and verify
+   on a device first, so the move has a known-good baseline. Stage 4
+   (contracts) waits for the OSM object panel, which is the work that would
+   actually consume a shared encoding.
 
 ## Open
 

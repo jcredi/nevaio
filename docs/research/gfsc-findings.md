@@ -3,15 +3,16 @@
 ## 2026-08-25 - setup, before any real GFSC download
 
 - No personal Copernicus/WEkEO/CDSE registration needed for GFSC via the HR-WSI S3
-  client (`recon/vendor/hrwsi/`). The script uses a read-only access key hardcoded
+  client (`pipeline/tools/vendor/hrwsi/`). The script uses a read-only access key hardcoded
   in `s3_hrwsi_downloader.py` itself, pointing at a CloudFerro S3 endpoint
   (`s3.WAW3-2.cloudferro.com`, bucket `HRWSI`) - consistent with Copernicus's
   full/open/free data policy. Confirmed by reading the script source directly,
   not just the README.
 - Client's own install docs are conda-only (`env.yaml`); all its deps
   (boto3, geopandas, pyproj, pyogrio, shapely, retry, tqdm) have PyPI wheels for
-  Python 3.14 (confirmed via `pip install --dry-run`), so `recon/.venv` + pip is
-  fine, no conda needed.
+  Python 3.14 (confirmed via `pip install --dry-run`), so a venv + pip is
+  fine, no conda needed. *(Aug 2026 note. The environment is now
+  `pipeline/.venv` on Python 3.12, matching CI - see `pipeline/README.md`.)*
 - Verified the "MGRS tile-boundary" sample point against the client's own
   `MGRS_tiles.gpkg` rather than guessing: tiles overlap by design (~10km margin),
   so a boundary point needs to fall inside the overlap of two tiles' polygons, not
@@ -102,7 +103,7 @@ Real per-day extraction at one pixel, full window - see this as the first concre
 ## 2026-08-25 - first real snow tile on the map (convergence milestone)
 
 First time Track A and Track B met: one real GFSC product reprojected and rendered over
-the MapLibre basemap. Script: `recon/make_overlay.py`. Artifacts: `app/public/snow/`.
+the MapLibre basemap. Script: `pipeline/tools/make_sample_overlay.py`. Artifacts: `app/public/snow/`.
 
 ### Picking a product: the date matters far more than the area
 

@@ -92,7 +92,7 @@ Recorded so they are not "fixed" by someone acting in good faith:
 
 ```sh
 cd app && npm test                                   # 33 frontend cases
-recon/.venv/bin/python -m unittest discover -s pipeline/tests   # 83 cases
+pipeline/.venv/bin/python -m unittest discover -s pipeline/tests   # 83 cases
 cd app && npm audit --package-lock-only --ignore-scripts
 ```
 
