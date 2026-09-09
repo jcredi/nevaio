@@ -48,8 +48,11 @@ Snow metadata fetched at runtime is validated by
 must resolve to the manifest's own origin and its own run directory, so a
 poisoned manifest cannot redirect the browser elsewhere. If the pipeline ever
 changes where tiles live, that validator changes in the same commit or the map
-goes blank. When the live snapshot is missing or fails validation the snow
-control says so, rather than presenting the archived sample as current data.
+goes blank. When the live snapshot is missing or fails validation the map shows
+no snow layer at all and the control says "Snow data unavailable". The archived
+sample that used to fill that gap was removed on 2026-09-09: a months-old
+raster that reads as current conditions is a hazard, not a graceful
+degradation.
 
 Geocoder responses are treated as untrusted: a feature whose centre is missing
 or not a finite, real coordinate is discarded rather than passed to the map.

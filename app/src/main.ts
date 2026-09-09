@@ -1,6 +1,5 @@
 import maplibregl from "maplibre-gl";
 import {
-  fallbackSnowOverlayUrl,
   initialView,
   snowManifestUrl,
   styleUrl,
@@ -28,7 +27,9 @@ document.body.append(createSearchBar(map));
 
 map.on("load", async () => {
   try {
-    const overlay = await addSnowOverlay(map, snowManifestUrl, fallbackSnowOverlayUrl);
+    // Null means there is no usable published snapshot; the control says so
+    // rather than the app going quiet about it.
+    const overlay = await addSnowOverlay(map, snowManifestUrl);
     map.addControl(new SnowControl(overlay), "top-left");
   } catch (error) {
     // A missing overlay shouldn't take the basemap down with it.

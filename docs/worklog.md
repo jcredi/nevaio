@@ -1,5 +1,49 @@
 # Working session log
 
+## 2026-09-09 - Snow fallback removed; the reconnaissance archive deleted
+
+The owner took the deferred product decision recorded in REFACTOR.md: drop the
+automatic archived-sample fallback rather than keep it as an opt-in demo. When
+the published snapshot is missing or fails validation the map now shows no snow
+layer at all, and the control renders "Snow data unavailable" - no toggle for a
+layer that is not there, and no legend explaining an encoding nothing on screen
+uses. `addSnowOverlay` returns `null` instead of throwing, so the caller can
+render that state deliberately rather than the app going quiet.
+
+The reasoning that decided it: a months-old raster that reads as current
+conditions is a hazard for the decisions this app exists to support, not a
+graceful degradation. The amber "showing an old sample tile" warning added for
+audit F6 was mitigation for a design that should not have existed.
+
+**A correction that changed the risk assessment.** `data/README.md`, written
+earlier the same day, claimed the winter archive "cannot be re-downloaded out
+of season". That was wrong and was flagged before the deletion: what cannot be
+re-downloaded in September is *today's* snow. HR-WSI keeps catalogue history
+back to 2016 - this repository already relied on that when it queried 2016-2026
+to prove the four missing tiles were open sea. So deleting the 1.5 GB archive
+costs a slow re-download, not the data.
+
+Removed together, because each existed only for the next: the committed
+`app/public/snow/gfsc_32TPS_20260206.{png,json}` (the repo's only image, 772
+KB), `pipeline/tools/make_sample_overlay.py` that generated it, the vendored
+HR-WSI client that was its acquisition provenance, the `pyproj` dev dependency
+only that tool needed, `validateImageMeta`/`SnowImageMeta` in the manifest
+validator, and `data/` itself. Stage 1 had carefully relocated most of this
+hours earlier; it turned out to be a waypoint rather than a destination, which
+is the honest outcome of separating things before deciding what they are for.
+
+**Browser-verified before commit, both paths.** Unavailable: control reads
+"Snow data unavailable", no toggle, no legend, no `gfsc-snow` layer, basemap
+still rendering 737 features, zero console errors. Available (synthetic local
+manifest): toggle and legend present, layer added, meta line "9 Sept 2026 - 58
+source tiles", no warning. The second case matters because the normal branch
+gained a local `overlay` binding - TypeScript rejected reading the narrowed
+`this.overlay` inside the change listener's closure, which is a real bug it
+caught rather than a style preference.
+
+83 pipeline tests, 30 frontend tests (down from 33: the three sidecar-validator
+cases went with the validator), clean build.
+
 ## 2026-09-09 - Refactor stage 2: pipeline packaged as `nevaio_pipeline`
 
 `pipeline/*.py` moved to `pipeline/src/nevaio_pipeline/`, with `preview.py`

@@ -24,11 +24,9 @@ app/shots/
 !.env.example
 !.env.*.example
 
-# Local data tree (see data/README.md). None of it is committed: research/ is
-# the durable winter GFSC archive, cache/ is disposable downloads, output/ is
-# generated artifacts. Only data/README.md itself is tracked.
-data/*
-!data/README.md
+# Local pipeline scratch, if you point --raw-dir/--work-dir/--output-dir here
+# rather than at /tmp. Never committed.
+data/
 
 # downloaded satellite data - don't commit raw rasters
 *.tif
@@ -39,10 +37,6 @@ data/*
 app/public/snow/latest.json
 app/public/snow/runs/
 
-# HR-WSI MGRS tile reference file (~16MB, easily re-fetched - see
-# data/README.md). Research reference data, not a build input: production
-# discovery hardcodes its tile list in pipeline/config.py precisely so it does
-# not depend on this file.
 *.gpkg
 
 # personal Claude Code notes (not shared with the team)

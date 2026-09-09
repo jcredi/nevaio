@@ -8,11 +8,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import {
-  ManifestError,
-  validateImageMeta,
-  validateTileManifest,
-} from "./manifestSchema.ts";
+import { ManifestError, validateTileManifest } from "./manifestSchema.ts";
 
 const PAGE = "https://nevaio.netlify.app/";
 const MANIFEST_URL = "https://pub-example.r2.dev/latest.json";
@@ -176,59 +172,5 @@ describe("validateTileManifest", () => {
     rejects("just a string", /must be a JSON object/);
     rejects([manifest()], /must be a JSON object/);
     rejects(null, /must be a JSON object/);
-  });
-});
-
-describe("validateImageMeta", () => {
-  const SIDECAR = "/snow/gfsc_32TPS_20260206.json";
-
-  function meta(overrides: Record<string, unknown> = {}): Record<string, unknown> {
-    return {
-      image: "gfsc_32TPS_20260206.png",
-      product: "CLMS_WSI_GFSC_060m_T32TPS_20260206P7D_COMB_V102",
-      tile: "32TPS",
-      date: "2026-02-06",
-      coordinates: [
-        [10.29, 46.95],
-        [11.75, 46.95],
-        [11.75, 45.93],
-        [10.29, 45.93],
-      ],
-      bounds: [10.29, 45.93, 11.75, 46.95],
-      ...overrides,
-    };
-  }
-
-  it("accepts the checked-in sidecar and resolves its image", () => {
-    const { imageUrl, meta: validated } = validateImageMeta(meta(), SIDECAR, PAGE);
-
-    assert.equal(imageUrl, "https://nevaio.netlify.app/snow/gfsc_32TPS_20260206.png");
-    assert.equal(validated.tile, "32TPS");
-  });
-
-  it("refuses an image on another origin or outside the sidecar's directory", () => {
-    assert.throws(
-      () => validateImageMeta(meta({ image: "https://evil.example/x.png" }), SIDECAR, PAGE),
-      ManifestError,
-    );
-    assert.throws(
-      () => validateImageMeta(meta({ image: "notapng.svg" }), SIDECAR, PAGE),
-      /not a PNG/,
-    );
-  });
-
-  it("refuses non-finite or out-of-world corner coordinates", () => {
-    assert.throws(
-      () => validateImageMeta(meta({ coordinates: [[0, 0], [1, 1], [2, 2], [1e9, 0]] }), SIDECAR, PAGE),
-      /outside the real world/,
-    );
-    assert.throws(
-      () => validateImageMeta(meta({ coordinates: [[0, 0], [1, 1], [2, 2], ["x", 0]] }), SIDECAR, PAGE),
-      /must be numbers/,
-    );
-    assert.throws(
-      () => validateImageMeta(meta({ coordinates: [[0, 0], [1, 1], [2, 2]] }), SIDECAR, PAGE),
-      /four corner pairs/,
-    );
   });
 });

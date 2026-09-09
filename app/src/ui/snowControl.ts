@@ -75,11 +75,35 @@ function formatProductDate(iso: string): string {
 export class SnowControl implements IControl {
   private container!: HTMLElement;
 
-  constructor(private readonly overlay: SnowOverlay) {}
+  constructor(private readonly overlay: SnowOverlay | null) {}
 
   onAdd(): HTMLElement {
     this.container = document.createElement("div");
     this.container.className = "maplibregl-ctrl maplibregl-ctrl-group snow-ctrl";
+
+    // No published snapshot loaded, or it failed validation. Say so and stop:
+    // no toggle for a layer that isn't there, and no legend explaining an
+    // encoding nothing on screen uses. Showing an archived sample here instead
+    // would risk a months-old raster being read as today's conditions.
+    if (!this.overlay) {
+      const heading = document.createElement("p");
+      heading.className = "snow-ctrl__meta";
+      heading.textContent = "Snow cover";
+
+      const warning = document.createElement("p");
+      warning.className = "snow-ctrl__warning";
+      warning.textContent = "Snow data unavailable";
+      warning.title =
+        "The published snapshot could not be loaded or did not pass validation. " +
+        "No snow data is being shown.";
+
+      this.container.append(heading, warning);
+      return this.container;
+    }
+
+    // Bound to a local so the narrowing above survives into the change
+    // listener's closure, which reads this.overlay after onAdd has returned.
+    const overlay = this.overlay;
 
     const toggle = document.createElement("label");
     toggle.className = "snow-ctrl__toggle";
@@ -87,8 +111,8 @@ export class SnowControl implements IControl {
     const checkbox = document.createElement("input");
     checkbox.type = "checkbox";
     checkbox.className = "snow-ctrl__toggle-input";
-    checkbox.checked = this.overlay.isVisible();
-    checkbox.addEventListener("change", () => this.overlay.setVisible(checkbox.checked));
+    checkbox.checked = overlay.isVisible();
+    checkbox.addEventListener("change", () => overlay.setVisible(checkbox.checked));
 
     // Visual switch track/thumb, styled from the (visually hidden but still
     // focusable/clickable, per the wrapping <label>) checkbox above via the
@@ -104,23 +128,10 @@ export class SnowControl implements IControl {
 
     const metaLine = document.createElement("p");
     metaLine.className = "snow-ctrl__meta";
-    metaLine.textContent = `${formatProductDate(this.overlay.date)} · ${this.overlay.summary}`;
-    metaLine.title = this.overlay.title;
+    metaLine.textContent = `${formatProductDate(overlay.date)} · ${overlay.summary}`;
+    metaLine.title = overlay.title;
 
     this.container.append(toggle, metaLine);
-
-    // The live publication was unavailable or failed validation, so what is on
-    // screen is the checked-in reconnaissance sample: one tile, months old.
-    // Say so plainly rather than letting it pass as today's snow (audit F6).
-    if (this.overlay.isSample) {
-      const warning = document.createElement("p");
-      warning.className = "snow-ctrl__warning";
-      warning.textContent = "Live data unavailable - showing an old sample tile";
-      warning.title =
-        "The published snapshot could not be loaded or did not pass validation. " +
-        "This is a single archived tile, not current snow cover.";
-      metaLine.after(warning);
-    }
 
     this.container.append(buildLegend());
     return this.container;

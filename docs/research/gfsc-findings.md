@@ -1,5 +1,11 @@
 # Recon findings (running notes)
 
+> **Historical record, Aug 2026.** The 1.5 GB sample archive and the vendored
+> HR-WSI client described below were deleted on 2026-09-09, once the fallback
+> overlay they existed to produce was removed. The findings still stand; the
+> files do not. HR-WSI's catalogue keeps history back to 2016, so any of this is
+> re-downloadable if a question needs real winter rasters again.
+
 ## 2026-08-25 - setup, before any real GFSC download
 
 - No personal Copernicus/WEkEO/CDSE registration needed for GFSC via the HR-WSI S3

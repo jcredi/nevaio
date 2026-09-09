@@ -8,8 +8,3 @@
 # version-pinned via requirements.in but not hash-verified, because the hashes
 # are platform-specific and CI owns them.
 -r requirements.in
-
-# Sample-tool only: pipeline/tools/make_sample_overlay.py reprojects with
-# pyproj.Transformer. Deliberately NOT in requirements.in - the render and
-# publish environments must not grow a dependency only a dev tool needs.
-pyproj==3.7.2

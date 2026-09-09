@@ -15,16 +15,6 @@
  * app/public/_headers is the independent second layer.
  */
 
-/** Sidecar written by pipeline/tools/make_sample_overlay.py alongside the fallback PNG. */
-export type SnowImageMeta = {
-  image: string;
-  product: string;
-  tile: string;
-  date: string;
-  coordinates: [[number, number], [number, number], [number, number], [number, number]];
-  bounds: [number, number, number, number];
-};
-
 /** AS-OF snapshot manifest published atomically by nevaio_pipeline.render. */
 export type SnowTileManifest = {
   schemaVersion: number;
@@ -264,56 +254,4 @@ export function validateTileManifest(
     notice,
   };
   return { manifest, tileUrls };
-}
-
-/** A validated fallback sidecar, with its image URL already resolved. */
-export type ValidatedImageMeta = {
-  meta: SnowImageMeta;
-  imageUrl: string;
-};
-
-export function validateImageMeta(
-  document: unknown,
-  sidecarUrl: string,
-  pageUrl: string,
-): ValidatedImageMeta {
-  if (typeof document !== "object" || document === null || Array.isArray(document)) {
-    fail("sidecar must be a JSON object");
-  }
-  const source = document as Record<string, unknown>;
-
-  const base = new URL(sidecarUrl, pageUrl);
-  const image = resolveTrustedUrl(source.image, "image", base);
-  if (!image.pathname.endsWith(".png")) fail(`image is not a PNG: ${image.pathname}`);
-
-  const product = requireString(source.product, "product", 128);
-  const tile = requireString(source.tile, "tile", 16);
-  const date = requireString(source.date, "date", 10);
-  if (!ISO_DATE.test(date)) fail(`date is not an ISO date: ${date}`);
-  const bounds = requireBounds(source.bounds, "bounds");
-
-  if (!Array.isArray(source.coordinates) || source.coordinates.length !== 4) {
-    fail("coordinates must be four corner pairs");
-  }
-  const coordinates = source.coordinates.map((corner, index) => {
-    if (!Array.isArray(corner) || corner.length !== 2) {
-      fail(`coordinates[${index}] must be a [lon, lat] pair`);
-    }
-    const [lon, lat] = corner as [unknown, unknown];
-    if (typeof lon !== "number" || typeof lat !== "number") {
-      fail(`coordinates[${index}] must be numbers`);
-    }
-    if (!Number.isFinite(lon) || !Number.isFinite(lat)) {
-      fail(`coordinates[${index}] must be finite`);
-    }
-    if (lon < -180 || lon > 180 || lat < -90 || lat > 90) {
-      fail(`coordinates[${index}] is outside the real world`);
-    }
-    return [lon, lat] as [number, number];
-  }) as SnowImageMeta["coordinates"];
-
-  return {
-    meta: { image: source.image as string, product, tile, date, coordinates, bounds },
-    imageUrl: image.href,
-  };
 }

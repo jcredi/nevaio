@@ -18,11 +18,11 @@ export const initialView = {
 };
 
 // Production points this at R2 with VITE_SNOW_MANIFEST_URL. A locally rendered
-// preview uses /snow/latest.json; when neither exists the app falls back to the
-// checked-in one-tile reconnaissance overlay.
+// preview uses /snow/latest.json. When neither exists there is deliberately no
+// fallback: the snow control reports the data as unavailable instead of showing
+// an archived raster that could be mistaken for current conditions.
 export const snowManifestUrl =
   import.meta.env.VITE_SNOW_MANIFEST_URL || "/snow/latest.json";
-export const fallbackSnowOverlayUrl = "/snow/gfsc_32TPS_20260206.json";
 
 // Approximate Alps + Italian Apennines bounding box (west, south, east,
 // north), used only to bias place-search results (spec section 6.1) toward

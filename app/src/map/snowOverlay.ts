@@ -2,13 +2,11 @@ import type { Map } from "maplibre-gl";
 
 import {
   ManifestError,
-  validateImageMeta,
   validateTileManifest,
-  type SnowImageMeta,
   type SnowTileManifest,
 } from "./manifestSchema";
 
-export type { SnowImageMeta, SnowTileManifest };
+export type { SnowTileManifest };
 
 export const SOURCE_ID = "gfsc-snow";
 export const LAYER_ID = "gfsc-snow";
@@ -20,20 +18,13 @@ export type SnowOverlay = {
   summary: string;
   title: string;
   bounds: [number, number, number, number];
-  /**
-   * True when this is the checked-in reconnaissance sample rather than a live
-   * publication. The audit (F6) asked for this to be visible: silently showing
-   * a months-old single-tile sample as if it were today's snow is worse than
-   * saying the data is unavailable.
-   */
-  isSample: boolean;
   setVisible: (visible: boolean) => void;
   isVisible: () => boolean;
 };
 
 function finishOverlay(
   map: Map,
-  info: Pick<SnowOverlay, "date" | "summary" | "title" | "bounds" | "isSample">,
+  info: Pick<SnowOverlay, "date" | "summary" | "title" | "bounds">,
 ): SnowOverlay {
   const beforeId = INSERT_BEFORE.find((id) => map.getLayer(id));
   map.addLayer(
@@ -91,7 +82,6 @@ function addTilePreview(
       ? `${manifest.sourceTileCount}/${manifest.requestedSourceTileCount} source tiles`
       : `${manifest.sourceTileCount} source tiles`;
   return finishOverlay(map, {
-    isSample: false,
     date: manifest.asOfDate,
     // The control already renders the AS-OF date, so don't repeat it here; the
     // notice tooltip carries the "newest valid observation, up to 14 days back"
@@ -102,48 +92,30 @@ function addTilePreview(
   });
 }
 
-async function addImageFallback(map: Map, sidecarUrl: string): Promise<SnowOverlay> {
-  const response = await fetch(sidecarUrl);
-  if (!response.ok) {
-    throw new Error(`Failed to load fallback snow metadata: ${response.status} ${sidecarUrl}`);
-  }
-  const { meta, imageUrl } = validateImageMeta(
-    await response.json(),
-    sidecarUrl,
-    window.location.href,
-  );
-  map.addSource(SOURCE_ID, {
-    type: "image",
-    url: imageUrl,
-    coordinates: meta.coordinates,
-  });
-  return finishOverlay(map, {
-    isSample: true,
-    date: meta.date,
-    summary: `sample tile ${meta.tile}`,
-    title: meta.product,
-    bounds: meta.bounds,
-  });
-}
-
-/** Load the R2/local XYZ preview, falling back to the checked-in sample tile. */
+/**
+ * Load the published XYZ snapshot, or return null if there isn't a usable one.
+ *
+ * There is deliberately no fallback. An archived sample used to be shown here
+ * when the live snapshot was unavailable, which meant a months-old raster could
+ * be read as today's conditions - a real hazard for the mountaineering
+ * decisions this app is meant to support (spec section 5.4). Saying nothing is
+ * the honest answer, and the caller renders that state explicitly.
+ */
 export async function addSnowOverlay(
   map: Map,
   manifestUrl: string,
-  fallbackSidecarUrl: string,
-): Promise<SnowOverlay> {
-  let validated: Awaited<ReturnType<typeof loadTileManifest>>;
+): Promise<SnowOverlay | null> {
   try {
-    validated = await loadTileManifest(manifestUrl);
+    const { manifest, tileUrls } = await loadTileManifest(manifestUrl);
+    return addTilePreview(map, manifest, tileUrls);
   } catch (error) {
     // A rejected manifest is a louder event than a missing one: it means the
     // published metadata is malformed or has been tampered with.
     if (error instanceof ManifestError) {
       console.error("Snow manifest rejected by validation", error);
     } else {
-      console.warn("Snow preview unavailable; using the checked-in sample", error);
+      console.warn("Snow snapshot unavailable", error);
     }
-    return addImageFallback(map, fallbackSidecarUrl);
+    return null;
   }
-  return addTilePreview(map, validated.manifest, validated.tileUrls);
 }

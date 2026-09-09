@@ -49,7 +49,8 @@ PREVIEW_MAX_ZOOM = 11
 #
 # The renderer parses bytes chosen by an upstream catalogue, so every input
 # needs a stated shape and a ceiling. These values describe GFSC as actually
-# published: measured across 2320 real layer files in data/research, every GF,
+# published: measured across 2320 real layer files in the 2026 reconnaissance
+# archive (since deleted - see docs/worklog.md 2026-09-09), every GF,
 # GF-QA and AT raster is a 1830x1830 GTiff at 60 m in a northern UTM zone, and
 # the largest is 1.4 MB. The limits below are deliberately several times
 # larger than observed so ordinary upstream variation does not fail a run,
