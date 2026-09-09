@@ -1,5 +1,46 @@
 # Working session log
 
+## 2026-09-09 - Recordkeeping cut from four surfaces to two
+
+Four files were narrating the same events - `CHANGELOG.md`, this worklog,
+`docs/plan.md` and `PROMPT_TO_RESUME.md` - and "what is left to do" was spread
+across five (those, plus `docs/spec.md` section 15 and `docs/security.md`).
+Today's maplibre revert got written four times. The fix is a rule rather than a
+merge: **records are split by tense.** The worklog is the past, `docs/plan.md`
+is the future, and nothing appears in both.
+
+`docs/plan.md` went from 252 lines to 62. It had accreted a status paragraph, a
+55-line DONE list and the entire 170-line repository refactor plan (a second
+copy of `REFACTOR.md`), leaving roughly twelve lines of genuinely
+forward-looking content buried at the end. It is now status, next-in-order,
+open, and not-doing-yet, with a rule at the top: when something ships it
+*leaves* the file. The refactor plan is a pointer to `REFACTOR.md` now, since
+two copies of a deferred plan will drift and the drifted one is what gets read.
+
+**`CHANGELOG.md` retired to `docs/archive/`, not deleted.** The counterintuitive
+call, so the reasoning: the usual instinct is to keep the changelog and treat a
+decisions log as the optional extra. Inverted here. A changelog answers "what
+changed between versions" for people who were not present - this repo has no
+tags, no releases and no external users, and all 240 of its content lines sat
+in one `[Unreleased]` block. The worklog answers "why is it like this," which
+is the question that actually costs a future session money. Restore a generated
+changelog at the first public MVP release. The archived file carries a header
+saying so.
+
+**`PROMPT_TO_RESUME.md` retired.** An honestly maintained plan.md *is* the
+resume prompt, and the guide's rule to rewrite it fully on every commit and
+push was the most expensive line in the whole document. It was untracked, so it
+was moved out of the tree rather than deleted.
+
+Also folded in: the mobile testing pass is now item 1 in the plan. A quick
+real-device check found the search bar overflowing the screen. The UI has only
+ever been verified at desktop viewport sizes, including in Playwright, against
+a spec whose section 10 is explicitly mobile-first.
+
+**Rejected:** merging the worklog and the changelog into one file. The split
+that mattered was tense, not audience, and the changelog side of that merge had
+no distinct content left to contribute.
+
 ## 2026-09-09 - Security work wrapped up; posture recorded in-repo
 
 Closed out the audit. The owner confirmed the remaining console items: the

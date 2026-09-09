@@ -56,10 +56,25 @@ version.
 - Favor steps with a visible or checkable result: for `app/`, "does it render correctly in a browser"; for `recon/`, "does the script run and produce inspectable output."
 
 ## Recordkeeping - update before ending a session
-Three files exist specifically to survive past this conversation. Update all
-three before considering a session done, whenever code changed or a real
-decision got made (skip all three for pure exploration/discussion that
-changed nothing):
-- **`CHANGELOG.md`** - what changed in the code, [Keep a Changelog](https://keepachangelog.com) format, under `## [Unreleased]`. User-facing/dev-facing summary, not a diff.
-- **`docs/worklog.md`** - narrative session log, newest entry first: what was done, what was decided *and why*, what was explicitly rejected and why, what's still open. The "rejected" section matters most - it's what stops a later session from re-litigating a dead end. This is not `docs/spec.md` (frozen intent), `docs/plan.md` (what's next), or `recon/findings.md` (what the data is) - it's what *we* did and decided, across sessions.
-- **`PROMPT_TO_RESUME.md`** (repo root) - the standing "resume work" prompt for the next session, in the imperative ("Resume the Nevaio GFSC snow pipeline work from commit \<sha\>..."), covering current status, a "DO THIS, IN ORDER" list, and a "things that will otherwise cost you time" list. Untracked by convention (commit it only if you want it to travel to another machine) - update it locally on **every commit + push in this repo**, not only at a session's natural end, so it never goes stale mid-session either. Rewrite it fully rather than appending; it should read as if written fresh for someone with zero prior context.
+Two files survive past this conversation, and they are split **by tense**.
+Update both whenever code changed or a real decision got made; skip both for
+pure exploration that changed nothing.
+- **`docs/worklog.md` - the past.** Narrative session log, newest entry first:
+  what was done, what was decided *and why*, what was explicitly rejected and
+  why, what is still open. The "rejected" section matters most - it is what
+  stops a later session re-litigating a dead end. Append; never rewrite old
+  entries.
+- **`docs/plan.md` - the future.** Status, what is next in order, what is open,
+  what we are not doing yet. **When something ships it leaves this file** - the
+  worklog entry is the record. Never add a "done" section here.
+
+Neither is `docs/spec.md` (frozen intent), `recon/findings.md` (what the data
+is), or `docs/security.md` (what protects the project).
+
+Retired on 2026-09-09, deliberately - do not reinstate without asking:
+- **`CHANGELOG.md`** (now `docs/archive/CHANGELOG.md`). It was a third
+  narration of what the worklog already held, and there are no releases for it
+  to sit between. Bring back a generated one at the first public MVP release.
+- **`PROMPT_TO_RESUME.md`**. An honestly maintained `docs/plan.md` *is* the
+  resume prompt, and rewriting a separate untracked copy on every push was the
+  most expensive rule in this guide.

@@ -1,5 +1,12 @@
 # Changelog
 
+> **Archived 2026-09-09, pre-MVP.** This file was retired because it was a
+> third narration of events already recorded in `docs/worklog.md`, and a
+> changelog earns its keep only once there are releases to sit between. There
+> are no tags; everything below sat in a single `[Unreleased]` block. Restore a
+> changelog at the first public MVP release, generated from `docs/worklog.md`
+> and `git log` rather than hand-written alongside them.
+
 All notable changes to this project are documented in this file.
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
