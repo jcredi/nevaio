@@ -1,5 +1,63 @@
 # Working session log
 
+## 2026-09-09 - F11 place search moved to MapTiler Geocoding
+
+The audit's F11 was not just a rate-limit warning: the OSMF Nominatim policy
+prohibits client-side autocomplete outright and caps the whole application at
+one request per second, which no per-browser debounce can enforce. So the
+shipped as-you-type search was outside the provider's terms, not merely near a
+limit. The user chose to switch to a provider that permits autocomplete rather
+than degrade the search to explicit submissions.
+
+Picked MapTiler Geocoding: it reuses the basemap's existing key (no new
+credential, no new CSP origin - `nominatim.openstreetmap.org` came back out of
+`connect-src`), and its results are still OSM-derived, which was the original
+reason for preferring Nominatim in the first place. Recorded as spec amendment
+v1.9, since section 15 item 5 had explicitly considered and rejected this exact
+provider; the amendment states what changed and what it costs rather than
+quietly editing the old decision.
+
+Two things only became visible by querying the real API rather than reading
+docs. First, the default result set is dominated by streets and addresses:
+"Ortles" returned four streets named Via Ortles and no mountain at all, and
+"Gran Sasso" and "Passo dello Stelvio" behaved the same way. Constraining
+`types` to POI and place classes fixes it - Ortler/Ortles, Payerhuette/Rifugio
+Payer and Stelvio Pass then rank first. Second, POI features expose their raw
+OSM tags in `properties.feature_tags`, so the existing icon rules keep working
+unchanged; administrative results have no tags and fall back to MapTiler's
+place vocabulary under a "place" category, matching how Nominatim reported
+towns.
+
+Classification takes the first meaningful tag from an ordered key list and
+skips bare `yes` values, because Payerhuette carries `building=yes` alongside
+`tourism=alpine_hut` and the wrong precedence would silently cost every hut its
+icon. There is a test for exactly that.
+
+Changed the result bounds from Nominatim's `[south, north, west, east]` tuple
+to named edges. The old shape was a standing transposition hazard - the same
+class of silent bug as the `category`/`class` field-name mistake this file
+records from 2026-09-06 - and MapTiler's bbox is in yet another order
+(`[west, south, east, north]`), so converting between two differently ordered
+anonymous tuples was worth removing outright.
+
+Geocoder responses are now treated as untrusted, per the audit's point that a
+malformed response should not be able to break map navigation: a feature whose
+centre is missing, non-numeric, non-finite or outside real lon/lat is dropped
+rather than passed to `map.flyTo`, one bad feature does not empty an otherwise
+good list, result counts and label lengths are bounded, and a broken bbox
+degrades to the point-zoom behavior instead of producing a nonsense span.
+
+Split the pure parsing into `geocodeResult.ts` so `npm test` can exercise it
+under plain Node (the network module imports Vite config and
+`import.meta.env`, which Node cannot resolve). Same core-independent-of-I/O
+split the Python pipeline already follows.
+
+Verification: 33 frontend tests pass, tsc and the Vite build are clean, and the
+fixtures are trimmed from real API responses rather than invented. Not yet
+verified in a browser: the production MapTiler key now correctly rejects
+localhost, so no local run can load the map until a development key exists.
+
+
 ## 2026-09-09 - F6 manifest validation
 
 The frontend now validates the snow metadata it fetches

@@ -17,6 +17,14 @@
  *
  * Requires VITE_MAPTILER_API_KEY in app/.env (as for any local build) and
  * network access to MapTiler.
+ *
+ * The production MapTiler key is origin-restricted (audit F9), so it returns
+ * 403 from localhost. Put a development key whose allowed origins include
+ * http://localhost and http://127.0.0.1 in NEVAIO_DEV_MAPTILER_KEY (or in
+ * app/.env as VITE_MAPTILER_API_KEY for local builds) and it is substituted
+ * into MapTiler requests for local runs. Spoofing the production origin is not
+ * an option: the browser controls the Origin header, which is what MapTiler
+ * checks.
  */
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
@@ -86,6 +94,15 @@ if (DEPLOYED) {
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
 
+const devKey = process.env.NEVAIO_DEV_MAPTILER_KEY;
+if (!DEPLOYED && devKey) {
+  console.log("  using NEVAIO_DEV_MAPTILER_KEY for MapTiler requests");
+  // Applies to worker-issued fetches too, which page.route() cannot see.
+  await page.route(/^https:\/\/api\.maptiler\.com\//, (route) =>
+    route.continue({ url: route.request().url().replace(/([?&]key=)[^&]*/, `$1${devKey}`) }),
+  );
+}
+
 const violations = [];
 const pageErrors = [];
 await page.addInitScript(() => {
@@ -115,6 +132,7 @@ const EXPECTED = [
   ["MapTiler style", /^https:\/\/api\.maptiler\.com\/maps\/outdoor\/style\.json/, false],
   ["MapTiler tiles", /^https:\/\/api\.maptiler\.com\/.*\.(pbf|png|webp|json)/, false],
   ["MapTiler glyphs", /^https:\/\/api\.maptiler\.com\/fonts\//, false],
+  ["place search", /^https:\/\/api\.maptiler\.com\/geocoding\//, false],
   ["snow manifest", /\/latest\.json/, true],
   ["snow tiles", /\/runs\/.*\/tiles\/.*\.png/, true],
 ].filter(([, , deployedOnly]) => DEPLOYED || !deployedOnly);

@@ -8,6 +8,18 @@ Versioned from `0.1.0` (2026-08-25), the first deploy.
 ## [Unreleased]
 
 ### Security
+- Move place search off the public OSMF Nominatim endpoint to MapTiler
+  Geocoding (F11, spec amendment v1.9). That endpoint's policy prohibits
+  client-side autocomplete and caps the whole application at one request per
+  second, which a per-browser debounce cannot enforce, so the shipped search
+  was outside its terms. The replacement permits typeahead, reuses the
+  basemap's existing key, and adds no new origin to the CSP - which lets
+  `nominatim.openstreetmap.org` be dropped from `connect-src`. Geocoder
+  responses are treated as untrusted: a feature whose centre is missing,
+  non-finite or outside real coordinates is discarded rather than passed to
+  `map.flyTo`, result counts and label lengths are bounded, and bounds are
+  named edges rather than an easily transposed tuple. Results stay
+  OSM-derived and keep their OSM tags, so the search icons are unaffected.
 - Validate the snow manifest and fallback sidecar at runtime (F6). Tile URL
   templates must resolve to the same origin and run directory as the manifest
   that offered them - the manifest URL is build-time configuration, so it is

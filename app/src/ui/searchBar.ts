@@ -1,6 +1,6 @@
 import maplibregl, { type Map } from "maplibre-gl";
 import { parseCoordinates } from "../search/coordinates";
-import { geocode, type GeocodeResult } from "../search/nominatim";
+import { geocode, type GeocodeBounds, type GeocodeResult } from "../search/geocode";
 
 type SearchResult =
   | ({ kind: "place" } & GeocodeResult)
@@ -59,9 +59,9 @@ function resultIcon(result: SearchResult): string {
  * Zoom level from a result's bounding-box span, rather than a hardcoded
  * per-OSM-type table - a tight bbox (a peak, a hut) zooms in close, a wide
  * one (a town, a valley) zooms out further, and it works for any OSM
- * class/type Nominatim returns without needing to enumerate them.
+ * class/type the geocoder returns without needing to enumerate them.
  */
-function zoomForBoundingBox([south, north, west, east]: [number, number, number, number]): number {
+function zoomForBounds({ west, south, east, north }: GeocodeBounds): number {
   const span = Math.max(north - south, east - west);
   if (span <= 0.005) return 15;
   if (span <= 0.02) return 14;
@@ -164,8 +164,9 @@ export function createSearchBar(map: Map): HTMLElement {
 
   function select(result: SearchResult): void {
     const center: [number, number] = [result.lon, result.lat];
-    const zoom =
-      result.kind === "place" ? zoomForBoundingBox(result.boundingbox) : 14;
+    // A point feature (a peak, a hut) has a degenerate bbox, so its span
+    // falls into the closest zoom bucket, which is what we want anyway.
+    const zoom = result.kind === "place" ? zoomForBounds(result.bounds) : 14;
     map.flyTo({ center, zoom });
 
     if (!marker) {
