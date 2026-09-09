@@ -1,5 +1,51 @@
 # Working session log
 
+## 2026-09-09 - F2 input boundaries
+
+Restricted and bounded what the renderer will parse. The audit's demonstrated
+primitive was a VRT named `*.tif` whose SimpleSource read a raster outside the
+input directory; the fix is opening with the driver pinned to GTiff, verified
+by reproducing the probe both ways in a test - an unrestricted open really does
+return the outside file's marker pixels, and the pipeline's restricted open
+raises. Keeping the demonstration in the test is deliberate: a bare "it raises"
+assertion would still pass if the restriction were quietly removed and the file
+merely happened to be invalid for some other reason.
+
+All shape checks moved ahead of `dataset.read`, so nothing allocates an array
+for a raster it has already decided to refuse. Added: exactly 1830x1830, 60 m
+axis-aligned pixels, an origin inside the northern-UTM range, and a CRS whose
+EPSG code matches the UTM zone in the product's own MGRS tile name - a raster
+filed under 32TPS but georeferenced in zone 33 is not that tile. Symlinked
+inputs are refused, matching the artifact validator.
+
+The exact-1830 requirement broke the existing 2x2 synthetic fixtures. Rejected
+weakening the check to "square and no larger than 1830", which would have kept
+the fixtures working: the equality is the stronger authenticity signal and
+costs nothing in production. Instead `load_tile_products` takes an
+`expected_pixels` argument that only tests pass, and a test asserts the
+production default is still the real measured shape.
+
+Volume ceilings live in `pipeline/config.py`, derived from measurement rather
+than guesswork: 2320 real layer files in `recon/data` are all 1830x1830 GTiffs
+under 1.4 MB, so the per-object limit is 16 MiB and the per-run download limit
+12 GiB (about 3x a normal 58-tile, 31-date window). An oversize catalogue
+object is dropped during grouping rather than raising, so its product becomes
+incomplete and the tile falls back to another date in the window; a tile left
+with nothing still raises through the existing require_all path. Chose that
+over failing the whole daily run on one anomalous upstream object.
+
+Not implemented: the audit's suggestion to parse in a network-isolated
+sandbox. The render job already holds no publication credentials after F1, and
+adding a container/seccomp layer to a GitHub-hosted runner is a larger change
+than the residual risk justifies right now. Recorded rather than silently
+skipped.
+
+Verification: 83 tests pass (up from 78, up from 70 before F1). A real
+end-to-end render of 31 genuine GFSC products for 32TPS produced 123 tiles and
+passed `pipeline.publish --check-only`, so the stricter loader accepts real
+Copernicus data.
+
+
 ## 2026-09-09 - F1 verified; F4/F5/F7/F8 fixed
 
 Confirmed F1's activation from evidence rather than assumption. The manual

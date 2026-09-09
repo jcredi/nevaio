@@ -8,6 +8,14 @@ Versioned from `0.1.0` (2026-08-25), the first deploy.
 ## [Unreleased]
 
 ### Security
+- Bound and type-restrict pipeline inputs (F2): GFSC layers are opened as
+  GTiff only, which refuses the VRT-disguised-as-`.tif` external read the
+  audit demonstrated, and are validated for shape, 60 m axis-aligned
+  georeferencing, plausible origin and a CRS matching the product's own MGRS
+  zone before any array is allocated. Symlinked inputs are rejected. Catalogue
+  objects over 16 MiB are dropped (falling back to another date in the window
+  rather than failing the run), and a run refuses to download more than 12 GiB
+  or keep more than a window's worth of products per tile.
 - F1 activation verified end to end (2026-09-09): the manual `main` dispatch
   ran rendering and publication on separate runners, validated the artifact
   before secrets were exposed, published a full 58/58-tile run, and confirmed

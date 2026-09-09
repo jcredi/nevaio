@@ -44,3 +44,29 @@ ASOF_WINDOW_DAYS = 31
 PREVIEW_MIN_ZOOM = 8
 PREVIEW_MAX_ZOOM = 11
 
+
+# --- Input boundaries (security audit F2) ---------------------------------
+#
+# The renderer parses bytes chosen by an upstream catalogue, so every input
+# needs a stated shape and a ceiling. These values describe GFSC as actually
+# published: measured across 2320 real layer files in recon/data, every GF,
+# GF-QA and AT raster is a 1830x1830 GTiff at 60 m in a northern UTM zone, and
+# the largest is 1.4 MB. The limits below are deliberately several times
+# larger than observed so ordinary upstream variation does not fail a run,
+# while a malformed or hostile product still cannot exhaust the runner.
+
+# A 60 m GFSC layer covers a 109.8 km MGRS square: 1830 x 1830 pixels.
+GFSC_TILE_PIXELS = 1830
+GFSC_PIXEL_METRES = 60.0
+
+# Per-object ceiling, checked against catalogue metadata before downloading and
+# against the file before parsing (~12x the largest observed layer).
+MAX_LAYER_BYTES = 16 * 1024 * 1024
+
+# Whole-run download ceiling. A full window is ~58 tiles x 31 dates x 3 layers
+# at under a megabyte each, so a few gigabytes is normal and this is ~3x that.
+MAX_DOWNLOAD_BYTES = 12 * 1024 * 1024 * 1024
+
+# One product per date is kept per tile, so the window length is also the
+# per-tile product ceiling.
+MAX_PRODUCTS_PER_TILE = ASOF_WINDOW_DAYS

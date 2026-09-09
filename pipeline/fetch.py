@@ -13,6 +13,8 @@ from typing import Iterable, Sequence
 import boto3
 from botocore.config import Config
 
+from .config import MAX_DOWNLOAD_BYTES, MAX_LAYER_BYTES, MAX_PRODUCTS_PER_TILE
+
 ENDPOINT_URL = "https://s3.WAW3-2.cloudferro.com"
 BUCKET = "HRWSI"
 
@@ -66,9 +68,17 @@ def _complete_products(
     """
 
     grouped: dict[tuple[str, date, str, str], dict[str, CatalogObject]] = {}
+    oversize: list[CatalogObject] = []
     for item in objects:
         match = _KEY_PATTERN.match(item.key)
         if not match:
+            continue
+        if item.size > MAX_LAYER_BYTES:
+            # Bounding inputs before download (audit F2). Dropping the object
+            # makes its product incomplete, so the tile falls back to another
+            # date in the window rather than failing the whole run on one
+            # anomalous object. A tile left with nothing still raises below.
+            oversize.append(item)
             continue
         metadata = match.groupdict()
         product_date = date.fromisoformat(
@@ -87,6 +97,13 @@ def _complete_products(
         if layer in layers:
             raise ValueError(f"duplicate {layer} object for {metadata['product']}")
         layers[layer] = item
+
+    if oversize:
+        listed = ", ".join(f"{item.key} ({item.size} bytes)" for item in oversize[:5])
+        print(
+            f"skipped {len(oversize)} catalogue object(s) over the "
+            f"{MAX_LAYER_BYTES}-byte layer limit: {listed}"
+        )
 
     by_tile: dict[str, list[CatalogProduct]] = {}
     for (tile, product_date, version, product), layers in grouped.items():
@@ -163,6 +180,11 @@ def select_window_products(
             incumbent = by_date.get(candidate.product_date)
             if incumbent is None or candidate.version > incumbent.version:
                 by_date[candidate.product_date] = candidate
+        if len(by_date) > MAX_PRODUCTS_PER_TILE:
+            raise ValueError(
+                f"{len(by_date)} products for tile {tile} exceeds the "
+                f"{MAX_PRODUCTS_PER_TILE}-product window limit"
+            )
         selected[tile] = tuple(by_date[day] for day in sorted(by_date))
     return selected
 
@@ -256,10 +278,22 @@ def download_products(
         product_dir = out_dir / product.product
         for layer in sorted(_REQUIRED_LAYERS):
             item = product.layers[layer]
+            if item.size > MAX_LAYER_BYTES:
+                raise ValueError(
+                    f"catalogue object {item.key} is {item.size} bytes, over the "
+                    f"{MAX_LAYER_BYTES}-byte layer limit"
+                )
             target = product_dir / Path(item.key).name
             if target.is_file() and target.stat().st_size == item.size:
                 continue
             downloads.append((item, target))
+
+    planned = sum(item.size for item, _ in downloads)
+    if planned > MAX_DOWNLOAD_BYTES:
+        raise ValueError(
+            f"this run would download {planned} bytes, over the "
+            f"{MAX_DOWNLOAD_BYTES}-byte run limit"
+        )
 
     def download(pair: tuple[CatalogObject, Path]) -> Path:
         item, target = pair

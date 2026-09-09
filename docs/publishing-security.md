@@ -79,6 +79,40 @@ credentials. Dependency pinning, updates and main-branch protection remain
 necessary. Artifact extraction and the pinned GitHub actions are also part of
 the trusted toolchain; output validation does not replace those controls.
 
+## Input boundaries (F2)
+
+`pipeline/raster_io.py` opens every GFSC layer with the driver restricted to
+GTiff, inside a GDAL environment that does not probe for sidecar files. That is
+what closes the audit's demonstrated primitive: a VRT named `*.tif` that reads
+a raster outside the input directory. `pipeline/tests/test_raster_io.py`
+asserts both halves - that an unrestricted open really does follow the external
+reference, and that the pipeline's restricted open refuses the same file - so
+the test would notice if the restriction were dropped.
+
+Every check now runs before the band is read, so an unexpected raster never
+gets an array allocated for it: one band, the layer's expected dtype and
+nodata, exactly 1830x1830 pixels, an axis-aligned 60 m grid, an origin inside
+the plausible northern-UTM range, and a CRS matching the UTM zone named by the
+product's own MGRS tile. Symlinked inputs are rejected, as in the artifact
+validator. `load_tile_products` takes `expected_pixels` only so tests can use
+small fixtures; production uses the measured GFSC shape.
+
+Volume is bounded in `pipeline/config.py` and enforced in `pipeline/fetch.py`.
+A catalogue object over `MAX_LAYER_BYTES` (16 MiB, about 12x the largest of
+2320 real layers measured in `recon/data`) is dropped during grouping, which
+makes its product incomplete so the tile falls back to another date in the
+window instead of failing the run; a tile left with no complete product still
+raises. `download_products` re-checks each object and refuses a run whose
+planned download exceeds `MAX_DOWNLOAD_BYTES` (12 GiB, roughly 3x a normal full
+window). `select_window_products` refuses more than `MAX_PRODUCTS_PER_TILE`
+products for one tile.
+
+These are integrity and resource bounds, not authenticity. Upstream bytes
+within the accepted shape are still trusted, and the audit's recommendation to
+parse in a network-isolated sandbox is not implemented - the render job simply
+holds no publication credentials (F1). Size equality against the catalogue
+detects truncation, not substitution.
+
 ## Dependency maintenance and local checks
 
 `requirements.in` records the selected direct render/test dependencies;

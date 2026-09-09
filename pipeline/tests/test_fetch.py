@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import tempfile
 import unittest
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 from unittest.mock import patch
 
 from pipeline.config import (
     ASOF_WINDOW_DAYS,
+    MAX_LAYER_BYTES,
+    MAX_PRODUCTS_PER_TILE,
     MVP_MGRS_TILES,
     PREVIEW_MAX_ZOOM,
     PREVIEW_MIN_ZOOM,
@@ -25,11 +27,18 @@ from pipeline.fetch import (
 )
 
 
-def objects(tile: str, day: date, version: str, *, missing: str | None = None) -> list[CatalogObject]:
+def objects(
+    tile: str,
+    day: date,
+    version: str,
+    *,
+    missing: str | None = None,
+    sizes: dict[str, int] | None = None,
+) -> list[CatalogObject]:
     product = f"CLMS_WSI_GFSC_060m_T{tile}_{day:%Y%m%d}P7D_COMB_{version}"
     prefix = f"GFSC/{tile}/{day:%Y/%m/%d}/{product}/{product}"
     return [
-        CatalogObject(f"{prefix}_{layer}.tif", len(layer))
+        CatalogObject(f"{prefix}_{layer}.tif", (sizes or {}).get(layer, len(layer)))
         for layer in ("GF", "GF-QA", "AT")
         if layer != missing
     ]
@@ -218,6 +227,70 @@ class FetchAdapterTests(unittest.TestCase):
             self.assertEqual(len(written), 2)
             self.assertNotIn(layers["GF"].key, client.keys)
             self.assertFalse(any(root.rglob("*.part")))
+
+class InputBoundaryTests(unittest.TestCase):
+    """Catalogue and download ceilings from the security audit (F2)."""
+
+    tiles = ("32TPS",)
+
+    def test_oversize_catalogue_object_drops_its_product_not_the_run(self) -> None:
+        newest = date(2026, 2, 12)
+        older = date(2026, 2, 11)
+        catalogue = [
+            *objects("32TPS", newest, "V100", sizes={"GF": MAX_LAYER_BYTES + 1}),
+            *objects("32TPS", older, "V100"),
+        ]
+
+        selected = select_latest_products(
+            catalogue, self.tiles, date(2026, 2, 1), newest
+        )
+
+        # The newest product lost a layer to the size limit, so it is
+        # incomplete and the run uses the previous date instead of failing.
+        self.assertEqual(selected["32TPS"].product_date, older)
+
+    def test_every_product_oversize_still_raises_for_a_required_tile(self) -> None:
+        day = date(2026, 2, 12)
+        catalogue = objects("32TPS", day, "V100", sizes={"AT": MAX_LAYER_BYTES + 1})
+
+        with self.assertRaisesRegex(ValueError, "no complete GFSC product found"):
+            select_latest_products(catalogue, self.tiles, date(2026, 2, 1), day)
+
+    def test_too_many_products_for_one_tile_is_refused(self) -> None:
+        end = date(2026, 3, 31)
+        start = end - timedelta(days=MAX_PRODUCTS_PER_TILE)
+        catalogue = [
+            item
+            for offset in range(MAX_PRODUCTS_PER_TILE + 1)
+            for item in objects("32TPS", start + timedelta(days=offset), "V100")
+        ]
+
+        with self.assertRaisesRegex(ValueError, "exceeds the .* window limit"):
+            select_window_products(catalogue, self.tiles, start, end)
+
+    def test_download_refuses_an_oversize_object(self) -> None:
+        day = date(2026, 2, 10)
+        source = objects("32TPS", day, "V100", sizes={"GF": MAX_LAYER_BYTES + 1})
+        layers = {"GF": source[0], "GF-QA": source[1], "AT": source[2]}
+        product = CatalogProduct("32TPS", day, "V100", source[0].key.split("/")[-2], layers)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaisesRegex(ValueError, "over the .*-byte layer limit"):
+                download_products([product], Path(tmp), workers=1)
+            self.assertEqual(list(Path(tmp).rglob("*.tif")), [])
+
+    def test_download_refuses_a_run_over_the_total_limit(self) -> None:
+        day = date(2026, 2, 10)
+        big = MAX_LAYER_BYTES
+        source = objects("32TPS", day, "V100", sizes={"GF": big, "GF-QA": big, "AT": big})
+        layers = {"GF": source[0], "GF-QA": source[1], "AT": source[2]}
+        product = CatalogProduct("32TPS", day, "V100", source[0].key.split("/")[-2], layers)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch("pipeline.fetch.MAX_DOWNLOAD_BYTES", big * 2):
+                with self.assertRaisesRegex(ValueError, "over the .*-byte run limit"):
+                    download_products([product], Path(tmp), workers=1)
+            self.assertEqual(list(Path(tmp).rglob("*.tif")), [])
 
 
 if __name__ == "__main__":
