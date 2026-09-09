@@ -68,6 +68,12 @@ routing.
   pre-launch). Owner console work; needs an Admin-scoped Cloudflare token.
   `app/public/_headers` pins the bucket host in its CSP and must change in the
   same commit - see [`r2-setup.md`](r2-setup.md) step 4.
+- **Nothing exercises the publish workflow's new module paths until it runs.**
+  Stage 2 renamed the entry points to `nevaio_pipeline.render` / `.publish` and
+  moved the package to `pipeline/src/`. The YAML parses, `test_workflow_security`
+  asserts the new module name, and both entry points run locally - but the first
+  real proof is a GitHub Actions run. Worth watching the next 04:35 UTC job, or
+  triggering a manual dispatch, rather than assuming.
 - **The recovery path is unrehearsed** - revoke the publication key, restore
   trusted code, rebuild dependencies, republish known-good data.
 
