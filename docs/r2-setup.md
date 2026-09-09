@@ -21,7 +21,14 @@ it does not build a historical archive.
 4. Before public launch, connect a custom domain from the same Cloudflare
    account under **Settings > Custom Domains** and use its `https://` origin in
    GitHub instead. A custom domain enables Cloudflare caching; the development
-   URL does not.
+   URL does not. Disable the development URL once the migration is complete, so
+   it cannot be used to bypass the custom domain's controls.
+
+   **`app/public/_headers` names the current bucket host in its
+   Content-Security-Policy**, so change that file in the same commit or the
+   browser will block every snow tile. Afterwards verify with
+   `NEVAIO_URL=https://nevaio.netlify.app npm run check-csp` from `app/` - it
+   fails on exactly this mistake. See `docs/security.md`.
 5. Add this CORS policy under **Settings > CORS Policy**. Include the production
    Netlify origin and local Vite origins used for testing:
 

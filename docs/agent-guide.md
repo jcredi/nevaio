@@ -8,6 +8,12 @@ in this file only, so the two never drift apart.
 ## What this is
 A free, mobile-friendly web app showing quasi-real-time Copernicus snow-cover data (GFSC) over an outdoor/topo map of the Alps + Italian Apennines, for hikers and mountaineers. Full requirements: @docs/spec.md. Current plan and status: @docs/plan.md.
 
+## Security
+Controls, deliberate decisions that look like oversights, and how to re-check
+them: @docs/security.md. Read it before touching `app/public/_headers`,
+`app/src/map/manifestSchema.ts`, the publishing workflow, or the `maplibre-gl`
+version.
+
 ## Project areas
 - **`app/`** - frontend map (MapLibre GL JS + OSM-based topo basemap).
 - **`pipeline/`** - production GFSC processing. Its pure AS-OF semantic core is independent of raster I/O so the frozen rules stay directly testable.

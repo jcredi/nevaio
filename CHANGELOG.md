@@ -8,6 +8,13 @@ Versioned from `0.1.0` (2026-08-25), the first deploy.
 ## [Unreleased]
 
 ### Security
+- Added `docs/security.md`: the durable summary of the 2026-09-06 review and
+  its remediation - what each control is, where it lives, which decisions are
+  deliberate despite looking like oversights, and how to re-check everything.
+  Linked from the agent guide, so the coupled controls (CSP allowlist, manifest
+  validator, maplibre pin) are discoverable before someone changes one of them.
+  `docs/r2-setup.md` now warns that the custom-domain migration must update the
+  CSP in the same commit.
 - Investigated and **declined** the maplibre-gl upgrade that `npm audit` asks
   for (GHSA-jrc7-96c5-q579, critical, affects all versions <= 6.4.0 including
   the 4.7.1 in use). 6.x renders no basemap at all - it reads the MapTiler

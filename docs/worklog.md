@@ -1,5 +1,36 @@
 # Working session log
 
+## 2026-09-09 - Security work wrapped up; posture recorded in-repo
+
+Closed out the audit. The owner confirmed the remaining console items: the
+repository-level R2 secret copies are deleted, the Cloudflare token is Object
+Read & Write on this bucket alone, Netlify has only the two intended VITE_
+variables, and Actions failure alerting is on. F10 (the r2.dev endpoint) is the
+one finding left open, deliberately deferred.
+
+`main` now has a ruleset blocking force pushes and deletions, with no
+pull-request requirement and no bypass actors - the middle ground proposed
+after the owner pointed out that requiring PRs would stop the coding agent
+pushing entirely. Worth knowing for next time: GitHub creates rulesets with
+enforcement **disabled**, so one has to be switched to Active separately; the
+public API reports `protected: false` until that happens, which is how this was
+caught.
+
+Wrote docs/security.md so the audit report itself can leave the repository. The
+report is untracked, so deleting it would destroy the only record of *why*
+things are the way they are; and the repository is public, so committing it
+verbatim would publish a catalogue of weaknesses, accepted risks and infra
+detail. The new doc is control-focused instead - safe to publish, and it names
+the couplings that are invisible in the code: the CSP is an origin allowlist
+that must change with any new outbound destination, the manifest validator must
+change if the pipeline moves where tiles live, and maplibre must not be
+"upgraded" to silence npm audit. Recommended keeping the original report
+outside the repo rather than deleting it.
+
+Also folded the CSP warning into docs/r2-setup.md at the custom-domain step,
+since that is where someone will actually be standing when the trap matters.
+
+
 ## 2026-09-09 - maplibre-gl upgrade attempted, measured, and rejected
 
 `npm audit` reports a critical advisory against maplibre-gl
