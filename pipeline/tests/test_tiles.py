@@ -9,11 +9,11 @@ from affine import Affine
 import numpy as np
 from PIL import Image
 
-from pipeline.asof import AsOfComposite, NO_AGE, NO_PRODUCT_DAY, NO_VALUE, PixelState
-from pipeline.raster_io import RasterGrid
-from pipeline.tiles import ORIGIN_SHIFT, render_rgba, write_xyz_tiles
+from nevaio_pipeline.asof import AsOfComposite, NO_AGE, NO_PRODUCT_DAY, NO_VALUE, PixelState
+from nevaio_pipeline.raster_io import RasterGrid
+from nevaio_pipeline.tiles import ORIGIN_SHIFT, render_rgba, write_xyz_tiles
 
-# The 4 frozen freshness-tier colors from pipeline.tiles._FRESHNESS_COLORS,
+# The 4 frozen freshness-tier colors from nevaio_pipeline.tiles._FRESHNESS_COLORS,
 # spelled out here so a test failure shows which tier broke rather than an
 # opaque import of the production constant.
 SKY_BLUE = (0x38, 0xBD, 0xF8)  # tier 0, 0-3 days: sky blue

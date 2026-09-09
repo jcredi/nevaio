@@ -25,7 +25,7 @@ export type SnowImageMeta = {
   bounds: [number, number, number, number];
 };
 
-/** AS-OF snapshot manifest published atomically by pipeline.preview. */
+/** AS-OF snapshot manifest published atomically by nevaio_pipeline.render. */
 export type SnowTileManifest = {
   schemaVersion: number;
   runId: string;

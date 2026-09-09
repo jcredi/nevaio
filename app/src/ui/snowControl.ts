@@ -1,7 +1,7 @@
 import type { IControl } from "maplibre-gl";
 import type { SnowOverlay } from "../map/snowOverlay";
 
-// Colors must match pipeline/tiles.py's _FRESHNESS_COLORS (spec section 5.2,
+// Colors must match pipeline/src/nevaio_pipeline/tiles.py's _FRESHNESS_COLORS (spec section 5.2,
 // "Sky to Indigo", revised 2026-09-06) - there is no shared source between
 // the Python pipeline and this frontend, so keep the two in sync by hand.
 const FRESHNESS_TIERS: { color: string; label: string }[] = [

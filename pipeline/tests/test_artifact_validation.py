@@ -10,9 +10,9 @@ import unittest
 from unittest.mock import patch
 import zlib
 
-from pipeline.artifact_validation import validate_artifact, validate_run
-from pipeline.publish import publish_to_r2
-from pipeline.tests.artifact_fixture import make_run
+from nevaio_pipeline.artifact_validation import validate_artifact, validate_run
+from nevaio_pipeline.publish import publish_to_r2
+from tests.artifact_fixture import make_run
 
 
 class ArtifactValidationTests(unittest.TestCase):
@@ -27,7 +27,7 @@ class ArtifactValidationTests(unittest.TestCase):
         (self.run / "run.json").write_text(json.dumps(self.metadata))
 
     def reject_before_client(self):
-        with patch("pipeline.publish.boto3.client") as client:
+        with patch("nevaio_pipeline.publish.boto3.client") as client:
             with self.assertRaises((ValueError, TypeError, zlib.error)):
                 publish_to_r2(self.run, self.metadata)
             client.assert_not_called()
@@ -115,20 +115,26 @@ class ArtifactValidationTests(unittest.TestCase):
     def test_cli_validation_needs_no_credentials_and_does_not_import_native_stack(self):
         script = '''
 import sys
-import pipeline.publish
+import nevaio_pipeline.publish
 assert not {'rasterio', 'numpy', 'PIL'} & sys.modules.keys()
 sys.argv = ['publish', '--runs-dir', sys.argv[1], '--tiles', '32TPS', '--check-only']
-pipeline.publish.main()
+nevaio_pipeline.publish.main()
 '''
+        # A deliberately bare environment: no AWS credentials, no R2 variables,
+        # nothing inherited. PYTHONPATH only makes the src-layout package
+        # importable at all, the way the workflow does it - it grants no
+        # credentials, so the point of the test is untouched.
+        src = Path(__file__).resolve().parents[1] / "src"
         result = subprocess.run([sys.executable, "-c", script, str(self.root)],
-            env={"PATH": os.environ.get("PATH", ""), "PYTHONDONTWRITEBYTECODE": "1"},
+            env={"PATH": os.environ.get("PATH", ""), "PYTHONDONTWRITEBYTECODE": "1",
+                 "PYTHONPATH": str(src)},
             capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("Validated run", result.stdout)
 
     def test_metadata_mismatch_and_invalid_retention_fail_before_client(self):
         for metadata, keep in (({**self.metadata, "tileCount": 2}, 7), (self.metadata, 0)):
-            with patch("pipeline.publish.boto3.client") as client, self.assertRaises(ValueError):
+            with patch("nevaio_pipeline.publish.boto3.client") as client, self.assertRaises(ValueError):
                 publish_to_r2(self.run, metadata, keep_runs=keep)
             client.assert_not_called()
 

@@ -5,7 +5,7 @@ from datetime import UTC, date, datetime
 
 import numpy as np
 
-from pipeline.asof import (
+from nevaio_pipeline.asof import (
     CLOUD,
     NODATA,
     WATER,

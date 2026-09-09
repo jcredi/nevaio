@@ -81,7 +81,7 @@ the trusted toolchain; output validation does not replace those controls.
 
 ## Input boundaries (F2)
 
-`pipeline/raster_io.py` opens every GFSC layer with the driver restricted to
+`pipeline/src/nevaio_pipeline/raster_io.py` opens every GFSC layer with the driver restricted to
 GTiff, inside a GDAL environment that does not probe for sidecar files. That is
 what closes the audit's demonstrated primitive: a VRT named `*.tif` that reads
 a raster outside the input directory. `pipeline/tests/test_raster_io.py`
@@ -97,7 +97,7 @@ product's own MGRS tile. Symlinked inputs are rejected, as in the artifact
 validator. `load_tile_products` takes `expected_pixels` only so tests can use
 small fixtures; production uses the measured GFSC shape.
 
-Volume is bounded in `pipeline/config.py` and enforced in `pipeline/fetch.py`.
+Volume is bounded in `pipeline/src/nevaio_pipeline/config.py` and enforced in `pipeline/src/nevaio_pipeline/fetch.py`.
 A catalogue object over `MAX_LAYER_BYTES` (16 MiB, about 12x the largest of
 2320 real layers measured in `data/research`) is dropped during grouping, which
 makes its product incomplete so the tile falls back to another date in the
@@ -144,7 +144,7 @@ updates; do not replace pins with movable major-version tags.
 python -m pip install --require-hashes --only-binary=:all: -r pipeline/requirements.txt
 python -m unittest discover -s pipeline/tests
 # In a separate environment with only requirements-publish.txt installed:
-python -m pipeline.publish --runs-dir /path/to/rendered/runs --check-only
+python -m nevaio_pipeline.publish --runs-dir /path/to/rendered/runs --check-only
 ```
 
 `--check-only` never creates an S3 client and needs no credentials. Add

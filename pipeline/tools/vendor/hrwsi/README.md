@@ -11,7 +11,7 @@ in this folder), commit as of 2026-08-25.
   curl -o MGRS_tiles.gpkg https://raw.githubusercontent.com/eea/clms-hrwsi-api-client-python/main/MGRS_tiles.gpkg
   ```
 
-Retained for provenance only - no production code imports this; `pipeline/fetch.py`
+Retained for provenance only - no production code imports this; `pipeline/src/nevaio_pipeline/fetch.py`
 has its own downloader. It is **not** installable from `pipeline/.venv`, which
 omits its geopandas/pyogrio/shapely/retry/tqdm dependencies. Historically run as:
 

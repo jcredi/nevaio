@@ -127,7 +127,7 @@ With `pipeline/requirements.txt` installed and the five variables exported,
 the same current-date full-area run can be started locally:
 
 ```sh
-python -m pipeline.preview \
+python -m nevaio_pipeline.render \
   --raw-dir /tmp/nevaio-gfsc/raw \
   --work-dir /tmp/nevaio-gfsc/work \
   --output-dir /tmp/nevaio-gfsc/output \

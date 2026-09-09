@@ -24,7 +24,7 @@ class WorkflowSecurityTests(unittest.TestCase):
                     self.assertEqual(set(k for k, v in step["env"].items() if "secrets." in v),
                                      {"R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY"})
                     self.assertNotIn("pip install", step["run"])
-                    self.assertIn("python -m pipeline.publish", step["run"])
+                    self.assertIn("python -m nevaio_pipeline.publish", step["run"])
         self.assertEqual(exposures, [("publish", "Publish validated run")])
 
     def test_fresh_hosted_jobs_protected_ref_and_environment(self):

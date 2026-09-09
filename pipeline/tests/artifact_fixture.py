@@ -3,7 +3,7 @@ from datetime import date
 import json
 from pathlib import Path
 
-from pipeline.artifact_validation import snapshot_notice
+from nevaio_pipeline.artifact_validation import snapshot_notice
 
 RUN_ID = "20260210T120000Z"
 

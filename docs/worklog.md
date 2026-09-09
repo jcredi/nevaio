@@ -1,5 +1,48 @@
 # Working session log
 
+## 2026-09-09 - Refactor stage 2: pipeline packaged as `nevaio_pipeline`
+
+`pipeline/*.py` moved to `pipeline/src/nevaio_pipeline/`, with `preview.py`
+finally renamed `render.py` - it stopped being a preview on 2026-08-28 when it
+became the thing that publishes production. Tests stay at `pipeline/tests/`,
+now discovered with `-t pipeline` so they import `tests.artifact_fixture`.
+
+**The interesting decision was whether CI should pip-install the package.** It
+should not, and the reason is the F1 isolation boundary: the publish job exists
+to hold exactly one dependency (boto3), and installing a src-layout package
+needs a build backend inside that job. So the workflow sets
+`PYTHONPATH=pipeline/src` instead - hash enforcement stays absolute, the
+privileged dependency surface stays at one package, and there is no build step
+to audit. `pyproject.toml` exists for local development and carries a comment
+saying all of this, because "why is this not pip-installed in CI" is exactly
+the tidy-up a future session would attempt.
+
+`[project.dependencies]` is deliberately empty for the same reason. If the real
+dependencies were declared there, `pip install .` in the publish job would
+resolve the renderer's native raster stack and silently undo the split. They
+live in `[project.optional-dependencies]` as `render` and `publish` extras
+instead, mirroring the two hash-locked files that remain the actual contract.
+
+**Verified rather than assumed.** A non-editable install into a throwaway venv
+outside the checkout: the package resolves from site-packages (asserted, not
+eyeballed), `nevaio_pipeline.publish` imports with boto3 alone and no rasterio,
+numpy or PIL in `sys.modules`, and the lazy `__init__` exports still defer -
+`render_rgba` raises only when touched without the render extra. That is the
+F1 property surviving packaging, checked directly.
+
+**One real bug caught by the existing tests,** which is the best argument for
+having written them: `test_cli_validation_needs_no_credentials_and_does_not_
+import_native_stack` spawns a subprocess with a deliberately bare environment
+to prove publication needs no credentials. Under src layout that subprocess
+could no longer find the package. Fixed by adding `PYTHONPATH` to that bare
+env - it grants no credentials, so the test's point is intact - rather than by
+loosening what the test asserts.
+
+83 pipeline tests, 33 frontend tests and a clean build, identical to the
+pre-refactor baseline. Both entry points run. The workflow YAML parses and
+`test_workflow_security` enforces the new module name, so a half-renamed
+workflow fails the suite rather than the 04:35 UTC job.
+
 ## 2026-09-09 - Refactor stage 1: `recon/` dissolved
 
 Started the deferred repository refactor, on the argument that this is the

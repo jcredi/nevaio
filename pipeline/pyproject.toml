@@ -1,0 +1,31 @@
+# Packaging metadata for the GFSC pipeline.
+#
+# CI deliberately does NOT install this package - see the note in
+# .github/workflows/publish-latest-preview.yml. Installing would require a build
+# backend inside the privileged publish job, which exists to hold exactly one
+# dependency (boto3). The workflow runs from source via PYTHONPATH instead, so
+# hash enforcement stays absolute and the publisher's dependency surface stays
+# at one package. This file is for local development and any future
+# distribution.
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "nevaio-pipeline"
+version = "0.1.0"
+description = "Copernicus GFSC snow-cover processing and publication for Nevaio"
+requires-python = ">=3.12"
+# Intentionally empty. The two hash-locked requirement files are the real
+# dependency contract, and they are split by job on purpose: the renderer gets
+# the native raster stack, the publisher gets boto3 and nothing else. Declaring
+# runtime dependencies here would let `pip install .` in the publish job
+# silently resolve the renderer's stack and quietly undo that separation.
+dependencies = []
+
+[project.optional-dependencies]
+render = ["boto3", "numpy", "pillow", "rasterio", "PyYAML"]
+publish = ["boto3"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/nevaio_pipeline"]

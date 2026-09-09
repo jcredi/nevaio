@@ -11,7 +11,7 @@ resampling and merges overlaps using the frozen rule in spec section 9.3.
 sections 5.2 and 5.4 and slices it into standard `{z}/{x}/{y}.png` Web Mercator
 tiles.
 
-`preview.py` chains all of that into one end-to-end run: it discovers and
+`render.py` chains all of that into one end-to-end run: it discovers and
 downloads every complete GFSC product in the 15-day AS-OF window for each MGRS
 tile, composes each tile through `asof.py`, renders the full MVP area, and can
 publish immutable XYZ tiles plus an atomic `latest.json` pointer to Cloudflare
@@ -54,16 +54,29 @@ surface and adds only dev-tool dependencies. Do not add a tool's dependency to
 either lock to make a local script run; the publish environment staying minimal
 is a security property, not tidiness (see `docs/publishing-security.md`).
 
+Install the package itself for local use (src layout, so it must be on the path
+one way or the other):
+
+```sh
+uv pip install --python pipeline/.venv --no-deps -e ./pipeline
+```
+
 Run the tests from the repository root:
 
 ```sh
-pipeline/.venv/bin/python -m unittest discover -s pipeline/tests
+PYTHONPATH=pipeline/src pipeline/.venv/bin/python \
+  -m unittest discover -s pipeline/tests -t pipeline
 ```
+
+CI deliberately does not install the package - it sets `PYTHONPATH=pipeline/src`
+instead. Installing would require a build backend inside the publish job, whose
+whole purpose is to carry one dependency; see the comment in
+`pipeline/pyproject.toml`.
 
 Build a local full-area preview without publishing it:
 
 ```sh
-pipeline/.venv/bin/python -m pipeline.preview \
+pipeline/.venv/bin/python -m nevaio_pipeline.render \
   --raw-dir /tmp/nevaio-gfsc/raw \
   --work-dir /tmp/nevaio-gfsc/work \
   --output-dir /tmp/nevaio-gfsc/output

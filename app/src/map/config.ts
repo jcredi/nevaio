@@ -10,7 +10,7 @@ export const styleUrl = `https://api.maptiler.com/maps/outdoor/style.json?key=${
 
 // Western Alps, with the Italian Apennines reachable by panning south. Zoom
 // is 8.3, just above the snow tile pyramid's PREVIEW_MIN_ZOOM (8, in
-// pipeline/config.py) - below that the snow layer cannot render at all, which
+// pipeline/src/nevaio_pipeline/config.py) - below that the snow layer cannot render at all, which
 // undercut MVP success criterion 1 (see docs/worklog.md, 2026-09-06).
 export const initialView = {
   center: [8.5, 45.3] as [number, number],

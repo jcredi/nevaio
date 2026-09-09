@@ -10,9 +10,9 @@ from unittest.mock import patch
 
 from affine import Affine
 
-from pipeline.preview import _downloaded_triplets, _local_window, _parse_date, build_preview
-from pipeline.fetch import CatalogProduct
-from pipeline.raster_io import ProductTriplet, RasterGrid
+from nevaio_pipeline.render import _downloaded_triplets, _local_window, _parse_date, build_preview
+from nevaio_pipeline.fetch import CatalogProduct
+from nevaio_pipeline.raster_io import ProductTriplet, RasterGrid
 
 
 def triplet(tile: str, day: date, version: str) -> ProductTriplet:
@@ -36,7 +36,7 @@ class PreviewHelpersTests(unittest.TestCase):
             triplet("32TPS", date(2026, 2, 11), "V999"),
             triplet("32TPS", date(2026, 1, 26), "V100"),
         ]
-        with patch("pipeline.preview.discover_product_triplets", return_value=discovered):
+        with patch("nevaio_pipeline.render.discover_product_triplets", return_value=discovered):
             selected = _local_window(Path("raw"), ["32TPS"], as_of, 15)
 
         # 2026-02-11 is after the AS-OF date and 2026-01-26 is before the
@@ -47,7 +47,7 @@ class PreviewHelpersTests(unittest.TestCase):
         )
 
     def test_local_window_reports_all_missing_tiles(self) -> None:
-        with patch("pipeline.preview.discover_product_triplets", return_value=[]):
+        with patch("nevaio_pipeline.render.discover_product_triplets", return_value=[]):
             with self.assertRaisesRegex(ValueError, "32TPS, 33TUM"):
                 _local_window(Path("raw"), ["33TUM", "32TPS"], date(2026, 2, 10), 15)
 
@@ -59,7 +59,7 @@ class PreviewHelpersTests(unittest.TestCase):
             return CatalogProduct("32TPS", item.product_date, item.version, item.product, {})
 
         with patch(
-            "pipeline.preview.discover_product_triplets", return_value=[older, newer]
+            "nevaio_pipeline.render.discover_product_triplets", return_value=[older, newer]
         ):
             selected = _downloaded_triplets(
                 Path("raw"), {"32TPS": (catalog(older), catalog(newer))}
@@ -67,7 +67,7 @@ class PreviewHelpersTests(unittest.TestCase):
         self.assertEqual(selected["32TPS"], (older, newer))
 
         missing = CatalogProduct("33TUM", newer.product_date, "V100", "missing-product", {})
-        with patch("pipeline.preview.discover_product_triplets", return_value=[newer]):
+        with patch("nevaio_pipeline.render.discover_product_triplets", return_value=[newer]):
             with self.assertRaisesRegex(ValueError, "missing-product"):
                 _downloaded_triplets(Path("raw"), {"33TUM": (missing,)})
 
@@ -87,13 +87,13 @@ class PreviewHelpersTests(unittest.TestCase):
             root = Path(tmp)
             output = root / "output"
             with (
-                patch("pipeline.preview._local_window", return_value={"32TPS": first, "33TUM": second}) as local,
-                patch("pipeline.preview.load_tile_products", return_value=SimpleNamespace(grid=grid, products=(object(),))) as load,
-                patch("pipeline.preview.compose_as_of", return_value=object()),
-                patch("pipeline.preview.save_snapshot", side_effect=persist),
-                patch("pipeline.preview.render_snapshots", return_value=[Path("one.png"), Path("two.png")]),
-                patch("pipeline.preview._bounds_wgs84", return_value=[5.0, 40.0, 16.0, 48.0]),
-                patch("pipeline.preview.publish_to_r2") as publish,
+                patch("nevaio_pipeline.render._local_window", return_value={"32TPS": first, "33TUM": second}) as local,
+                patch("nevaio_pipeline.render.load_tile_products", return_value=SimpleNamespace(grid=grid, products=(object(),))) as load,
+                patch("nevaio_pipeline.render.compose_as_of", return_value=object()),
+                patch("nevaio_pipeline.render.save_snapshot", side_effect=persist),
+                patch("nevaio_pipeline.render.render_snapshots", return_value=[Path("one.png"), Path("two.png")]),
+                patch("nevaio_pipeline.render._bounds_wgs84", return_value=[5.0, 40.0, 16.0, 48.0]),
+                patch("nevaio_pipeline.render.publish_to_r2") as publish,
             ):
                 metadata = build_preview(
                     as_of_date=date(2026, 2, 10),
@@ -132,8 +132,8 @@ class PreviewHelpersTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             with (
-                patch("pipeline.preview._local_window", return_value={"32TPS": found}),
-                patch("pipeline.preview.publish_to_r2") as publish,
+                patch("nevaio_pipeline.render._local_window", return_value={"32TPS": found}),
+                patch("nevaio_pipeline.render.publish_to_r2") as publish,
             ):
                 with self.assertRaisesRegex(ValueError, "33TUM"):
                     build_preview(

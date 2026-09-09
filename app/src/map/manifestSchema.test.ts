@@ -18,7 +18,7 @@ const PAGE = "https://nevaio.netlify.app/";
 const MANIFEST_URL = "https://pub-example.r2.dev/latest.json";
 const RUN_ID = "20260909T193729Z";
 
-/** The shape pipeline.preview really publishes, trimmed to what matters here. */
+/** The shape nevaio_pipeline.render really publishes, trimmed to what matters here. */
 function manifest(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     schemaVersion: 1,

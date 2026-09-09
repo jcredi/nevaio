@@ -6,8 +6,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from pipeline.publish import _prune_old_runs, _required_env, publish_to_r2
-from pipeline.tests.artifact_fixture import make_run, RUN_ID
+from nevaio_pipeline.publish import _prune_old_runs, _required_env, publish_to_r2
+from tests.artifact_fixture import make_run, RUN_ID
 
 
 class FakePaginator:
@@ -70,7 +70,7 @@ class PublishTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             run_dir, metadata = make_run(Path(tmp))
             with patch.dict("os.environ", env, clear=True), patch(
-                "pipeline.publish.boto3.client", return_value=client
+                "nevaio_pipeline.publish.boto3.client", return_value=client
             ) as make_client:
                 latest = publish_to_r2(run_dir, metadata)
 
@@ -111,7 +111,7 @@ class PublishTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             run_dir, metadata = make_run(Path(tmp))
             with patch.dict("os.environ", env, clear=True), patch(
-                "pipeline.publish.boto3.client", return_value=client
+                "nevaio_pipeline.publish.boto3.client", return_value=client
             ), patch.object(client, "upload_file", side_effect=IOError("upload failed")):
                 with self.assertRaises(IOError):
                     publish_to_r2(run_dir, metadata, keep_runs=7)
@@ -168,7 +168,7 @@ class PruneOldRunsTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             run_dir, metadata = make_run(Path(tmp), "20260824T000000Z")
             with patch.dict("os.environ", env, clear=True), patch(
-                "pipeline.publish.boto3.client", return_value=client
+                "nevaio_pipeline.publish.boto3.client", return_value=client
             ):
                 publish_to_r2(run_dir, metadata, keep_runs=2)
 

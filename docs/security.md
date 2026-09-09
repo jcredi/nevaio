@@ -59,7 +59,7 @@ or not a finite, real coordinate is discarded rather than passed to the map.
 - `VITE_MAPTILER_API_KEY` is **public by design** - Vite inlines it into the
   browser bundle. Its protection is MapTiler's origin restriction, not secrecy.
   Never mark it as a Netlify secret; that only breaks the build.
-- The Copernicus HR-WSI credentials in `pipeline/fetch.py` are the read-only
+- The Copernicus HR-WSI credentials in `pipeline/src/nevaio_pipeline/fetch.py` are the read-only
   pair published in Copernicus's own official client. Public, not a leak.
 - Everything genuinely private - the R2 key pair - lives in the GitHub
   environment and, locally, in gitignored `.env` files. `.gitignore` ignores
@@ -92,7 +92,8 @@ Recorded so they are not "fixed" by someone acting in good faith:
 
 ```sh
 cd app && npm test                                   # 33 frontend cases
-pipeline/.venv/bin/python -m unittest discover -s pipeline/tests   # 83 cases
+PYTHONPATH=pipeline/src pipeline/.venv/bin/python \
+  -m unittest discover -s pipeline/tests -t pipeline            # 83 cases
 cd app && npm audit --package-lock-only --ignore-scripts
 ```
 

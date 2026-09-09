@@ -42,8 +42,8 @@ routing.
    be shown clearly and prominently on the route profile, not "where
    practical". Spec section 15 item 11.
 4. **Repository structure refactor, stage 3 onward**
-   ([`../REFACTOR.md`](../REFACTOR.md)). Stage 1 (dissolve `recon/`) is done -
-   2026-09-09. Sequencing decided that day and worth not re-deriving: stage 3
+   ([`../REFACTOR.md`](../REFACTOR.md)). Stages 1 (dissolve `recon/`) and 2
+   (package the pipeline) are done - 2026-09-09. Sequencing decided that day and worth not re-deriving: stage 3
    regroups the frontend into feature folders and therefore must come *after*
    the mobile pass above, because its own instruction is to "preserve
    responsive styling" and that styling is currently broken - fix it and verify

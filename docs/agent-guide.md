@@ -16,7 +16,7 @@ version.
 
 ## Project areas
 - **`app/`** - frontend map (MapLibre GL JS + OSM-based topo basemap).
-- **`pipeline/`** - production GFSC processing. Its pure AS-OF semantic core is independent of raster I/O so the frozen rules stay directly testable.
+- **`pipeline/`** - production GFSC processing, a src-layout package at `pipeline/src/nevaio_pipeline/` with its tests in `pipeline/tests/` and dev tools in `pipeline/tools/`. Its pure AS-OF semantic core is independent of raster I/O so the frozen rules stay directly testable.
 - **`data/`** - local only, nothing committed but its README. `research/` is the durable winter GFSC archive (~1.5 GB) that real-data checks depend on; `cache/` and `output/` are disposable. See `data/README.md`.
 - **`docs/research/`** - what the GFSC data actually is (`gfsc-findings.md`), as opposed to what we decided about it.
 
@@ -52,6 +52,8 @@ version.
 ## `pipeline/` conventions
 - Python. Keep the semantic core independent of raster I/O, reprojection, storage, and scheduling; those are adapters around it.
 - AS-OF behavior must match `docs/spec.md` sections 5.2-5.4 and 9.2. Add focused tests for every semantic edge case rather than re-encoding rules in callers.
+- Entry points are `python -m nevaio_pipeline.render` (was `pipeline.preview`) and `python -m nevaio_pipeline.publish`. `pipeline/src/nevaio_pipeline/__init__.py` exports lazily on purpose - the publisher must import without the native raster stack, so never add an eager `from .tiles import ...` there.
+- CI does not pip-install the package; it sets `PYTHONPATH=pipeline/src`. That is deliberate - a build backend inside the publish job would enlarge a dependency surface that exists to be exactly one package. Don't "tidy" it into a pip install.
 - Local environment is `pipeline/.venv` on **Python 3.12**, matching CI. Create it with `uv venv --python 3.12 pipeline/.venv && uv pip install --python pipeline/.venv -r pipeline/requirements-dev.in`. Tests: `pipeline/.venv/bin/python -m unittest discover -s pipeline/tests`.
 - Three dependency surfaces, deliberately: `requirements.in`/`.txt` (render, hash-locked) and `requirements-publish.in`/`.txt` (publish, hash-locked) are CI's contract and are compiled for **linux x86_64**, so they cannot be installed on a Mac. `requirements-dev.in` is the local mirror and the only one carrying dev-tool-only dependencies. Don't add a tool's dependency to the render or publish locks to make a local script run.
 

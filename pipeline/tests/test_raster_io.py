@@ -11,8 +11,8 @@ import numpy as np
 import rasterio
 from rasterio.crs import CRS
 
-from pipeline.config import GFSC_TILE_PIXELS
-from pipeline.raster_io import discover_product_triplets, load_tile_products
+from nevaio_pipeline.config import GFSC_TILE_PIXELS
+from nevaio_pipeline.raster_io import discover_product_triplets, load_tile_products
 
 
 # Pixel value written only into a file outside the input directory, so a test
@@ -132,7 +132,7 @@ class RasterIoTests(unittest.TestCase):
     def test_rejects_a_layer_over_the_size_limit(self) -> None:
         product_dir = self._write_product()
         gf_path = product_dir / f"{product_dir.name}_GF.tif"
-        with patch("pipeline.raster_io.MAX_LAYER_BYTES", 16):
+        with patch("nevaio_pipeline.raster_io.MAX_LAYER_BYTES", 16):
             with self.assertRaisesRegex(ValueError, "over the 16-byte limit"):
                 load_tile_products(discover_product_triplets(self.root), expected_pixels=2)
         self.assertTrue(gf_path.is_file())

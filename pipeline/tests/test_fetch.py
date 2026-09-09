@@ -6,7 +6,7 @@ from datetime import date, timedelta
 from pathlib import Path
 from unittest.mock import patch
 
-from pipeline.config import (
+from nevaio_pipeline.config import (
     ASOF_WINDOW_DAYS,
     MAX_LAYER_BYTES,
     MAX_PRODUCTS_PER_TILE,
@@ -14,7 +14,7 @@ from pipeline.config import (
     PREVIEW_MAX_ZOOM,
     PREVIEW_MIN_ZOOM,
 )
-from pipeline.fetch import (
+from nevaio_pipeline.fetch import (
     BUCKET,
     CatalogObject,
     CatalogProduct,
@@ -155,7 +155,7 @@ class SelectWindowProductsTests(unittest.TestCase):
 
         paginator = Paginator()
         client = type("Client", (), {"get_paginator": lambda self, name: paginator})()
-        with patch("pipeline.fetch._client", return_value=client):
+        with patch("nevaio_pipeline.fetch._client", return_value=client):
             selected = discover_window_products(["32TPS"], day, window_days=15)
 
         self.assertEqual(
@@ -194,7 +194,7 @@ class FetchAdapterTests(unittest.TestCase):
 
         paginator = Paginator()
         client = type("Client", (), {"get_paginator": lambda self, name: paginator})()
-        with patch("pipeline.fetch._client", return_value=client):
+        with patch("nevaio_pipeline.fetch._client", return_value=client):
             selected = discover_latest_products(["32TPS"], day, lookback_days=1)
 
         self.assertEqual(selected["32TPS"].version, "V100")
@@ -221,7 +221,7 @@ class FetchAdapterTests(unittest.TestCase):
             cached = root / product_name / Path(layers["GF"].key).name
             cached.parent.mkdir(parents=True)
             cached.write_bytes(b"x" * layers["GF"].size)
-            with patch("pipeline.fetch._client", return_value=client):
+            with patch("nevaio_pipeline.fetch._client", return_value=client):
                 written = download_products([product], root, workers=1)
 
             self.assertEqual(len(written), 2)
@@ -287,7 +287,7 @@ class InputBoundaryTests(unittest.TestCase):
         product = CatalogProduct("32TPS", day, "V100", source[0].key.split("/")[-2], layers)
 
         with tempfile.TemporaryDirectory() as tmp:
-            with patch("pipeline.fetch.MAX_DOWNLOAD_BYTES", big * 2):
+            with patch("nevaio_pipeline.fetch.MAX_DOWNLOAD_BYTES", big * 2):
                 with self.assertRaisesRegex(ValueError, "over the .*-byte run limit"):
                     download_products([product], Path(tmp), workers=1)
             self.assertEqual(list(Path(tmp).rglob("*.tif")), [])

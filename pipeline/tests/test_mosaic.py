@@ -6,9 +6,9 @@ from datetime import date
 from affine import Affine
 import numpy as np
 
-from pipeline.asof import AsOfComposite, PixelState
-from pipeline.mosaic import TileComposite, mosaic_to_grid
-from pipeline.raster_io import RasterGrid
+from nevaio_pipeline.asof import AsOfComposite, PixelState
+from nevaio_pipeline.mosaic import TileComposite, mosaic_to_grid
+from nevaio_pipeline.raster_io import RasterGrid
 
 
 def grid(width: int = 3, height: int = 2) -> RasterGrid:

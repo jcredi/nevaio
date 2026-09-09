@@ -30,19 +30,19 @@ real-data checks depend on that: any change to the frozen section 5.2/9.2
 encoding needs to be evaluated against genuine winter coverage, which cannot be
 re-downloaded *out of season* - the live catalogue in September returns a
 near-snowless Alps. It is also the input to the sample overlay tool below, and
-the source of the 2320-layer measurement behind `pipeline/config.py`'s
+the source of the 2320-layer measurement behind `pipeline/src/nevaio_pipeline/config.py`'s
 `GFSC_TILE_PIXELS` and the 16 MiB layer ceiling.
 
 `reference/MGRS_tiles.gpkg` is HR-WSI's own tile grid, used during
 reconnaissance to verify tile overlap rather than guessing at it. Production
-discovery does **not** read it - `pipeline/config.py` hardcodes its 58-tile list
+discovery does **not** read it - `pipeline/src/nevaio_pipeline/config.py` hardcodes its 58-tile list
 precisely so publication has no dependency on a 16 MB ignored file.
 
 ## Provenance
 
 Downloaded with the vendored HR-WSI S3 client, retained for provenance at
 `pipeline/tools/vendor/hrwsi/` (its own LICENSE and README travel with it). No
-production code imports it; `pipeline/fetch.py` has its own implementation. It
+production code imports it; `pipeline/src/nevaio_pipeline/fetch.py` has its own implementation. It
 is not installable from the current `pipeline/.venv`, which deliberately omits
 its geopandas/pyogrio/shapely/retry/tqdm dependencies - see
 `pipeline/requirements-dev.in`.

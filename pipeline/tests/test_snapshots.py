@@ -8,11 +8,11 @@ from pathlib import Path
 from affine import Affine
 import numpy as np
 
-from pipeline.asof import AsOfComposite, PixelState
-from pipeline.mosaic import TileComposite
-from pipeline.raster_io import RasterGrid
-from pipeline.snapshots import _metatile_grid, _xyz_range, load_snapshot, save_snapshot, snapshot_info
-from pipeline.tiles import ORIGIN_SHIFT, TILE_SIZE
+from nevaio_pipeline.asof import AsOfComposite, PixelState
+from nevaio_pipeline.mosaic import TileComposite
+from nevaio_pipeline.raster_io import RasterGrid
+from nevaio_pipeline.snapshots import _metatile_grid, _xyz_range, load_snapshot, save_snapshot, snapshot_info
+from nevaio_pipeline.tiles import ORIGIN_SHIFT, TILE_SIZE
 
 
 def tile() -> TileComposite:
