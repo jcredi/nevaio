@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "shot": "node scripts/screenshot.mjs",
     "verify": "node scripts/verify-snapshot.mjs",
+    "check-mobile-layout": "node scripts/check-mobile-layout.mjs",
     "check-csp": "node scripts/check-csp.mjs",
     "test": "node --test \"src/**/*.test.ts\""
   },

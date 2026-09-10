@@ -56,6 +56,20 @@ body {
   }
 }
 
+/* The search bar is horizontally centred with a transform. Its entrance
+   animation must preserve that translation instead of replacing it, otherwise
+   the bar starts at the viewport midpoint and runs off the right edge. */
+@keyframes search-bar-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -6px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
 /* Keep MapLibre's built-in controls clear of notches/home indicators on mobile. */
 .maplibregl-ctrl-top-right {
   top: env(safe-area-inset-top);
@@ -261,7 +275,23 @@ body {
     -apple-system,
     sans-serif;
   color: var(--text-primary);
-  animation: panel-in 320ms ease both;
+  animation: search-bar-in 320ms ease both;
+}
+
+/* On a phone, the near-full-width search bar shares its top edge with
+   MapLibre's fixed top-right navigation controls. A centred 92vw bar extends
+   underneath that control column (for example, by 25px in a 390px viewport),
+   so anchor it to the safe left edge and reserve that column instead. */
+@media (max-width: 34rem) {
+  .search-bar {
+    left: max(0.625rem, env(safe-area-inset-left));
+    right: calc(env(safe-area-inset-right) + 3.25rem);
+    width: auto;
+    transform: none;
+    /* The narrow layout is left-anchored, so it uses the ordinary vertical
+       entrance animation rather than the centred search-bar variant above. */
+    animation: panel-in 320ms ease both;
+  }
 }
 
 .search-bar__input-row {
