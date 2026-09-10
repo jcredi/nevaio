@@ -15,6 +15,9 @@ const map = new maplibregl.Map({
   center: initialView.center,
   zoom: initialView.zoom,
   attributionControl: {
+    // Keep full legal attribution visible on phones. The compact variant turns
+    // it into a separate ⓘ disclosure, which is not the intended footer.
+    compact: false,
     // The MapTiler style supplies its own MapTiler/OSM credit; this adds the
     // Copernicus one, now that we render Copernicus-derived data.
     customAttribution:
@@ -30,7 +33,7 @@ map.on("load", async () => {
     // Null means there is no usable published snapshot; the control says so
     // rather than the app going quiet about it.
     const overlay = await addSnowOverlay(map, snowManifestUrl);
-    map.addControl(new SnowControl(overlay), "top-left");
+    map.addControl(new SnowControl(overlay), "bottom-left");
   } catch (error) {
     // A missing overlay shouldn't take the basemap down with it.
     console.error("Snow overlay failed to load", error);

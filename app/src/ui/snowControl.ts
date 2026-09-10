@@ -11,10 +11,11 @@ const FRESHNESS_TIERS: { color: string; label: string }[] = [
   { color: "#713A9C", label: "15-30d" },
 ];
 
-/** Explains the two independent visual channels from spec section 5.2. */
+/** Explains the two independent visual channels from spec section 5.2 on demand. */
 function buildLegend(): HTMLElement {
-  const legend = document.createElement("div");
+  const legend = document.createElement("section");
   legend.className = "snow-ctrl__legend";
+  legend.setAttribute("aria-label", "How to read the snow layer");
 
   const coverageLabel = document.createElement("span");
   coverageLabel.className = "snow-ctrl__legend-label";
@@ -71,25 +72,22 @@ function formatProductDate(iso: string): string {
       });
 }
 
-/** Snow layer on/off, plus the product currently being shown. */
+/** Compact snow layer control, kept beside the map rather than above it. */
 export class SnowControl implements IControl {
   private container!: HTMLElement;
+  private dateControl: HTMLElement | null = null;
 
   constructor(private readonly overlay: SnowOverlay | null) {}
 
   onAdd(): HTMLElement {
     this.container = document.createElement("div");
-    this.container.className = "maplibregl-ctrl maplibregl-ctrl-group snow-ctrl";
+    this.container.className = "maplibregl-ctrl snow-ctrl";
 
     // No published snapshot loaded, or it failed validation. Say so and stop:
     // no toggle for a layer that isn't there, and no legend explaining an
     // encoding nothing on screen uses. Showing an archived sample here instead
     // would risk a months-old raster being read as today's conditions.
     if (!this.overlay) {
-      const heading = document.createElement("p");
-      heading.className = "snow-ctrl__meta";
-      heading.textContent = "Snow cover";
-
       const warning = document.createElement("p");
       warning.className = "snow-ctrl__warning";
       warning.textContent = "Snow data unavailable";
@@ -97,7 +95,7 @@ export class SnowControl implements IControl {
         "The published snapshot could not be loaded or did not pass validation. " +
         "No snow data is being shown.";
 
-      this.container.append(heading, warning);
+      this.container.append(warning);
       return this.container;
     }
 
@@ -126,18 +124,36 @@ export class SnowControl implements IControl {
 
     toggle.append(checkbox, switchTrack, label);
 
-    const metaLine = document.createElement("p");
-    metaLine.className = "snow-ctrl__meta";
-    metaLine.textContent = `${formatProductDate(overlay.date)} · ${overlay.summary}`;
-    metaLine.title = overlay.title;
+    // Keep the AS-OF date in its future-picker position under search, but do
+    // not imitate a date picker until the historical archive exists.
+    const date = document.createElement("span");
+    date.className = "snow-date";
+    date.textContent = formatProductDate(overlay.date);
+    date.title = overlay.title;
+    document.body.append(date);
+    this.dateControl = date;
 
-    this.container.append(toggle, metaLine);
+    const legend = buildLegend();
+    legend.hidden = true;
 
-    this.container.append(buildLegend());
+    const info = document.createElement("button");
+    info.type = "button";
+    info.className = "snow-ctrl__info";
+    info.textContent = "i";
+    info.setAttribute("aria-label", "How to read the snow layer");
+    info.setAttribute("aria-expanded", "false");
+    info.addEventListener("click", () => {
+      legend.hidden = !legend.hidden;
+      info.setAttribute("aria-expanded", String(!legend.hidden));
+    });
+
+    this.container.append(toggle, info, legend);
     return this.container;
   }
 
   onRemove(): void {
     this.container.remove();
+    this.dateControl?.remove();
+    this.dateControl = null;
   }
 }
