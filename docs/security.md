@@ -56,10 +56,14 @@ Snow metadata fetched at runtime is validated by
 must resolve to the manifest's own origin and its own run directory, so a
 poisoned manifest cannot redirect the browser elsewhere. If the pipeline ever
 changes where tiles live, that validator changes in the same commit or the map
-goes blank.
+goes blank. When the live snapshot is missing or fails validation the map shows
+no snow layer at all and the control says "Snow data unavailable". The archived
+sample that used to fill that gap was removed on 2026-09-09: a months-old
+raster that reads as current conditions is a hazard, not a graceful
+degradation.
 
 The AS-OF date archive (2026-09-11) was shaped around that rule rather than
-around it. Each archived date's manifest is published at the bucket root as
+against it. Each archived date's manifest is published at the bucket root as
 `asof-<date>-<runId>.json`, in the same directory as `latest.json`, precisely
 so an archived date validates through the unchanged `validateTileManifest`
 path; a `dates/` prefix would have moved the manifest's directory and forced
@@ -68,11 +72,8 @@ that validator open. The catalogue `dates.json` names each manifest by a
 catalogue cannot send the browser to another host - the frontend validator
 that consumes it must enforce that, not merely assume it. Both objects are on
 the R2 origin `app/public/_headers` already allows, so the archive needed no
-CSP change. When the live snapshot is missing or fails validation the map shows
-no snow layer at all and the control says "Snow data unavailable". The archived
-sample that used to fill that gap was removed on 2026-09-09: a months-old
-raster that reads as current conditions is a hazard, not a graceful
-degradation.
+CSP change. The same "unavailable, never substituted" rule applies per date:
+a date absent from the catalogue must show nothing, not the latest map.
 
 Geocoder responses are treated as untrusted: a feature whose centre is missing
 or not a finite, real coordinate is discarded rather than passed to the map.
@@ -116,7 +117,7 @@ Recorded so they are not "fixed" by someone acting in good faith:
 ```sh
 cd app && npm test                                   # 33 frontend cases
 PYTHONPATH=pipeline/src pipeline/.venv/bin/python \
-  -m unittest discover -s pipeline/tests -t pipeline           # 137 cases
+  -m unittest discover -s pipeline/tests -t pipeline           # 138 cases
 cd app && npm audit --package-lock-only --ignore-scripts
 ```
 
