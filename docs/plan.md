@@ -31,23 +31,35 @@ routing.
    provides the repeatable emulator baseline (with `npm run dev` running), but
    is not a substitute for the handset checks - see `worklog.md` (2026-09-06,
    2026-09-10).
-2. **OSM object panel + historical chart (spec section 7).** The eligible
-   default classes are now peaks, huts/refuges, passes/saddles, shelters,
-   parking, and settlements/named places; trails, paths, and roads are map
-   context, not interaction targets (spec section 15 item 3). Next, inspect
-   the selected MapTiler vector style's concrete feature properties/layers and
-   make a small, testable selection prototype. The MapTiler style supplies
-   visual context only: use a Nevaio-owned static OSM object index with stable
-   IDs as the click/history contract, published to R2 beside the precomputed
-   time series. The local regional-extract filter is fixture-validated and
-   date-matched Alps/Italy extracts are acquired and the first full build is
-   valid, but its 244,011-record/45 MB result is too broad to ship as one
-   browser download. Next, derive the exact snow/MGRS footprint and spatially
-   shard or filter the static index to that scope; only then batch-sample the
-   rasters the daily pipeline already downloads and backfill from Copernicus's
-   multi-year archive - no new running server. Do not use a full-area query
-   against a shared public Overpass instance. See `worklog.md` (2026-09-06,
-   2026-09-10, 2026-09-11).
+2. **OSM object panel: publish the index, then the snow history (spec
+   section 7).** Selection is done and runs on a committed fixture: the tap
+   rule, the shard-index/shard validators, lazy shard loading and the minimal
+   panel are in `app/src/objects/` and `app/src/ui/objectPanel.ts`, and
+   `docs/research/maptiler-outdoor-objects.md` records what the basemap really
+   renders. What remains, in order:
+   - **Publish the sharded index to R2** and point `VITE_OBJECT_INDEX_URL` at
+     it. That is the URL in `app/src/map/config.ts` and nothing else; the
+     bucket host is already in `app/public/_headers`' `connect-src`, so no CSP
+     change is needed for that host. Then delete the fixture in
+     `app/public/object-index/`, or keep it only as a local-dev fallback -
+     decide deliberately, and remember there is no offline snow data by design.
+   - **Precompute the per-object GFSC time series**, keyed on the same stable
+     OSM ids, by batch-sampling the rasters the daily pipeline already
+     downloads and backfilling from Copernicus's multi-year archive. No new
+     running server.
+   - **Then the chart itself** (spec section 7.1), including its honest
+     treatment of cloud/no-data/stale gaps. The panel currently shows a
+     labelled placeholder, on purpose.
+   - **Wire place search into the panel**: a search result is a MapTiler
+     geocoding hit, not an index record, so it needs the same matching
+     question answered again - most likely reusing `resolveSelection` at the
+     result's coordinates rather than trusting the geocoder's own identity.
+   - Open contract questions for the pipeline, from the first consumer:
+     whether `bytes`/`sha256` stay in the contract (the frontend does verify
+     them), and whether two OSM objects for one building - `Rifugio Quinto
+     Alpini` appears as both `shelter` and `hut`, 10 m apart - should be
+     deduplicated upstream or surfaced as a choice.
+
 3. **30-day historical AS-OF map dates (spec section 5.3).** Publish a bounded
    R2 catalogue of available dates plus each date's immutable manifest/tiles,
    and raise retention from the current seven rollback runs to cover the latest

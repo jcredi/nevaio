@@ -1,5 +1,118 @@
 # Working session log
 
+## 2026-09-11 - Probe the real basemap style, then build object selection
+
+Two halves of plan item 2's frontend work: find out what the MapTiler Outdoor
+style actually renders, then build the selection slice against Nevaio's own
+index rather than against that style.
+
+**Style evidence.** `docs/research/maptiler-outdoor-objects.md` is the dated
+record: the live style JSON, its four sources' TileJSON, and real `.pbf` tiles
+over six Alpine/Apennine areas at z9-z15, cross-checked with
+`queryRenderedFeatures()` in a real browser. Seven traps, all measured:
+
+1. The Planet `mountain_peak` source carries `class: "saddle"` (146 features in
+   the sample) and **no style layer renders it** - passes and saddles, an
+   approved product class, are invisible on this basemap. This confirms and
+   extends the 2026-09-10 note.
+2. Both peak layers filter `rank == 1`. Only 236 of 957 sampled peak features
+   qualify - about **a quarter of the peaks in the tile the browser already
+   downloaded**. `rank` is also recomputed per zoom: Balmenhorn is rank 2 at
+   z11 and rank 1 at z13, so *which* peaks render changes as you zoom.
+3. Symbol collision then culls most of the survivors: over Monte Rosa, 20 peak
+   symbols are placed at z12 and **one** at z14.
+4. `place: isolated_dwelling` is in the data and in no layer; `place_village`
+   and `place_town` stop at zoom 16.
+5. The `outdoor` TileJSON advertises an `outdoor_poi.osm_id` field. It was
+   absent from **all 7,618** decoded `outdoor_poi` features.
+6. MVT feature ids are real OSM ids under two different undocumented
+   encodings - raw in `mountain_peak`/`outdoor_poi`, `osm_id * 10 + type` in
+   the planet `poi`/`place` layers - and the OSM type is not recoverable from
+   the raw ones. Verified against the OSM API.
+7. One served `outdoor_poi` feature (`Capanna Damiano Marinelli`,
+   `4747654476`) points at an OSM node that returns **HTTP 410 Gone**.
+
+That is the concrete case for spec amendment v1.11, not merely something
+consistent with it.
+
+**Selection prototype.** Tapping an eligible object opens a minimal panel with
+its name, class, elevation, coordinates and durable OSM identity, plus a
+labelled placeholder where the snow history will go. The placeholder says why
+it is empty rather than drawing an empty chart - the per-object GFSC series
+does not exist yet, and a chart that looked like data would be the same hazard
+the removed sample raster was.
+
+The matching rule, in `app/src/objects/selection.ts`, is **index-first
+proximity with an explicit ambiguity result and a scale floor**: nearest index
+record within a 22 CSS px tap radius converted to metres at the live map
+scale; if a runner-up is within 1.5x that distance the panel refuses to choose
+and offers the candidates; coarser than 20 m/px (about zoom 11.4) nothing is
+selectable and the panel says to zoom in. The module header states the failure
+modes rather than hiding them - an object outside the published shard is
+simply not selectable, proximity is not intent, the floor puts the app's own
+initial view out of range, and way/relation records match from a
+representative point. A highlight marker shows *which* point was matched, so a
+wrong match is visible rather than silent.
+
+The client-side contract follows the pipeline's published artifact exactly: an
+entry-point `object-index.json` listing 54 MGRS shards, and
+`objects/<TILE>.json` holding `{id, kind, name, longitude, latitude,
+elevationMeters}` records. `app/src/objects/objectIndexSchema.ts` validates
+both the way `manifestSchema.ts` validates `latest.json` - every shard `path`
+is resolved against the index's own URL and must stay on that origin and in
+that directory, so a poisoned index cannot redirect the browser; shard counts
+must add up; a shard must be the one that was requested and hold exactly the
+promised number of records. `bytes` and `sha256` are verified too, via
+SubtleCrypto, skipped with a warning outside a secure context because the
+origin pin still holds there. Shards load lazily by viewport intersection -
+never all 54, and nothing at all until the scale is fine enough for a tap to
+mean something. `app/public/object-index/` is a fixture cut from the real
+artifact: 445 real records in four real shards.
+
+Verified in the real app at 320, 390 and 1280 CSS px, with no console errors
+and no horizontal overflow: a tap at z9 asks for more zoom; a tap on
+Dufourspitze selects it and loads only the entry point plus `32TMR`; a tap on
+Punta Gnifetti, which has the Capanna Regina Margherita 29 m away on its
+summit, refuses to choose and offers both. The panel publishes its height so
+the bottom-left snow control lifts clear of it, and
+`npm run check-mobile-layout` now fails if that regresses. 76 frontend tests
+pass (30 at the start of the session).
+
+**Rejected, with reasons:**
+
+- **Rendered-feature-first selection**, with or without a proximity fallback.
+  It is the obvious design and the measurements kill it: passes would be
+  unselectable everywhere, three quarters of peaks unselectable at any zoom,
+  and at z14 over Monte Rosa exactly one peak would be tappable. Selection
+  would also silently change as label collision changed.
+- **Using the MVT feature id as the identity**, even though the ids do resolve
+  to real OSM objects and are stable across zoom. Two undocumented encodings,
+  no recoverable OSM type, and one live feature already pointing at a deleted
+  node.
+- **A nearest-record rule with no ambiguity case.** Punta Gnifetti and the hut
+  on its summit are 29 m apart; picking one silently is exactly how the wrong
+  peak's snow history gets shown.
+- **A metres cap on the tap radius instead of a scale floor.** Capping the
+  radius keeps taps possible at any zoom but makes them nearly impossible to
+  land - a 250 m radius is under 5 px at zoom 11 - so it trades an honest
+  refusal for a frustrating one.
+- **Class priority in tie-breaking** (peaks before parking, say). Distance is
+  the only thing a tap actually expresses; a priority rule would surprise the
+  user in the cases where it mattered.
+- **A spatial index inside a shard.** A linear scan over a few thousand
+  records is far inside a tap's frame budget. Add one when a measurement says
+  to.
+
+**Still open, and one thing for the pipeline.** The index is not yet published
+to R2, so the frontend runs on the committed fixture; swapping it is the URL
+in `app/src/map/config.ts` and nothing else, and needs no CSP change because
+the bucket host is already in `connect-src`. The per-object snow series, the
+chart itself, and wiring search results into the panel are all still to come.
+One data observation worth a look: the fixture contains `Rifugio Quinto
+Alpini` twice, 10 m apart, once as `shelter` and once as `hut` - two distinct
+OSM objects for one building, which the ambiguity rule will surface to users
+as a choice between two identical names.
+
 ## 2026-09-10 - Compact snow control and committed 30-day AS-OF archive
 
 The owner confirmed the handset search fix, then redirected the snow UI around
