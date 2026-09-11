@@ -1,5 +1,51 @@
 # Working session log
 
+## 2026-09-11 - Handset check passes; three sequencing choices recorded
+
+**The mobile pass (former plan item 1) is closed.** The owner verified the UI
+on a real handset and reports it works well, which is the check the emulator
+baseline explicitly could not stand in for - notch/safe-area insets, the
+on-screen keyboard shrinking the viewport, real touch targets. The search-bar
+overflow found on 2026-09-09 and the reserved top-right control column both
+hold up in the hand. Recorded as owner confirmation rather than a captured
+artifact: no device model or screenshots were taken, so if a future regression
+needs a baseline to diff against, that baseline does not exist yet and
+`npm run check-mobile-layout` remains the only repeatable one.
+
+The direct consequence is that **refactor stage 3 is unblocked.** Its whole
+reason for waiting was that it must "preserve responsive styling" and that
+styling was broken; it now has a known-good baseline to preserve.
+
+Also confirmed from the deployed site: object selection responds only around
+Monte Rosa. That is expected and not a defect. The tap rule is live and
+correct; it is reading the committed 445-object fixture, which covers four
+MGRS tiles, one of them Monte Rosa's. Publishing the real index is what makes
+the rest of the arc selectable.
+
+**Three choices made, none acted on yet:**
+
+1. *The object index reaches R2 via a new `workflow_dispatch` Action*, reusing
+   the existing `production-r2` environment, into the same bucket as the snow
+   data. Rejected: a one-off manual upload from `data/osm/index-shards/`. It is
+   faster exactly once - the index is rebuilt whenever the OSM extracts
+   refresh, and a repeatable job also keeps the publication key inside GitHub
+   rather than on a laptop. It is a separate workflow rather than a stage on
+   `publish-latest-preview.yml` because it has a different lifecycle: the
+   snapshot is daily and the index is occasional, and coupling them would make
+   an OSM refresh wait for a render.
+2. *The routing provider and elevation/DEM source get a costed shortlist
+   first* (spec section 15 items 6 and 7), then the owner picks. Not chosen
+   cold.
+3. *The per-object time series is compute-bound, not storage-bound.* An
+   earlier framing in this session was wrong and is corrected here: 211,855
+   objects x 31 dates is single-digit MB, and even two years daily is ~155 MB
+   against ~6 GB of free-tier headroom. The real wall is the render job, which
+   already spends a 360-minute timeout on 58 tiles x 31 dates; a multi-year
+   backfill cannot fit in one Actions run. The open question is therefore "how
+   far back, chunked across how many runs", which shapes the schema rather
+   than the bill. Options for beating that limit are being investigated
+   separately.
+
 ## 2026-09-11 - Collapse the hut/shelter duplicates in the object index
 
 A staffed refuge is routinely mapped twice in OSM: once as

@@ -6,32 +6,18 @@ of what was done and why lives in [`worklog.md`](worklog.md), newest entry
 first. Do not add a "done" section here; it only grows a third copy of history
 that then drifts.
 
-**Status (2026-09-09).** MVP snow layer is functionally complete and live on
+**Status (2026-09-11).** MVP snow layer is functionally complete and live on
 `https://nevaio.netlify.app`: the real GFSC pipeline composes the frozen spec
 section 9.2 AS-OF rule over a 30-day window across 58 MGRS tiles, publishes to
 Cloudflare R2 on a daily 04:35 UTC schedule, and has run unattended since
 2026-08-28. Place search (section 6.1) is done, on MapTiler Geocoding. A
 security review and its remediation closed on 2026-09-09; posture is in
-[`security.md`](security.md). Next work is the OSM object panel and A-to-B
-routing.
+[`security.md`](security.md). The mobile-first UI was verified on a real
+handset on 2026-09-11. Next work is the OSM object panel and A-to-B routing.
 
 ## Next, in order
 
-1. **Proper mobile testing pass.** Spec section 10 is mobile-first, but the UI
-   has only ever been verified on a desktop viewport and in Playwright at a
-   desktop size. A quick real-device check on 2026-09-09 found the search bar
-   overflowing the screen, and more besides. Test on real handsets rather than
-   only a resized desktop window - notch/safe-area insets, the on-screen
-   keyboard shrinking the viewport, and touch target sizes are all things a
-   narrow desktop window does not reproduce. Fix what it turns up; the floating
-   panels (`app/src/ui/searchBar.ts`, `snowControl.ts`, `app/src/style.css`)
-   are the likely surface. In particular, confirm the search bar's new reserved
-   top-right-control column at 320 and 390 CSS pixels on actual handsets, along
-   with the existing snow-control clearance. `npm run check-mobile-layout`
-   provides the repeatable emulator baseline (with `npm run dev` running), but
-   is not a substitute for the handset checks - see `worklog.md` (2026-09-06,
-   2026-09-10).
-2. **OSM object panel: publish the index, then the snow history (spec
+1. **OSM object panel: publish the index, then the snow history (spec
    section 7).** Selection is done and runs on a committed fixture: the tap
    rule, the shard-index/shard validators, lazy shard loading and the minimal
    panel are in `app/src/objects/` and `app/src/ui/objectPanel.ts`, and
@@ -43,6 +29,16 @@ routing.
      change is needed for that host. Then delete the fixture in
      `app/public/object-index/`, or keep it only as a local-dev fallback -
      decide deliberately, and remember there is no offline snow data by design.
+     **Decided 2026-09-11: a new `workflow_dispatch` GitHub Action, reusing the
+     existing `production-r2` environment, into the same bucket as the snow
+     data.** Not a manual upload: the index is rebuilt whenever the OSM
+     extracts refresh, so a repeatable job is worth its cost the second time,
+     and it keeps the publication key inside GitHub. The artifact is 54 files
+     and 28.6 MB, trivial against the free tier. It is a different lifecycle
+     from the daily snapshot, so it is a separate workflow, not a stage bolted
+     onto `publish-latest-preview.yml`.
+     Until then the deployed site selects objects only inside the four fixture
+     tiles - the tap rule is live and correct, the data behind it is a stub.
    - **Precompute the per-object GFSC time series**, keyed on the same stable
      OSM ids, by batch-sampling the rasters the daily pipeline already
      downloads and backfilling from Copernicus's multi-year archive. No new
@@ -62,7 +58,7 @@ routing.
    - Anything needing to know where Nevaio shows snow must ask
      `nevaio_pipeline.footprint`, not re-derive it.
 
-3. **The date picker for historical AS-OF dates (spec section 5.3).** The
+2. **The date picker for historical AS-OF dates (spec section 5.3).** The
    storage half shipped on 2026-09-11 - see `worklog.md` for the schema and
    the retention argument. R2 now carries `dates.json` (the authoritative
    catalogue, newest first, `{asOfDate, runId, manifest}` per entry) and one
@@ -77,18 +73,23 @@ routing.
    nearby date, or to anything recomposed in the browser. No CSP change is
    needed; the new objects are on the R2 origin `_headers` already allows.
    The latest-date text stays non-interactive until the picker lands.
-4. **A-to-B routing + snow/elevation profile (spec section 8).** Needs a hosted
-   routing provider chosen (spec section 15 item 6). Firm requirement, stronger
+3. **A-to-B routing + snow/elevation profile (spec section 8).** Needs a hosted
+   routing provider chosen (spec section 15 item 6). **Decided 2026-09-11: the
+   choice is made from a costed shortlist rather than cold** - a written
+   options/pros-cons/recommendation pass covering the routing provider and the
+   elevation/DEM source (section 15 item 7) comes first, then the owner picks.
+   That research is queued and does not block items 1-2. Firm requirement, stronger
    than sections 8.4-8.5 currently read: observation freshness and quality must
    be shown clearly and prominently on the route profile, not "where
    practical". Spec section 15 item 11.
-5. **Repository structure refactor, stage 3 onward**
+4. **Repository structure refactor, stage 3 onward**
    ([`../REFACTOR.md`](../REFACTOR.md)). Stages 1 (dissolve `recon/`) and 2
-   (package the pipeline) are done - 2026-09-09. Sequencing decided that day and worth not re-deriving: stage 3
-   regroups the frontend into feature folders and therefore must come *after*
-   the mobile pass above, because its own instruction is to "preserve
-   responsive styling" and that styling is currently broken - fix it and verify
-   on a device first, so the move has a known-good baseline. Stage 4
+   (package the pipeline) are done - 2026-09-09. Sequencing decided that day
+   and worth not re-deriving: stage 3 regroups the frontend into feature
+   folders and had to come *after* the mobile pass, because its own instruction
+   is to "preserve responsive styling" and that styling was broken - it needed
+   a known-good baseline to preserve. **That baseline now exists** (handset
+   check, 2026-09-11), so stage 3 is unblocked. Stage 4
    (contracts) waits for the OSM object panel, which is the work that would
    actually consume a shared encoding.
 
