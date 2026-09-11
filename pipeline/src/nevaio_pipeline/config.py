@@ -71,3 +71,20 @@ MAX_DOWNLOAD_BYTES = 12 * 1024 * 1024 * 1024
 # One product per date is kept per tile, so the window length is also the
 # per-tile product ceiling.
 MAX_PRODUCTS_PER_TILE = ASOF_WINDOW_DAYS
+
+
+# --- Published archive retention (spec section 5.3, amendment v1.12) ------
+#
+# Spec section 5.3 lets the user pick "the latest available date and up to the
+# preceding 30 calendar dates", so the catalogue window is 31 calendar dates
+# wide, anchored on the newest date actually published. It is a *calendar*
+# window rather than a count of the newest 31 published dates: after a gap the
+# latter would keep advertising dates further back than 30 days, which the
+# selector is not allowed to offer.
+ASOF_CATALOGUE_DATES = 31
+
+# Independent of the date window: the newest N immutable runs always survive a
+# prune, whatever their AS-OF date. This is the rollback buffer the original
+# seven-run policy provided, and it is what keeps the superseded run of a
+# same-date re-run around long enough to point `latest.json` back at it.
+ROLLBACK_RUNS = 7
