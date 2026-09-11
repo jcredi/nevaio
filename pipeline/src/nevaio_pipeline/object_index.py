@@ -6,6 +6,12 @@ GeoJSON FeatureCollection (with an OSM type, ID, and tags); this pure module
 keeps only the product's approved, named point objects and gives each one a
 stable ``node/123``-style identity. It deliberately knows nothing about
 downloads, raster sampling, R2, or MapLibre.
+
+An object outside Nevaio's snow footprint is dropped the same way an
+unapproved tag is. The panel's whole purpose is a snow history, and there is
+none to show where no GFSC product exists; shipping such an object would be a
+selectable target that answers every question with "no data". The footprint
+itself is not defined here - :mod:`nevaio_pipeline.footprint` owns it.
 """
 
 from __future__ import annotations
@@ -17,6 +23,8 @@ from math import isfinite
 from pathlib import Path
 import re
 from typing import Literal, Mapping, Sequence
+
+from .footprint import Footprint, mvp_footprint
 
 ObjectKind = Literal["peak", "hut", "saddle", "shelter", "parking", "settlement"]
 
@@ -124,13 +132,24 @@ def _elevation(tags: Mapping[str, object]) -> float | None:
     return elevation if isfinite(elevation) else None
 
 
-def build_object_index(features: Sequence[Mapping[str, object]]) -> tuple[ObjectIndexEntry, ...]:
+def build_object_index(
+    features: Sequence[Mapping[str, object]],
+    footprint: Footprint | None = None,
+) -> tuple[ObjectIndexEntry, ...]:
     """Return a deterministic index from normalized OSM GeoJSON features.
 
     Input is deliberately small and explicit: each Feature needs ``geometry``
     plus ``properties.osmType``, ``properties.osmId``, and ``properties.tags``.
     Unapproved tags are ignored, while malformed approved records fail instead
     of being published as a target that cannot later be matched to history.
+
+    ``footprint`` restricts the result to objects Nevaio actually has snow for.
+    It stays optional so the classification and identity rules can be tested
+    without a geography, but every published index is built with one; the
+    command below supplies the MVP footprint and offers no way to opt out.
+    Filtering is a coordinate test on already-validated records, so a record
+    that is malformed still fails rather than being quietly skipped for being
+    somewhere else.
     """
 
     entries: list[ObjectIndexEntry] = []
@@ -152,6 +171,9 @@ def build_object_index(features: Sequence[Mapping[str, object]]) -> tuple[Object
             raise ValueError(f"duplicate OSM object: {object_id}")
         name = _required_string(tags.get("name"), f"name for {object_id}")
         longitude, latitude = _point(feature)
+        if footprint is not None and not footprint.contains(longitude, latitude):
+            seen_ids.add(object_id)
+            continue
         entries.append(
             ObjectIndexEntry(
                 id=object_id,
@@ -167,7 +189,10 @@ def build_object_index(features: Sequence[Mapping[str, object]]) -> tuple[Object
     return tuple(sorted(entries, key=lambda entry: entry.id))
 
 
-def build_index_document(feature_collection: Mapping[str, object]) -> dict[str, object]:
+def build_index_document(
+    feature_collection: Mapping[str, object],
+    footprint: Footprint | None = None,
+) -> dict[str, object]:
     """Validate a normalized GeoJSON FeatureCollection and produce public JSON.
 
     The document contains no timestamp or source-specific metadata, so identical
@@ -184,14 +209,18 @@ def build_index_document(feature_collection: Mapping[str, object]) -> dict[str, 
     if not all(isinstance(feature, Mapping) for feature in features):
         raise ValueError("GeoJSON FeatureCollection.features must contain objects")
 
-    index = build_object_index(features)
+    index = build_object_index(features, footprint)
     return {
         "schemaVersion": 1,
         "objects": [entry.to_document() for entry in index],
     }
 
 
-def write_index_document(input_path: Path, output_path: Path) -> int:
+def write_index_document(
+    input_path: Path,
+    output_path: Path,
+    footprint: Footprint | None = None,
+) -> int:
     """Convert a normalized local GeoJSON file to a deterministic index file."""
 
     try:
@@ -203,7 +232,7 @@ def write_index_document(input_path: Path, output_path: Path) -> int:
     if not isinstance(source, Mapping):
         raise ValueError("OSM input must be a JSON object")
 
-    document = build_index_document(source)
+    document = build_index_document(source, footprint)
     output_path.write_text(
         json.dumps(document, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
@@ -218,8 +247,9 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser.add_argument("--input", type=Path, required=True, help="normalized OSM GeoJSON input")
     parser.add_argument("--output", type=Path, required=True, help="public index JSON output")
     args = parser.parse_args(argv)
-    count = write_index_document(args.input, args.output)
-    print(f"wrote {count} approved OSM object(s) to {args.output}")
+    footprint = mvp_footprint()
+    count = write_index_document(args.input, args.output, footprint)
+    print(f"wrote {count} approved OSM object(s) inside the snow footprint to {args.output}")
 
 
 if __name__ == "__main__":

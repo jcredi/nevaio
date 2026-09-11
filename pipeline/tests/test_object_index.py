@@ -5,6 +5,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 
+from nevaio_pipeline.footprint import Footprint, mvp_footprint, parse_mgrs_tile, unproject_utm
 from nevaio_pipeline.object_index import (
     build_index_document,
     build_object_index,
@@ -49,6 +50,61 @@ class ClassifyObjectTests(unittest.TestCase):
         )
         self.assertIsNone(classify_object({"highway": "path", "name": "Via Alta"}))
         self.assertIsNone(classify_object({"highway": "track", "mountain_pass": "no"}))
+
+
+class FootprintFilterTests(unittest.TestCase):
+    """Only objects Nevaio has snow for may reach the published index."""
+
+    def _names(self, features, footprint) -> list[str]:
+        return [entry.name for entry in build_object_index(features, footprint)]
+
+    def test_keeps_objects_inside_the_snow_footprint_and_drops_the_rest(self) -> None:
+        footprint = mvp_footprint()
+        features = [
+            feature("node", 1, {"natural": "peak", "name": "Mont Blanc"}, [6.8651, 45.8326]),
+            feature("node", 2, {"natural": "peak", "name": "Gran Sasso"}, [13.5594, 42.4700]),
+            feature("node", 3, {"place": "city", "name": "Paris"}, [2.3522, 48.8566]),
+            feature("node", 4, {"place": "city", "name": "Palermo"}, [13.3614, 38.1157]),
+            feature("node", 5, {"place": "city", "name": "Vienna"}, [16.3738, 48.2082]),
+        ]
+        self.assertEqual(self._names(features, footprint), ["Mont Blanc", "Gran Sasso"])
+
+    def test_no_footprint_keeps_everything_so_the_core_stays_testable(self) -> None:
+        features = [feature("node", 3, {"place": "city", "name": "Paris"}, [2.3522, 48.8566])]
+        self.assertEqual(self._names(features, None), ["Paris"])
+
+    def test_granule_edges_are_inclusive_and_one_metre_outside_is_excluded(self) -> None:
+        square = parse_mgrs_tile("33TUH")
+        footprint = Footprint.from_tiles(["33TUH"])
+        inside = unproject_utm(square.min_easting + 1.0, square.min_northing + 1.0, square.zone)
+        outside = unproject_utm(square.min_easting - 1.0, square.min_northing - 1.0, square.zone)
+        features = [
+            feature("node", 1, {"natural": "peak", "name": "Just inside"}, list(inside)),
+            feature("node", 2, {"natural": "peak", "name": "Just outside"}, list(outside)),
+        ]
+        self.assertEqual(self._names(features, footprint), ["Just inside"])
+
+    def test_an_object_in_the_gap_between_squares_is_dropped(self) -> None:
+        # The MVP set has no 32TQQ; the Po plain there is genuinely uncovered.
+        gap = unproject_utm(750_000.0, 4_945_000.0, 32)
+        features = [feature("node", 1, {"place": "town", "name": "In the gap"}, list(gap))]
+        self.assertEqual(self._names(features, mvp_footprint()), [])
+
+    def test_a_duplicate_identity_still_fails_outside_the_footprint(self) -> None:
+        # Filtering must not become a way for a conflicting source snapshot to
+        # slip through unnoticed.
+        features = [
+            feature("node", 1, {"place": "city", "name": "Paris"}, [2.3522, 48.8566]),
+            feature("node", 1, {"place": "city", "name": "Paris"}, [2.3522, 48.8566]),
+        ]
+        with self.assertRaisesRegex(ValueError, "duplicate OSM object"):
+            build_object_index(features, mvp_footprint())
+
+    def test_a_malformed_record_fails_rather_than_being_filtered_away(self) -> None:
+        broken = feature("node", 1, {"natural": "peak", "name": "Nameless"}, [2.0, 48.0])
+        broken["properties"]["tags"]["name"] = "   "
+        with self.assertRaisesRegex(ValueError, "name for node/1"):
+            build_object_index([broken], mvp_footprint())
 
 
 class BuildObjectIndexTests(unittest.TestCase):
