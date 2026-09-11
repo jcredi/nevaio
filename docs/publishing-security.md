@@ -66,6 +66,32 @@ chunk CRCs, no ancillary/trailing payloads, bounded zlib output and valid row
 filter types. The real Pillow renderer format is covered by tests. A future
 renderer format change must update this contract deliberately.
 
+### The AS-OF date archive (2026-09-11)
+
+A publication now also writes two small public JSON objects at the bucket root
+- the date's own manifest `asof-<date>-<runId>.json` and the catalogue
+`dates.json` - and may delete evicted ones. Three things keep that inside the
+existing boundary:
+
+- The catalogue is generated from bucket **listings only**. The publisher
+  reads no object bodies, so nothing previously published can influence this
+  run's behaviour through its content; a key name it does not fully recognise
+  under the `asof-` prefix is ignored rather than treated as garbage to
+  collect.
+- `validate_date_catalogue` in `artifact_validation.py` re-derives every value
+  it can - the manifest key from the entry's own date and run, ordering,
+  uniqueness, window width - and the publisher runs it over its own serialized
+  bytes before the PUT, so a bug fails the run instead of advertising a date
+  the browser will reject. Same stdlib-only style as the run validator: exact
+  field sets, no duplicate keys, a 16 KiB ceiling.
+- Deletion is ordered after the catalogue that stops advertising the target,
+  and a doomed date manifest is deleted before the run it names. The publisher
+  never deletes the run it just uploaded, and folds it into the plan
+  explicitly rather than trusting a listing to be current.
+
+`nevaio_pipeline/catalogue.py` carries the pure logic and imports only the
+standard library and `config.py`; the publish dependency surface is unchanged.
+
 Validation runs before secrets are exposed, and the publisher checks again
 before opening its S3 client or uploading anything. The same validator protects
 local publication, closing the unsafe upload primitive described in F3 as part

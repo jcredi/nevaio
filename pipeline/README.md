@@ -127,11 +127,63 @@ pipeline/.venv/bin/python -m nevaio_pipeline.render \
 ```
 
 The GitHub Actions entry point is `Publish latest GFSC snapshot`. It runs daily
-at `04:35 UTC` and on manual dispatch, and passes `--keep-runs 7` so R2 holds a
-week of immutable runs rather than growing without bound. There is still
-deliberately no historical backfill - the job renders "today" only (spec
-section 5.3). Cloudflare bucket, token, GitHub variable, invocation, and
-verification instructions are in [`docs/r2-setup.md`](../docs/r2-setup.md).
+at `04:35 UTC` and on manual dispatch. There is still deliberately no
+historical backfill - the job renders "today" only (spec section 5.3).
+Cloudflare bucket, token, GitHub variable, invocation, and verification
+instructions are in [`docs/r2-setup.md`](../docs/r2-setup.md).
+
+## What a publication puts in R2
+
+Four kinds of public object, all read directly by the browser:
+
+| Key | What it is | Cache |
+|---|---|---|
+| `runs/<runId>/tiles/{z}/{x}/{y}.png`, `runs/<runId>/run.json` | one immutable run | one year, immutable |
+| `latest.json` | atomic pointer to the newest run | no-cache |
+| `asof-<YYYY-MM-DD>-<runId>.json` | that date's manifest, `latest.json`-shaped | one year, immutable |
+| `dates.json` | the AS-OF date catalogue | no-cache |
+
+`dates.json` is **authoritative about availability** (spec section 5.3): a date
+absent from it is unavailable, and must never be substituted with the latest
+map or a nearby date. It is small enough to fetch at startup - about 3 KB at a
+full window - and carries `schemaVersion`, `kind`, `generatedAt`, `maxDates`,
+and `dates` newest-first, each entry `{asOfDate, runId, manifest}`. The
+`manifest` value is a *relative* key, resolved against the catalogue's own URL,
+so a poisoned catalogue cannot point the browser at another host.
+
+Date manifests sit at the bucket root rather than under a `dates/` prefix on
+purpose: `app/src/map/manifestSchema.ts` resolves tiles as
+`<manifest directory>/runs/<runId>/tiles/…`, so a root-level manifest validates
+through the identical code path as `latest.json`. The run ID is part of the key
+so the whole public layer is derivable from two bucket listings with no GETs,
+and so each manifest is immutable. `nevaio_pipeline.catalogue` holds all of
+this (pure, no boto3); `artifact_validation.validate_date_catalogue` is the
+stdlib validator the publisher runs over its own bytes before the PUT.
+
+## Retention
+
+Two independent rules, both applied after `latest.json` moves:
+
+- `--keep-dates` (default `config.ASOF_CATALOGUE_DATES` = 31) is a **calendar
+  window**: the newest available date and the 30 dates before it. Not a count
+  of the newest 31 published dates - after a failed day a count would keep
+  advertising dates further back than the selector may offer.
+- `--keep-runs` (7 in the workflow) is the **rollback buffer**: that many
+  newest runs survive whatever their date. It is what keeps the superseded run
+  of a same-date re-run recoverable, and it is unchanged from the original
+  policy.
+
+A run survives if it backs a catalogue entry, is in the rollback buffer, or is
+the run being published. Order is the safety property: upload the run, put its
+date manifest, put the catalogue, move `latest.json`, then delete - so a date
+is advertised only after its data is complete, and an object is deleted only
+after a durable catalogue that omits it exists. A crash leaves unreferenced
+objects, never an advertised date with no tiles. Omit `--keep-runs` (the
+library default `keep_runs=None`) and nothing is ever deleted.
+
+Storage: a mid-winter full-area run is ~130 MB / ~3,500 objects, so a full
+31-date archive is ~4.0 GB and ~109,000 objects against R2's 10 GB free
+allowance.
 
 The schedule is set from measured behavior, not assumption: HR-WSI publishes
 GFSC strictly daily, and a product dated `D` becomes fetchable at roughly

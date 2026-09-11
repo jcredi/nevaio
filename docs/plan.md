@@ -48,14 +48,21 @@ routing.
    multi-year archive - no new running server. Do not use a full-area query
    against a shared public Overpass instance. See `worklog.md` (2026-09-06,
    2026-09-10, 2026-09-11).
-3. **30-day historical AS-OF map dates (spec section 5.3).** Publish a bounded
-   R2 catalogue of available dates plus each date's immutable manifest/tiles,
-   and raise retention from the current seven rollback runs to cover the latest
-   30 calendar dates. Then add the compact control's date picker. A selection
-   must load that exact archived AS-OF output; missing days stay unavailable.
-   Do not add a client-side mock picker, recompute tiles in the browser, or add
-   a running service. The existing latest-date text is intentionally
-   non-interactive until this work exists.
+3. **The date picker for historical AS-OF dates (spec section 5.3).** The
+   storage half shipped on 2026-09-11 - see `worklog.md` for the schema and
+   the retention argument. R2 now carries `dates.json` (the authoritative
+   catalogue, newest first, `{asOfDate, runId, manifest}` per entry) and one
+   `asof-<date>-<runId>.json` manifest per available date, latest plus 30
+   preceding. What remains is the frontend: fetch and validate `dates.json` at
+   startup with a runtime validator alongside `manifestSchema.ts`, resolve
+   each entry's relative `manifest` key against the catalogue's own URL, and
+   let the compact control select one. An archived date manifest is
+   `latest.json`-shaped and lives in the same directory, so
+   `validateTileManifest` accepts it unchanged - keep it that way. A date
+   absent from the catalogue is unavailable: no falling back to latest, to a
+   nearby date, or to anything recomposed in the browser. No CSP change is
+   needed; the new objects are on the R2 origin `_headers` already allows.
+   The latest-date text stays non-interactive until the picker lands.
 4. **A-to-B routing + snow/elevation profile (spec section 8).** Needs a hosted
    routing provider chosen (spec section 15 item 6). Firm requirement, stronger
    than sections 8.4-8.5 currently read: observation freshness and quality must
@@ -89,6 +96,13 @@ routing.
   publish a 1x1 transparent PNG for empty cells (simple, more objects in R2),
   or narrow the published `bounds`/per-zoom coverage so the grid matches what
   actually exists (cheaper at runtime, more pipeline work). Not urgent.
+- **R2 free-tier headroom is now the binding constraint on what else ships
+  there.** A 31-date archive is roughly 4.0 GB and ~109,000 objects against
+  the 10 GB allowance (it was ~0.9 GB at seven runs). The static OSM object
+  index and any precomputed per-object series have to fit in the remaining
+  ~6 GB, or the date window shortens - `config.ASOF_CATALOGUE_DATES` is the
+  one dial. Worth an actual `du` against the bucket once a full window exists,
+  since 130 MB/run is a mid-winter figure and summer runs are smaller.
 - **The recovery path is unrehearsed** - revoke the publication key, restore
   trusted code, rebuild dependencies, republish known-good data.
 

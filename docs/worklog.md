@@ -1,5 +1,125 @@
 # Working session log
 
+## 2026-09-11 - The storage half of 30-day AS-OF dates: archive, catalogue, retention
+
+Shipped the pipeline side of spec section 5.3 (amendment v1.12). R2 now holds
+a bounded archive of date-specific manifests and a public catalogue of the
+dates actually available, so a date picker has something real to select. The
+picker itself is deliberately not here - a parallel change owns `app/`, and
+the spec keeps the control non-interactive until this exists.
+
+**What is published.** Three kinds of public object at the bucket root, beside
+the tiles' unchanged `runs/<runId>/` trees:
+
+- `latest.json` - unchanged, still the atomic pointer to the newest run.
+- `asof-<YYYY-MM-DD>-<runId>.json` - one date's manifest, identical in shape
+  to `latest.json` apart from its self-referential `manifestUrl`.
+- `dates.json` - the catalogue: `schemaVersion`, `kind`, `generatedAt`,
+  `maxDates`, and `dates`, newest first, each `{asOfDate, runId, manifest}`.
+  About 3 KB at a full window.
+
+**Why those shapes.** Three decisions did the most work:
+
+- *Date manifests live at the bucket root, not under a `dates/` prefix.* The
+  frontend's existing validator (`app/src/map/manifestSchema.ts`) resolves
+  tiles as `<manifest directory>/runs/<runId>/tiles/…`. Keeping the manifest in
+  the same directory as `latest.json` means an archived date validates through
+  the identical code path with no change to that file - which the security
+  posture explicitly wants coupled to the pipeline, not loosened for it.
+- *The run ID is in the manifest key.* That makes the entire public layer
+  derivable from two bucket LISTs with zero GETs, makes each date manifest
+  immutable (a re-run writes a new key rather than mutating a live one), and
+  removes any way for the catalogue and a manifest to disagree about which run
+  backs a date. The catalogue's `manifest` field is therefore a *relative* key
+  the frontend resolves against the catalogue's own URL, so it can never send
+  the browser to another host.
+- *`maxDates` is in the document.* Without it a short catalogue is ambiguous:
+  a reader cannot tell a 31-date policy with five failed days from a policy
+  that shrank. With it, no consumer hardcodes 31.
+
+**Retention is two independent rules.** They are not the same question and
+collapsing them was the mistake worth avoiding:
+
+1. The catalogue keeps a **calendar window** - the newest available date and
+   the 30 dates before it. Not "the newest 31 published dates": after a failed
+   day a count would quietly reach further back than 30 days and advertise a
+   date the selector is not allowed to offer.
+2. The newest `--keep-runs` runs survive a prune **whatever their date**. This
+   is exactly the rollback buffer the old seven-run policy provided, and it is
+   what keeps the superseded run of a same-date re-run around long enough to
+   point `latest.json` back at it. Within one date the newest run wins the
+   catalogue entry; its predecessor stops being advertised but is not
+   immediately destroyed.
+
+A run survives if it backs a catalogue entry, is in the rollback buffer, or is
+the run being published - the last folded in explicitly rather than trusted to
+appear in a listing, so an eventually-consistent LIST can never make the
+publisher delete the run it just uploaded.
+
+**Crash safety is an ordering property, not a lock.** The publish is five
+stages: upload the run, put its date manifest, put the catalogue, move
+`latest.json`, then delete. A date is advertised only after its manifest and
+tiles are complete, and an object is deleted only after a durable catalogue
+that omits it exists. Every reachable failure therefore leaves objects nothing
+refers to - collected by the next run - rather than a catalogue entry whose
+tiles are gone. Within the delete phase, doomed manifests go before the runs
+they named. The catalogue goes out *before* `latest.json` on purpose: crashing
+between them leaves the picker offering a date the pointer has not caught up
+to, whose data is all present, which is strictly better than a pointer
+advertising a date the picker does not list.
+
+**Cost.** A mid-winter full-area run is ~130 MB / ~3,500 objects, so 31 dates
+is ~4.0 GB and ~109,000 objects, against R2's 10 GB free allowance - up from
+~0.9 GB at seven runs, and still leaving roughly 6 GB of headroom, which the
+static OSM object index will want a slice of. Operations barely move: the
+daily job adds two LISTs and two small PUTs, and reads no object bodies at
+all. Class A operations stay near ~110k/month against a 1M allowance.
+
+**Rejected, with reasons:**
+
+- *Reading every run's `run.json` to learn its AS-OF date.* The obvious way to
+  map runs to dates, and it works, but it costs a GET per archived run every
+  day and makes a transient read failure a correctness question ("is this run
+  unadvertised, or did I just fail to read it?"). Putting the date in the key
+  removed the question instead of answering it.
+- *Deriving retention from the previous `dates.json`.* Smaller still, but it
+  makes the catalogue self-referential: a corrupted or lost catalogue would
+  prune the archive down to one date. Deriving it from the objects that
+  actually exist means a lost catalogue is rebuilt by the next run.
+- *Healing a missing date manifest by reconstructing it from the run.* Ten
+  lines, and it would recover a date whose manifest write crashed. Left out:
+  the reconstruction would have to invent a `publishedAt`, and the spec's own
+  rule is that a failed day stays unavailable rather than being approximated.
+  The date is simply not advertised.
+- *`dates/<date>.json` as the manifest key.* Reads better, breaks the
+  frontend's tile-path rule, and would have meant editing a validator the
+  security posture deliberately keeps tight.
+- *A count-based date policy, and a `keep_dates` that replaces `keep_runs`.*
+  Both discard a property that is currently relied on; see above.
+- *Making the publish job idempotent by rewriting the whole catalogue from a
+  full bucket scan on every run.* It already is, in effect - the catalogue is
+  recomputed from listings each time - without a scan of tile objects.
+
+**Numbers.** 31 dates, not 30: spec 5.3 says "the latest available date and up
+to the preceding 30 calendar dates", which is a 31-date window, matching how
+`ASOF_WINDOW_DAYS = 31` already encodes the 30-day acquisition ceiling. The
+constant is `config.ASOF_CATALOGUE_DATES`.
+
+**Workflow.** One change, inside the existing credential-free verification
+step: it now also fetches `dates.json`, validates it with the same stdlib
+validator, and fails the job unless the catalogue advertises the run just
+published. No new step, secret, environment reference or dependency; the
+publish step's `--keep-runs 7` is untouched and the date window comes from the
+config constant. A consequence worth knowing: a manual dispatch backfilling a
+date older than 31 days will publish a run the catalogue cannot advertise, and
+that check will fail the job loudly rather than leave it unremarked.
+
+**Still open.** Nothing was published to production and no real R2 object was
+touched; all of this is tested against an in-memory bucket double. The first
+real run will be the first time the archive grows past seven runs, and it is
+worth watching that day's job log for the new catalogue line. The frontend
+half - fetching and validating `dates.json`, and the picker - is next.
+
 ## 2026-09-10 - Compact snow control and committed 30-day AS-OF archive
 
 The owner confirmed the handset search fix, then redirected the snow UI around
