@@ -117,7 +117,7 @@ Recorded so they are not "fixed" by someone acting in good faith:
 ```sh
 cd app && npm test                                   # 33 frontend cases
 PYTHONPATH=pipeline/src pipeline/.venv/bin/python \
-  -m unittest discover -s pipeline/tests -t pipeline           # 138 cases
+  -m unittest discover -s pipeline/tests -t pipeline           # 139 cases
 cd app && npm audit --package-lock-only --ignore-scripts
 ```
 

@@ -186,7 +186,7 @@ def publish_to_r2(
         put_json(date_key, manifest(date_key), "public, max-age=31536000, immutable")
 
     catalogue = build_catalogue(plan.entries, generated_at=published_at, keep_dates=keep_dates)
-    validate_date_catalogue(json.dumps(catalogue, indent=2))
+    validate_date_catalogue(json.dumps(catalogue, indent=2), max_dates=keep_dates)
     put_json(CATALOGUE_KEY, catalogue, "no-cache, max-age=0")
 
     latest = manifest("latest.json")

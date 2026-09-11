@@ -73,6 +73,11 @@ class DateCatalogueValidationTests(unittest.TestCase):
         self.rejects(document(kind="latest"), "unexpected catalogue kind")
         self.rejects(document(maxDates=ASOF_CATALOGUE_DATES + 1), "invalid catalogue maxDates")
 
+    def test_a_narrowed_window_validates_against_itself_only(self) -> None:
+        narrow = build_catalogue(ENTRIES[:2], generated_at=GENERATED, keep_dates=7)
+        self.assertEqual(validate_date_catalogue(json.dumps(narrow), max_dates=7), narrow)
+        self.rejects(narrow, "invalid catalogue maxDates")
+
     def test_rejects_a_generation_stamp_that_is_not_utc(self) -> None:
         self.rejects(document(generatedAt="2026-09-11T04:41:02+02:00"), "must be UTC")
         self.rejects(document(generatedAt="2026-09-11T04:41:02"), "must be UTC")

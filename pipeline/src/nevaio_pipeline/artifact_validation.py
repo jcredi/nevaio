@@ -217,8 +217,13 @@ def validate_artifact(runs_dir: Path, *, tiles: list[str] | None = None,
     return run_dir, metadata
 
 
-def validate_date_catalogue(document: bytes | str) -> dict:
+def validate_date_catalogue(document: bytes | str, *, max_dates: int = ASOF_CATALOGUE_DATES) -> dict:
     """Validate the public AS-OF date catalogue, as the browser will.
+
+    ``max_dates`` is the window the document must declare, and defaults to the
+    shipped policy - a consumer checking the real object should leave it
+    alone. The publisher passes its own ``--keep-dates`` so a deliberately
+    narrowed window still validates against itself.
 
     The catalogue is the authority on which historical dates exist (spec
     section 5.3), so it is a public contract in the same sense `latest.json`
@@ -239,7 +244,7 @@ def validate_date_catalogue(document: bytes | str) -> dict:
     generated = datetime.fromisoformat(d["generatedAt"])
     _require(generated.utcoffset() is not None and generated.utcoffset().total_seconds() == 0,
              "catalogue generatedAt must be UTC")
-    _require(type(d["maxDates"]) is int and d["maxDates"] == ASOF_CATALOGUE_DATES,
+    _require(type(d["maxDates"]) is int and d["maxDates"] == max_dates,
              "invalid catalogue maxDates")
 
     entries = d["dates"]
