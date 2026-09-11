@@ -1,10 +1,17 @@
 import maplibregl from "maplibre-gl";
 import {
   initialView,
+  objectIndexUrl,
   snowManifestUrl,
   styleUrl,
 } from "./map/config";
+import { metersPerPixel } from "./map/scale";
+import { SelectionHighlight } from "./map/selectionHighlight";
 import { addSnowOverlay } from "./map/snowOverlay";
+import { loadObjectIndex } from "./objects/objectIndex";
+import type { ObjectRecord } from "./objects/objectIndexSchema";
+import { resolveSelection } from "./objects/selection";
+import { ObjectPanel, type IndexStatus } from "./ui/objectPanel";
 import { SnowControl } from "./ui/snowControl";
 import { createSearchBar } from "./ui/searchBar";
 import "./style.css";
@@ -28,6 +35,28 @@ const map = new maplibregl.Map({
 map.addControl(new maplibregl.NavigationControl(), "top-right");
 document.body.append(createSearchBar(map));
 
+// Object selection (spec section 7, amendment v1.11). The identity contract is
+// Nevaio's own static index, never MapTiler's rendered feature properties -
+// see docs/research/maptiler-outdoor-objects.md.
+const objectPanel = new ObjectPanel();
+document.body.append(objectPanel.element);
+
+let objects: ObjectRecord[] = [];
+let indexStatus: IndexStatus = "loading";
+let highlight: SelectionHighlight | null = null;
+
+loadObjectIndex(objectIndexUrl)
+  .then((index) => {
+    objects = index.objects;
+    indexStatus = "ready";
+  })
+  .catch((error) => {
+    // Same principle as the snow overlay: no data is reported as no data,
+    // never as an empty map the user might read as "nothing is here".
+    indexStatus = "unavailable";
+    console.error("Object index failed to load", error);
+  });
+
 map.on("load", async () => {
   try {
     // Null means there is no usable published snapshot; the control says so
@@ -37,6 +66,25 @@ map.on("load", async () => {
   } catch (error) {
     // A missing overlay shouldn't take the basemap down with it.
     console.error("Snow overlay failed to load", error);
+  }
+  // Added last so the selection marker sits above the snow raster.
+  highlight = new SelectionHighlight(map);
+});
+
+objectPanel.setChoiceHandler((record) => highlight?.show(record));
+objectPanel.setCloseHandler(() => highlight?.clear());
+
+map.on("click", (event) => {
+  const selection = resolveSelection(
+    objects,
+    { longitude: event.lngLat.lng, latitude: event.lngLat.lat },
+    metersPerPixel(map),
+  );
+  objectPanel.present(selection, indexStatus);
+  if (selection.status === "selected" && indexStatus === "ready") {
+    highlight?.show(selection.record);
+  } else {
+    highlight?.clear();
   }
 });
 

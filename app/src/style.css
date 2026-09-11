@@ -77,9 +77,13 @@ body {
 }
 
 .maplibregl-ctrl-bottom-left {
-  /* Keep the on-map snow controls above the visible attribution footer. */
-  bottom: calc(env(safe-area-inset-bottom) + 2.25rem);
+  /* Keep the on-map snow controls above the visible attribution footer, and
+     above the object panel while it is open. The panel publishes its own
+     height as --object-panel-height (see src/ui/objectPanel.ts); this is the
+     single place the two layouts are coupled. */
+  bottom: calc(env(safe-area-inset-bottom) + 2.25rem + var(--object-panel-height, 0px));
   left: env(safe-area-inset-left);
+  transition: bottom 180ms ease;
 }
 
 .maplibregl-ctrl-bottom-right {
@@ -459,5 +463,193 @@ body {
 
 .search-bar__message {
   padding: 0.625rem 0.75rem;
+  color: var(--text-secondary);
+}
+
+/* Object information panel (spec section 7) - a bottom sheet in every
+   viewport, so a phone gets the full width and a desktop gets a card in the
+   lower-left. It sits above the attribution footer and lifts the bottom-left
+   snow control by publishing --object-panel-height. */
+.object-panel {
+  position: fixed;
+  z-index: 6;
+  bottom: calc(env(safe-area-inset-bottom) + 2.25rem);
+  left: max(0.625rem, env(safe-area-inset-left));
+  right: max(0.625rem, env(safe-area-inset-right));
+  max-width: 24rem;
+  max-height: 45dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0.75rem 0.875rem 0.875rem;
+  background: var(--panel-bg);
+  backdrop-filter: blur(var(--panel-blur)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--panel-blur)) saturate(180%);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--panel-radius);
+  box-shadow: var(--panel-shadow);
+  font:
+    500 0.8125rem/1.35 system-ui,
+    -apple-system,
+    sans-serif;
+  color: var(--text-primary);
+  animation: panel-in 220ms ease both;
+}
+
+/* The panel is toggled with the standard hidden attribute. */
+.object-panel[hidden] {
+  display: none;
+}
+
+.object-panel__header {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.object-panel__heading {
+  min-width: 0;
+  flex: 1;
+}
+
+.object-panel__title {
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.25;
+  /* Long Alpine names must wrap, not overflow a 320 px viewport. */
+  overflow-wrap: anywhere;
+}
+
+.object-panel__subtitle {
+  margin-top: 0.125rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.object-panel__close {
+  flex: none;
+  /* Comfortable touch target - docs/spec.md section 10. */
+  width: 2.25rem;
+  height: 2.25rem;
+  margin: -0.375rem -0.375rem 0 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-secondary);
+  font:
+    400 1.375rem/1 system-ui,
+    -apple-system,
+    sans-serif;
+  cursor: pointer;
+}
+
+.object-panel__close:hover {
+  background: rgba(15, 23, 42, 0.08);
+}
+
+.object-panel__close:focus-visible {
+  outline: 2px solid var(--accent-strong);
+  outline-offset: 2px;
+}
+
+.object-panel__body {
+  margin-top: 0.625rem;
+}
+
+.object-panel__note {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.object-panel__facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.25rem 0.75rem;
+  font-size: 0.75rem;
+}
+
+.object-panel__term {
+  font-weight: 500;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.object-panel__value {
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.object-panel__history {
+  margin-top: 0.75rem;
+  padding-top: 0.625rem;
+  border-top: 1px solid rgba(15, 23, 42, 0.1);
+}
+
+.object-panel__history-title {
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.object-panel__history-note {
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  /* This is a "you are not looking at data" caveat, like the snow notice. */
+  color: var(--text-warning);
+}
+
+.object-panel__choices {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.object-panel__choice {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  width: 100%;
+  /* Comfortable touch target - docs/spec.md section 10. */
+  min-height: 2.75rem;
+  padding: 0.5rem 0.625rem;
+  border: none;
+  border-radius: var(--panel-radius-sm);
+  background: rgba(255, 255, 255, 0.6);
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.object-panel__choice:hover {
+  background: rgba(56, 189, 248, 0.18);
+}
+
+.object-panel__choice:focus-visible {
+  outline: 2px solid var(--accent-strong);
+  outline-offset: 2px;
+}
+
+.object-panel__choice-icon {
+  flex: none;
+  width: 1rem;
+  text-align: center;
+  color: var(--accent-strong);
+}
+
+.object-panel__choice-name {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.object-panel__choice-kind {
+  flex: none;
+  font-size: 0.6875rem;
   color: var(--text-secondary);
 }

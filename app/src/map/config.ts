@@ -24,6 +24,20 @@ export const initialView = {
 export const snowManifestUrl =
   import.meta.env.VITE_SNOW_MANIFEST_URL || "/snow/latest.json";
 
+// The static OSM object index (spec amendment v1.11) - the panel's identity
+// contract, and later the key for each object's snow history. The MapTiler
+// basemap is visual context only; docs/research/maptiler-outdoor-objects.md
+// measures why its rendered features cannot play this role.
+//
+// Today this is a small committed fixture in public/objects/, built from real
+// OSM objects around Monte Rosa, Gran San Bernardo, Chamonix and Solda so the
+// selection prototype can be exercised for real. When the pipeline publishes a
+// spatially scoped shard, point VITE_OBJECT_INDEX_URL at it: the R2 bucket
+// host is already in the CSP's connect-src, so no _headers change is needed
+// for that host - any other host would need one.
+export const objectIndexUrl =
+  import.meta.env.VITE_OBJECT_INDEX_URL || "/objects/index.json";
+
 // Approximate Alps + Italian Apennines bounding box (west, south, east,
 // north), used only to bias place-search results (spec section 6.1) toward
 // the MVP geographic scope - not a hard filter, so exact correctness here
