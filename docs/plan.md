@@ -25,23 +25,43 @@ routing.
    keyboard shrinking the viewport, and touch target sizes are all things a
    narrow desktop window does not reproduce. Fix what it turns up; the floating
    panels (`app/src/ui/searchBar.ts`, `snowControl.ts`, `app/src/style.css`)
-   are the likely surface. Note the search bar and the snow control have
-   collided on narrow viewports once before - see `worklog.md` (2026-09-06).
-2. **OSM object panel + historical chart (spec section 7).** Blocked on spec
-   section 15 item 3 - deciding which OSM object classes are interactive at
-   each zoom. Two constraints already settled, so do not re-derive them: the
-   rendered map tiles **cannot** be the data source (the opacity/color encoding
-   is lossy and cannot be inverted back to FSC%/age/quality), and the intended
-   architecture is a precomputed per-object time series, batch-sampled per
-   tile/date from the rasters the daily pipeline already downloads, backfilled
-   once from Copernicus's multi-year archive and published statically to R2 -
-   no new running server. See `worklog.md` (2026-09-06).
-3. **A-to-B routing + snow/elevation profile (spec section 8).** Needs a hosted
+   are the likely surface. In particular, confirm the search bar's new reserved
+   top-right-control column at 320 and 390 CSS pixels on actual handsets, along
+   with the existing snow-control clearance. `npm run check-mobile-layout`
+   provides the repeatable emulator baseline (with `npm run dev` running), but
+   is not a substitute for the handset checks - see `worklog.md` (2026-09-06,
+   2026-09-10).
+2. **OSM object panel + historical chart (spec section 7).** The eligible
+   default classes are now peaks, huts/refuges, passes/saddles, shelters,
+   parking, and settlements/named places; trails, paths, and roads are map
+   context, not interaction targets (spec section 15 item 3). Next, inspect
+   the selected MapTiler vector style's concrete feature properties/layers and
+   make a small, testable selection prototype. The MapTiler style supplies
+   visual context only: use a Nevaio-owned static OSM object index with stable
+   IDs as the click/history contract, published to R2 beside the precomputed
+   time series. The local regional-extract filter is fixture-validated and
+   date-matched Alps/Italy extracts are acquired and the first full build is
+   valid, but its 244,011-record/45 MB result is too broad to ship as one
+   browser download. Next, derive the exact snow/MGRS footprint and spatially
+   shard or filter the static index to that scope; only then batch-sample the
+   rasters the daily pipeline already downloads and backfill from Copernicus's
+   multi-year archive - no new running server. Do not use a full-area query
+   against a shared public Overpass instance. See `worklog.md` (2026-09-06,
+   2026-09-10, 2026-09-11).
+3. **30-day historical AS-OF map dates (spec section 5.3).** Publish a bounded
+   R2 catalogue of available dates plus each date's immutable manifest/tiles,
+   and raise retention from the current seven rollback runs to cover the latest
+   30 calendar dates. Then add the compact control's date picker. A selection
+   must load that exact archived AS-OF output; missing days stay unavailable.
+   Do not add a client-side mock picker, recompute tiles in the browser, or add
+   a running service. The existing latest-date text is intentionally
+   non-interactive until this work exists.
+4. **A-to-B routing + snow/elevation profile (spec section 8).** Needs a hosted
    routing provider chosen (spec section 15 item 6). Firm requirement, stronger
    than sections 8.4-8.5 currently read: observation freshness and quality must
    be shown clearly and prominently on the route profile, not "where
    practical". Spec section 15 item 11.
-4. **Repository structure refactor, stage 3 onward**
+5. **Repository structure refactor, stage 3 onward**
    ([`../REFACTOR.md`](../REFACTOR.md)). Stages 1 (dissolve `recon/`) and 2
    (package the pipeline) are done - 2026-09-09. Sequencing decided that day and worth not re-deriving: stage 3
    regroups the frontend into feature folders and therefore must come *after*
@@ -55,15 +75,8 @@ routing.
 
 - **Spec section 15** is the canonical list of undecided product questions.
   Live ones: route sampling method and "snow-covered percentage" definition
-  (1, 2), interactive OSM object classes (3), basemap/terrain provider (4),
-  routing provider (6), elevation/DEM source (7), optional 20 m FSCOG layer
-  (10).
-- **Historical AS-OF map dates (spec section 5.3).** The daily job renders only
-  "today" and discards each composite. Leading candidate: archive a per-day
-  compact raster to the same R2 bucket plus on-demand tile rendering reusing
-  the frozen section 9.2 logic, cached hard since a historical (date, tile)
-  never changes. Smaller step than it looks - the job already downloads the
-  whole window. Spec section 15 item 8.
+  (1, 2), basemap/terrain provider (4), routing provider (6), elevation/DEM
+  source (7), optional 20 m FSCOG layer (10).
 - **Custom domain in front of the `r2.dev` endpoint** (security F10, optional
   pre-launch). Owner console work; needs an Admin-scoped Cloudflare token.
   `app/public/_headers` pins the bucket host in its CSP and must change in the

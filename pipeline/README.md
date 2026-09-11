@@ -29,6 +29,50 @@ recovered area is 8-14 days old, which the frozen section 5.2 ramp draws at
 `--window-days 1` reproduces the older newest-product-only behavior exactly,
 which is the useful control when a published run looks wrong.
 
+## Static OSM object index (in progress)
+
+The future object panel and historical chart use Nevaio's own static OSM index,
+not MapTiler's rendered feature properties. The pure
+`nevaio_pipeline.object_index` core currently accepts a **normalized** local
+GeoJSON FeatureCollection and writes deterministic `schemaVersion: 1` JSON:
+
+```sh
+PYTHONPATH=pipeline/src pipeline/.venv/bin/python -m nevaio_pipeline.object_index \
+  --input /path/to/normalized-osm-objects.geojson \
+  --output /path/to/object-index.json
+```
+
+Every input feature must be a Point with `properties.osmType` (`node`, `way`,
+or `relation`), positive `properties.osmId`, and a `properties.tags` object.
+The index keeps only named peaks, huts/refuges, saddles/passes, shelters,
+parking, and city/town/village/hamlet settlements. It rejects malformed
+eligible records and duplicate OSM identities; it deliberately does **not**
+download OSM data, publish to R2, or sample snow yet. Those are the next
+adapters, not implicit side effects of a local format conversion.
+
+### Regional extract adapter
+
+The checked-in local adapter consumes regional `.osm.pbf` extracts through
+[`osmium-tool`](https://osmcode.org/osmium-tool/), filters only the approved
+OSM tags (retaining referenced geometry nodes), and normalizes the resulting
+GeoJSON before building the index. It retains node/way/relation identity; areas
+and lines get a deterministic representative point. It is intentionally not a
+pipeline job yet and has no network or R2 side effect:
+
+```sh
+pipeline/tools/build_osm_object_index.sh \
+  --output /tmp/nevaio-object-index.json \
+  /path/to/region-a.osm.pbf /path/to/region-b.osm.pbf
+```
+
+Use extracts made from the same OSM snapshot where they overlap. Identical
+overlap is deduplicated; conflicting duplicate IDs fail, which prevents a
+mixed-snapshot index from being published accidentally. The final public UI
+must credit OpenStreetMap contributors and link the ODbL licence before an
+index is shipped. Osmium reports and omits the occasional incomplete area
+relation at an extract boundary; all emitted records still pass the strict
+normalization and index validation contract.
+
 ## Local environment
 
 `pipeline/.venv`, on **Python 3.12** to match CI (`uv` fetches the interpreter;

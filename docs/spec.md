@@ -1,8 +1,39 @@
 # Nevaio MVP Product Specification
 
-**Status:** Draft v1.9 - place search moved to MapTiler Geocoding
-**Date:** 2026-09-09  
+**Status:** Draft v1.12 - 30-day AS-OF date selection planned
+**Date:** 2026-09-10
 **Product stage:** Planning only
+
+**Amendment (v1.12):** The map will gain an AS-OF date selector for the latest
+available date and up to the preceding 30 calendar dates. It must select
+already-rendered, date-specific R2 manifests and tiles, never reinterpret the
+current map as an older date. The daily pipeline will retain the bounded
+30-day archive and publish a small public date catalogue; a date absent from
+that catalogue is unavailable, not silently substituted with another date.
+This preserves the no-running-server design and the frozen section 9.2
+selection semantics. The current compact control shows the latest AS-OF date
+as non-interactive until this storage/catalogue work exists. See section 5.3
+and `docs/plan.md`.
+
+**Amendment (v1.11):** The object panel and chart will consume a Nevaio-owned,
+static OSM object index, published to R2 beside the precomputed per-object snow
+series. Each index record keeps a stable OSM type/ID, approved object class,
+name, coordinates, and optional elevation. The MapTiler basemap remains visual
+context only: its rendered feature properties are not the durable identity
+contract for history. This retains the no-running-server architecture. The
+source acquisition adapter and publication format remain implementation work;
+the panel must not pretend a provider-tile click is an identity it cannot later
+match to its snow history. See section 7 and `docs/worklog.md` (2026-09-10).
+
+**Amendment (v1.10):** The initial set of interactive OSM objects is peaks,
+huts/refuges, passes/saddles, shelters, parking, and settlements/named places.
+Trails, paths, and roads remain visible map context but are not selectable by
+default: their dense linear geometry would make accidental selection common and
+would expand the first object-history dataset without a correspondingly useful
+panel interaction. Exact zoom/layer matching is an implementation detail of
+the selected vector style; an eligible object must be selectable wherever that
+style renders it. See sections 4.2, 6.2, and 15 item 3, and
+`docs/worklog.md` (2026-09-10).
 
 **Amendment (v1.9):** Place search (section 6.1) moved from the public OSMF
 Nominatim endpoint to MapTiler's Geocoding API (2026-09-09), reversing the
@@ -154,6 +185,11 @@ The map should support mountaineering-relevant objects such as:
 - settlements and named places;
 - other useful OSM objects exposed by the chosen map/search stack.
 
+For the first interactive object panel, peaks, huts/refuges, passes/saddles,
+shelters, parking, and settlements/named places are selectable wherever the
+vector style renders them. Trails, paths, and roads remain map context only;
+they are not selectable by default.
+
 The exact basemap, tile provider, vector source, terrain source, geocoder, and elevation source are technical choices to be made later.
 
 ## 5. Core user experience
@@ -202,9 +238,16 @@ The map renderer may display progressively coarser representations at lower zoom
 
 ### 5.3 Latest and historical AS-OF dates
 
-The user must be able to view the latest available snow conditions.
+The user must be able to view the latest available snow conditions and choose
+any available AS-OF date from the preceding 30 calendar days. The date control
+is enabled only after a date-specific archive is published; until then the UI
+shows the latest date as text rather than offering a non-functional picker.
 
-**Deferred for MVP (v1.3):** letting the user pick an arbitrary historical map date is out of MVP scope - see section 15 item 8 and `docs/worklog.md` (2026-08-26) for why and the revisit trigger. "Latest" is itself computed AS-OF today via the same rule below, so the AS-OF mechanics remain frozen and in effect; the OSM-object historical chart (section 7.1) is unaffected and remains required. The rest of this section describes that frozen mechanic, which a later historical map-date feature would reuse unchanged.
+Each selectable date maps to that date's own immutable R2 manifest and tiles.
+The public date catalogue is authoritative about availability. A failed or
+missing historical day must remain unavailable; the app must not show the
+latest map, a nearby map, or a client-recomposed substitute under the selected
+date. The OSM-object historical chart (section 7.1) remains independent.
 
 A selected date is an **AS-OF date**, not a requirement that every pixel have an observation acquired exactly on that date.
 
@@ -250,6 +293,10 @@ Examples include peaks, huts, passes, villages, parking areas, and other named f
 
 Mountaineering-relevant OSM objects shown on the map should be interactive map entities, not merely labels baked into a raster image.
 
+The initial eligible classes are peaks, huts/refuges, passes/saddles, shelters,
+parking, and settlements/named places. Trails, paths, and roads are excluded
+from the default interaction target to avoid dense-line accidental selection.
+
 When the user selects an eligible OSM object, an information panel opens below or adjacent to the map depending on screen size.
 
 The detailed snow-history panel applies to OSM objects only.
@@ -274,6 +321,12 @@ It should also display current/as-of snow information derived at the object's lo
 - quality tier for that pixel (high/medium/low/minimal), as the primary indicator of how much gap-filling was involved.
 
 ### 7.1 Historical chart
+
+The panel and chart use a static Nevaio-owned OSM object index published to R2
+alongside the precomputed per-object time series. Every record has a stable OSM
+type/ID, approved object type, name, coordinates, and optional elevation. The
+rendered MapTiler basemap is visual context, not the identity source for a
+history lookup; no new running server is introduced for this feature.
 
 The panel should include an interactive snow-cover history chart for the selected object.
 
@@ -459,7 +512,7 @@ The schedule is set from HR-WSI's measured behavior rather than assumption: prod
 | Outdoor/topographic map | Required |
 | GFSC snow overlay | Required |
 | Latest snow conditions | Required |
-| Historical AS-OF map date | Deferred post-MVP (see section 15 item 8) |
+| Historical AS-OF map date (latest 30 days) | Planned - needs dated R2 archive/catalogue |
 | Observation freshness visualization | Required |
 | Quality/missing-data handling | Required |
 | Search by name | Required |
@@ -502,7 +555,12 @@ Snow/freshness encoding, quality and categorical-code handling, staleness, prolo
 
 1. Exact route sampling method and sampling spacing.
 2. Exact definition of route "snow-covered percentage."
-3. Which OSM object classes are interactive by default at each zoom level.
+3. **Decided for MVP (2026-09-10):** Peaks, huts/refuges, passes/saddles,
+   shelters, parking, and settlements/named places are interactive wherever
+   the chosen vector style renders them. Trails, paths, and roads remain visible
+   but are not selectable by default: their dense linear geometry makes
+   accidental selection common and does not justify expanding the first
+   per-object snow-history dataset. See sections 4.2 and 6.2.
 4. Basemap/vector/terrain provider.
 5. **Decided for MVP (2026-09-06; reversed 2026-09-09, amendment v1.9):**
    Nominatim's free, keyless public search endpoint was chosen over reusing
@@ -520,7 +578,7 @@ Snow/freshness encoding, quality and categorical-code handling, staleness, prolo
    2026-09-09).
 6. Hiking routing provider.
 7. Elevation/DEM source.
-8. **Decided for MVP (2026-08-26, revised same day; completed 2026-08-28):** frontend on Netlify (done, see section 12); data pipeline is a GitHub Actions job rendering one "latest conditions" tile set, publishing an immutable run plus an atomic `latest.json` pointer to Cloudflare R2 (not a static Netlify republish - see `docs/worklog.md`, 2026-08-26, for the Netlify Blobs/static-republish alternatives considered and rejected). Implemented, live on production (`https://spikely.netlify.app`), and visually verified end-to-end (2026-08-27, again 2026-08-28). As of 2026-08-28 the job composes the **full section 9.2 AS-OF rule** over a 15-day product window per tile rather than the single newest product, and runs on a **daily `04:35 UTC` schedule** keeping the newest seven runs in R2; the four never-published tiles were removed from the tile set after confirming they are absent from HR-WSI's own grid, so a missing tile now fails the run rather than publishing a partial map. Reasoning and measurements: `docs/worklog.md` (2026-08-28). **Still open:** a custom domain in front of the `r2.dev` URL (optional, pre-launch). Separately still open for later: the storage/serving architecture needed to bring back arbitrary historical AS-OF map dates (section 5.3) - the daily job renders only "today", discarding each day's composite once the next replaces it. Leading candidate when full historical support is revisited: extend this same R2 archive with a per-day compact raster plus a small on-demand tile-rendering service reusing the frozen section 9.2 selection logic, cached aggressively since a historical (date, tile) result never changes once computed. Note that the daily job already downloads the whole 15-day window, so archiving each day's per-tile composite is a smaller step from here than it was from the newest-product-only preview.
+8. **Decided for MVP (2026-08-26, revised same day; completed 2026-08-28):** frontend on Netlify (done, see section 12); data pipeline is a GitHub Actions job rendering one "latest conditions" tile set, publishing an immutable run plus an atomic `latest.json` pointer to Cloudflare R2 (not a static Netlify republish - see `docs/worklog.md`, 2026-08-26, for the Netlify Blobs/static-republish alternatives considered and rejected). Implemented, live on production (`https://spikely.netlify.app`), and visually verified end-to-end (2026-08-27, again 2026-08-28). As of 2026-08-28 the job composes the **full section 9.2 AS-OF rule** over a 15-day product window per tile rather than the single newest product. **New planned extension (2026-09-10):** retain a bounded 30-day set of immutable daily runs and publish a date catalogue so the frontend can select an actual archived AS-OF manifest/tiles with no running server. The catalogue and retention policy must arrive before the UI date picker; an unavailable date is unavailable, never a fallback to latest. The existing seven-run rollback policy is therefore not yet sufficient for this feature. **Still open:** a custom domain in front of the `r2.dev` URL (optional, pre-launch).
 9. **Decided for MVP (2026-08-26):** operating-cost target is free where possible, up to EUR 20/month if it substantially simplifies things (see section 12).
 10. Whether raw FSCOG/FSCTOC (20 m) should be added later as an optional higher-resolution layer for terrain where 60 m GFSC proves too coarse.
 11. **Noted 2026-09-06, detail deferred:** the route planner's snow/elevation profile (sections 8.4-8.5) must clearly and prominently display observation freshness/quality, not merely "where practical" as currently worded - the user wants this treated as a firm requirement once routing is built, not an optional extra. Exact treatment (per-point badges, a color-coded profile band, a separate freshness track, etc.) to be decided when section 8 is actually implemented; see `docs/worklog.md` (2026-09-06).

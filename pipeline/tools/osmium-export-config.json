@@ -1,0 +1,8 @@
+{
+  "attributes": {
+    "type": true,
+    "id": true
+  },
+  "area_tags": false,
+  "linear_tags": true
+}

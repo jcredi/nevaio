@@ -1,5 +1,166 @@
 # Working session log
 
+## 2026-09-10 - Compact snow control and committed 30-day AS-OF archive
+
+The owner confirmed the handset search fix, then redirected the snow UI around
+the map rather than above it: the default-on toggle and its accessible info
+icon sit directly on the bottom-left of the map, above attribution; the
+irrelevant source-tile count is removed; the current AS-OF date moves under
+search; and the info button opens the legend only when requested. Attribution
+is visible black text on a small semi-transparent footer rather than an opaque
+panel or MapLibre's compact info disclosure. This is local UI work pending
+deployment.
+
+The owner also committed to selecting a historical AS-OF map date going back
+up to 30 days. This cannot be a cosmetic date field: the current seven-run
+rollback policy only exposes the latest map. The future implementation must
+retain date-specific immutable R2 runs and publish a catalogue of the dates
+actually available; selecting one loads its own manifest and tiles. Missing
+dates must not substitute latest data. This retains the no-running-server
+architecture and section 9.2 semantics, but moves the work into the ordered
+plan before routing. `spec.md` is v1.12 accordingly.
+
+## 2026-09-10 - Establish the static OSM object-index boundary
+
+The owner approved the object-panel architecture proposed after inspecting the
+actual MapTiler style: Nevaio will publish its own static OSM object index to
+R2 next to the precomputed per-object snow series. Each public entry has a
+stable OSM type/ID, approved class, name, coordinates, and optional elevation.
+The basemap stays visual context; a rendered provider-tile feature is not a
+durable history identity. This preserves the settled no-server design.
+
+The first implementation slice is `nevaio_pipeline.object_index`, a pure
+standard-library core that converts normalized tagged OSM GeoJSON input into a
+deterministic index. It includes only the approved peak, hut/refuge,
+saddle/pass, shelter, parking, and settlement classes; ignores unapproved
+features; and refuses duplicate identities or malformed eligible records. The
+local regional-extract adapter now uses `osmium-tool` to filter the approved
+tags, preserve OSM type/ID metadata, and normalize line/area geometry to a
+deterministic representative point before this strict core. The R2
+artifact/pointer, raster sampling, historical backfill, and frontend panel
+still do not exist. They must build on this identity contract rather than
+reach into MapTiler's undocumented rendered properties.
+
+The actual style evidence matters: its Planet `mountain_peak` source carries
+the `saddle` class, but the Outdoor style renders only `peak`; it does render
+the approved hut, shelter, parking, and settlement layers. This is another
+reason that a provider style cannot define the data contract. The new five
+focused tests and the full pipeline suite passed: 88 tests total. Official
+schema references: MapTiler Planet and Outdoor.
+
+Expanded that core into the explicit, local-only command
+`python -m nevaio_pipeline.object_index --input … --output …`. It accepts a
+normalized GeoJSON FeatureCollection and writes a deterministic
+`schemaVersion: 1` document without a timestamp or provider metadata; identical
+input therefore gives byte-identical public output. Seven focused tests cover
+classification, stable sorting, validation, duplicate rejection, document
+shape, and file conversion. The complete pipeline suite passed with 90 tests.
+No raw OSM data, download dependency, R2 artifact, or publication-workflow
+change was added. Those are distinct next steps, and the README documents the
+normalization contract rather than silently picking a source provider.
+
+**Regional-source checkpoint (2026-09-11):** Installed the local-only
+`osmium-tool` and fixture-tested the entire filter/export/normalization/index
+path with both a point peak and an area-style parking way. Downloaded the
+Geofabrik Alps and Italy extracts to ignored local storage; both declare the
+same `2026-09-09T20:21:20Z` OSM replication timestamp, so their overlap can be
+checked meaningfully. The first real full build reported three incomplete
+boundary relations. The adapter now logs and omits only such unexportable
+geometries, while retaining strict validation for every emitted index record.
+
+**Build diagnostic (2026-09-11):** The matching/extract phase produced
+777,743 candidate records, then correctly exposed an unspoken source-policy
+gap: anonymous objects (first observed: an unnamed parking node) cannot enter
+the public panel, whose index contract requires a name. Chose to skip unnamed
+source records in the regional adapter. This keeps the strict core contract,
+avoids invented generic labels, and matches the product's useful named-place
+interaction model. Added a focused test; the full real build now reruns with
+this selection rule before any result is considered publishable.
+
+**First full-build result (2026-09-11):** The date-matched Alps + Italy sources
+now produce a schema-1 index with 244,011 named, unique records and no blank
+names: 110,729 settlements, 71,581 peaks, 31,458 parking locations, 15,585
+saddles, 8,157 shelters, and 6,501 huts. Its local JSON is 45 MB (SHA-256
+`7e0511ccf72eb3dfbffaf64a80bd509e5fa1a97930c53240afa3e79f7798b7e0`). This
+validates the source contract and cross-extract deduplication, but is **not
+publishable as one browser download**: the regional extracts are broader than
+Nevaio's actual GFSC/MGRS footprint and the object count is too large for a
+single startup payload. Next, derive that precise footprint and spatially
+filter or shard the static index before any raster sampling, R2 publication,
+or frontend selection prototype.
+
+**Rejected after a single bounded live probe:** a whole-area public Overpass
+query as the acquisition adapter. Even with one identified request and a 16 MiB
+response ceiling it returned HTTP 406 before data transfer, which is the public
+service's overload/refusal signal. The policy explicitly directs larger work to
+regional extracts; retrying or splitting the query against a shared instance
+would turn the project into the load problem it is meant to avoid. The
+uncommitted probe tool and tests were removed rather than leaving a command
+whose default fails. Next source work is a regional OSM extract with a local
+filter, evaluated separately because it needs an appropriate local tool and
+disk plan.
+
+## 2026-09-10 - Set the first interactive OSM-object scope
+
+The owner decided the panel's first eligible classes: peaks, huts/refuges,
+passes/saddles, shelters, parking, and settlements/named places. They are
+interactive wherever the chosen vector style renders them. Trails, paths, and
+roads remain visible map context but are not selectable by default.
+
+The inclusion set covers the discrete mountaineering destinations and access
+points that make a useful snow-history lookup. Excluding dense linear geometry
+keeps ordinary map taps from accidentally selecting a trail or road and avoids
+growing the first precomputed per-object dataset for a panel interaction that
+would be hard to use. Exact zoom/layer matching remains an implementation
+detail to establish against MapTiler's actual rendered feature properties;
+this decision unblocks that investigation rather than guessing style internals
+in the product spec.
+
+Updated `spec.md` to v1.10 and removed this choice from the open list in
+`plan.md`. The next small slice is a selection prototype only; the established
+static, precomputed snow-series architecture is unchanged.
+
+## 2026-09-10 - Reserve the mobile navigation-control column for search
+
+The current first plan item is the real-device mobile pass, so this was kept
+to its smallest independently useful slice rather than beginning refactor
+stage 3: below `34rem`, the floating search bar now anchors to the safe left
+edge and reserves `3.25rem` at the safe right edge for MapLibre's fixed
+top-right navigation control. Previously its centred `92vw` width spanned
+16-374 px in a 390 px viewport while that control occupied roughly 349-380 px,
+so it was visibly covered by the zoom buttons. Desktop and larger-tablet
+layouts retain the original centred, 24rem-capped search bar.
+
+Local Chromium screenshots at 390x844 and 320x568 show a clear gap between the
+search field and the control column. `npm test` passed all 30 frontend tests
+and `npm run build` passed. These are only an emulator baseline: local
+development intentionally has no snow manifest, and the existing `npm run
+shot` helper cannot target production because its camera hook is development
+only. The outstanding real-handset check in `plan.md` remains necessary for
+safe areas, keyboard resizing, and touch interaction.
+
+Made that emulator baseline repeatable with `npm run check-mobile-layout`
+(while `npm run dev` is running). It launches the existing Playwright Chromium
+at 320x568 and 390x844, waits only for the search and navigation controls, and
+fails if the document becomes horizontally scrollable or the two rectangles
+overlap. Its first run measured 10-268 px versus 279-320 px at the smaller
+viewport, and 10-338 px versus 349-390 px at the larger one. It deliberately
+does not claim to emulate an iPhone safe area or virtual keyboard.
+
+**Correction from a real handset screenshot.** The reported production
+overflow had a deeper cause than the navigation-control collision: the generic
+`panel-in` animation sets `transform`, replacing the search bar's baseline
+`translateX(-50%)`. The completed animation therefore left it at `left: 50%`
+without centring, with half the bar outside the right edge. Added a dedicated
+`search-bar-in` keyframe that preserves both X and Y translations; the
+left-anchored mobile form intentionally continues to use the generic vertical
+animation. Local 320/390 checks, frontend tests (30), and the build all pass;
+an 800 px screenshot confirms the centred desktop form.
+
+**Not changed:** the snow control's existing vertical clearance remains as-is;
+the evidence here was a horizontal search/navigation collision, not a reason
+to rearrange unrelated controls or start the deferred frontend refactor.
+
 ## 2026-09-09 - Refactored pipeline verified end to end in production
 
 Run #15 (`workflow_dispatch`, `a754d13`) published successfully - the first CI
