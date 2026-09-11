@@ -107,6 +107,16 @@ export class ObjectPanel {
    * them would let a broken deployment look like empty ground.
    */
   present(selection: Selection, indexStatus: IndexStatus): void {
+    // The scale floor is answered first: at a world view it is true whatever
+    // the index is doing, and "loading" would be a misleading answer.
+    if (selection.status === "zoom-in") {
+      this.renderNotice(
+        "Zoom in to select",
+        "At this scale one tap covers several named objects, so nothing is selected. " +
+          "Zoom in and tap again.",
+      );
+      return;
+    }
     if (indexStatus !== "ready") {
       this.renderNotice(
         indexStatus === "loading" ? "Loading map objects…" : "Map objects unavailable",
@@ -123,13 +133,6 @@ export class ObjectPanel {
         return;
       case "ambiguous":
         this.renderChoices(selection.candidates.map((candidate) => candidate.record));
-        return;
-      case "zoom-in":
-        this.renderNotice(
-          "Zoom in to select",
-          "At this scale one tap covers several named objects, so nothing is selected. " +
-            "Zoom in and tap again.",
-        );
         return;
       case "empty":
         // Tapping open ground is the common case; say nothing.

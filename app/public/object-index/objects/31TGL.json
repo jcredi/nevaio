@@ -1,0 +1,926 @@
+{
+  "schemaVersion": 1,
+  "tile": "31TGL",
+  "objects": [
+    {
+      "elevationMeters": null,
+      "id": "node/1040145574",
+      "kind": "settlement",
+      "latitude": 45.893835,
+      "longitude": 6.8099636,
+      "name": "Les Couttets"
+    },
+    {
+      "elevationMeters": null,
+      "id": "node/1040145733",
+      "kind": "settlement",
+      "latitude": 45.8914195,
+      "longitude": 6.812621,
+      "name": "Les Granges"
+    },
+    {
+      "elevationMeters": null,
+      "id": "node/1040145798",
+      "kind": "settlement",
+      "latitude": 45.8861044,
+      "longitude": 6.8042652,
+      "name": "Les Gens"
+    },
+    {
+      "elevationMeters": 2276,
+      "id": "node/10804512952",
+      "kind": "peak",
+      "latitude": 45.9250075,
+      "longitude": 6.8300536,
+      "name": "Tête de Bellachat"
+    },
+    {
+      "elevationMeters": 2310,
+      "id": "node/10804512975",
+      "kind": "peak",
+      "latitude": 45.9195959,
+      "longitude": 6.8175058,
+      "name": "Aiguillette du Brévent"
+    },
+    {
+      "elevationMeters": 1823,
+      "id": "node/10837381579",
+      "kind": "peak",
+      "latitude": 45.9625064,
+      "longitude": 6.8910486,
+      "name": "Tête de la Raverettaz"
+    },
+    {
+      "elevationMeters": null,
+      "id": "node/10937831649",
+      "kind": "settlement",
+      "latitude": 45.9497409,
+      "longitude": 6.8977255,
+      "name": "Les Glières"
+    },
+    {
+      "elevationMeters": null,
+      "id": "node/10937831650",
+      "kind": "settlement",
+      "latitude": 45.9430785,
+      "longitude": 6.8980751,
+      "name": "Les Bois"
+    },
+    {
+      "elevationMeters": null,
+      "id": "node/10937831651",
+      "kind": "settlement",
+      "latitude": 45.9419297,
+      "longitude": 6.8918464,
+      "name": "Les Gaudenays"
+    },
+    {
+      "elevationMeters": null,
+      "id": "node/10937831652",
+      "kind": "settlement",
+      "latitude": 45.9370024,
+      "longitude": 6.8793768,
+      "name": "Les Rosières"
+    },
+    {
+      "elevationMeters": null,
+      "id": "node/10937831653",
+      "kind": "settlement",
+      "latitude": 45.9339255,
+      "longitude": 6.8728733,
+      "name": "Les Nants"
+    },
+    {
+      "elevationMeters": null,
+      "id": "node/10937831654",
+      "kind": "settlement",
+      "latitude": 45.930108,
+      "longitude": 6.8697078,
+      "name": "Les Plans"
+    },
+    {
+      "elevationMeters": 2322,
+      "id": "node/10944787347",
+      "kind": "peak",
+      "latitude": 45.8809117,
+      "longitude": 6.8552587,
+      "name": "Mont Corbeau"
+    },
+    {
+      "elevationMeters": null,
+      "id": "node/1134444484",
+      "kind": "parking",
+      "latitude": 45.9425198,
+      "longitude": 6.8886552,
+      "name": "La Cabane"
+    },
+    {
+      "elevationMeters": 3409,
+      "id": "node/1241259938",
+      "kind": "peak",
+      "latitude": 45.9019708,
+      "longitude": 6.9209798,
+      "name": "Aiguille de Roc"
+    },
+    {
+      "elevationMeters": 3554,
+      "id": "node/1241259959",
+      "kind": "peak",
+      "latitude": 45.8944205,
+      "longitude": 6.9090321,
+      "name": "Dent du Caïman"
+    },
+    {
+      "elevationMeters": 3501,
+      "id": "node/1241260041",
+      "kind": "peak",
+      "latitude": 45.8973457,
+      "longitude": 6.9123454,
+      "name": "Aiguille du Fou"
+    },
+    {
+      "elevationMeters": 3479,
+      "id": "node/1241260056",
+      "kind": "peak",
+      "latitude": 45.898177,
+      "longitude": 6.9127198,
+      "name": "Aiguille des Ciseaux"
+    },
+    {
+      "elevationMeters": 3482,
+      "id": "node/1241260299",
+      "kind": "peak",
+      "latitude": 45.9028436,
+      "longitude": 6.9190588,
+      "name": "Aiguille du Grépon"
+    },
+    {
+      "elevationMeters": 3305,
+      "id": "node/1241260305",
+      "kind": "peak",
+      "latitude": 45.9056685,
+      "longitude": 6.9212635,
+      "name": "Aiguille de la République"
+    },
+    {
+      "elevationMeters": 3429,
+      "id": "node/1241260312",
+      "kind": "peak",
+      "latitude": 45.8958424,
+      "longitude": 6.9115889,
+      "name": "Pointe Lépiney"
+    },
+    {
+      "elevationMeters": 3640,
+      "id": "node/1241260315",
+      "kind": "peak",
+      "latitude": 45.8928174,
+      "longitude": 6.9077016,
+      "name": "Dent du Crocodile"
+    },
+    {
+      "elevationMeters": 2899,
+      "id": "node/1241260441",
+      "kind": "peak",
+      "latitude": 45.9032079,
+      "longitude": 6.9249313,
+      "name": "La Tour Rouge"
+    },
+    {
+      "elevationMeters": 3417,
+      "id": "node/1241260495",
+      "kind": "peak",
+      "latitude": 45.9011346,
+      "longitude": 6.9188126,
+      "name": "Bec d'Oiseau"
+    },
+    {
+      "elevationMeters": 3310,
+      "id": "node/1241260531",
+      "kind": "saddle",
+      "latitude": 45.9007755,
+      "longitude": 6.9177397,
+      "name": "Col des Nantillons"
+    },
+    {
+      "elevationMeters": null,
+      "id": "node/1249014760",
+      "kind": "settlement",
+      "latitude": 45.9532637,
+      "longitude": 6.9010489,
+      "name": "Les Tines"
+    },
+    {
+      "elevationMeters": null,
+      "id": "node/1249015094",
+      "kind": "settlement",
+      "latitude": 45.9678641,
+      "longitude": 6.9141473,
+      "name": "Les Iles"
+    },
+    {
+      "elevationMeters": 2552,
+      "id": "node/13013811813",
+      "kind": "peak",
+      "latitude": 45.9081159,
+      "longitude": 6.9308257,
+      "name": "Tête de Trélaporte"
+    },
+    {
+      "elevationMeters": 3304,
+      "id": "node/13013825212",
+      "kind": "saddle",
+      "latitude": 45.8878579,
+      "longitude": 6.9163051,
+      "name": "Col du Requin"
+    },
+    {
+      "elevationMeters": 2523,
+      "id": "node/13013830134",
+      "kind": "saddle",
+      "latitude": 45.9078285,
+      "longitude": 6.9302517,
+      "name": "Fenêtre de Trélaporte"
+    },
+    {
+      "elevationMeters": 2663,
+      "id": "node/13016997205",
+      "kind": "peak",
+      "latitude": 45.9356725,
+      "longitude": 6.9487617,
+      "name": "Rognon des Drus"
+    },
+    {
+      "elevationMeters": 2241,
+      "id": "node/13202664438",
+      "kind": "peak",
+      "latitude": 45.9201293,
+      "longitude": 6.803423,
+      "name": "Pointe de la Chalette"
+    },
+    {
+      "elevationMeters": 2136,
+      "id": "node/13593106321",
+      "kind": "hut",
+      "latitude": 45.9221805,
+      "longitude": 6.8296087,
+      "name": "Refuge de Bellachat"
+    },
+    {
+      "elevationMeters": null,
+      "id": "node/1398995763",
+      "kind": "settlement",
+      "latitude": 45.964793,
+      "longitude": 6.9091411,
+      "name": "La Joux"
+    },
+    {
+      "elevationMeters": null,
+      "id": "node/1399643116",
+      "kind": "parking",
+      "latitude": 45.9177757,
+      "longitude": 6.8657673,
+      "name": "Entrèves"
+    },
+    {
+      "elevationMeters": 3192,
+      "id": "node/14070704872",
+      "kind": "peak",
+      "latitude": 45.89601,
+      "longitude": 6.8996215,
+      "name": "Aiguille du Peigne"
+    },
+    {
+      "elevationMeters": 3507,
+      "id": "node/14124434675",
+      "kind": "peak",
+      "latitude": 45.8998108,
+      "longitude": 6.9121465,
+      "name": "Aiguille de Chamonix"
+    },
+    {
+      "elevationMeters": 3449,
+      "id": "node/14124434676",
+      "kind": "saddle",
+      "latitude": 45.8997092,
+      "longitude": 6.9128732,
+      "name": "Brèche de Blaitière"
+    },
+    {
+      "elevationMeters": 3352,
+      "id": "node/14124434693",
+      "kind": "saddle",
+      "latitude": 45.8958191,
+      "longitude": 6.9112798,
+      "name": "Col de Blaitière"
+    },
+    {
+      "elevationMeters": 2130,
+      "id": "node/1562291543",
+      "kind": "saddle",
+      "latitude": 45.9232245,
+      "longitude": 6.823897,
+      "name": "Col de Bellachat"
+    },
+    {
+      "elevationMeters": null,
+      "id": "node/1812896630",
+      "kind": "settlement",
+      "latitude": 45.9566608,
+      "longitude": 6.9064828,
+      "name": "Le Lavancher"
+    },
+    {
+      "elevationMeters": 1778,
+      "id": "node/2076186974",
+      "kind": "shelter",
+      "latitude": 45.9569634,
+      "longitude": 6.9244844,
+      "name": "Chalets de la Pendant"
+    },
+    {
+      "elevationMeters": null,
+      "id": "node/2422678820",
+      "kind": "settlement",
+      "latitude": 45.9071485,
+      "longitude": 6.8420548,
+      "name": "Les Bossons"
+    },
+    {
+      "elevationMeters": 2368,
+      "id": "node/2462041947",
+      "kind": "saddle",
+      "latitude": 45.9413485,
+      "longitude": 6.8435255,
+      "name": "Col du Brévent"
+    },
+    {
+      "elevationMeters": null,
+      "id": "node/26696275",
+      "kind": "settlement",
+      "latitude": 45.9230969,
+      "longitude": 6.8700009,
+      "name": "Chamonix-Mont-Blanc"
+    },
+    {
+      "elevationMeters": 2200,
+      "id": "node/275445172",
+      "kind": "peak",
+      "latitude": 45.9284706,
+      "longitude": 6.912468,
+      "name": "Signal Forbes"
+    },
+    {
+      "elevationMeters": null,
+      "id": "node/277928675",
+      "kind": "settlement",
+      "latitude": 45.9404532,
+      "longitude": 6.8865884,
+      "name": "Les Praz de Chamonix"
+    },
+    {
+      "elevationMeters": 2313,
+      "id": "node/2899082023",
+      "kind": "peak",
+      "latitude": 45.9194835,
+      "longitude": 6.8135341,
+      "name": "Pointe de Lapaz"
+    },
+    {
+      "elevationMeters": 3318,
+      "id": "node/2938505180",
+      "kind": "peak",
+      "latitude": 45.8949457,
+      "longitude": 6.9014862,
+      "name": "Aiguille des Pèlerins - Secteur du Plan"
+    },
+    {
+      "elevationMeters": null,
+      "id": "node/2940263651",
+      "kind": "hut",
+      "latitude": 45.9599953,
+      "longitude": 6.8872948,
+      "name": "La Flégère"
+    },
+    {
+      "elevationMeters": 2320,
+      "id": "node/3103929029",
+      "kind": "saddle",
+      "latitude": 45.9662086,
+      "longitude": 6.8743935,
+      "name": "Col du Fouet"
+    },
+    {
+      "elevationMeters": null,
+      "id": "node/3109773379",
+      "kind": "parking",
+      "latitude": 45.9249518,
+      "longitude": 6.8728461,
+      "name": "Parking du Mont Blanc"
+    },
+    {
+      "elevationMeters": 2557,
+      "id": "node/340230288",
+      "kind": "peak",
+      "latitude": 45.95623,
+      "longitude": 6.9482276,
+      "name": "Triangle de l'Herse"
+    },
+    {
+      "elevationMeters": 2285,
+      "id": "node/3408780382",
+      "kind": "peak",
+      "latitude": 45.9213583,
+      "longitude": 6.8053923,
+      "name": "Aiguillette des Houches"
+    },
+    {
+      "elevationMeters": 3673,
+      "id": "node/344715578",
+      "kind": "peak",
+      "latitude": 45.8917008,
+      "longitude": 6.907229,
+      "name": "Aiguille du Plan"
+    },
+    {
+      "elevationMeters": 3522,
+      "id": "node/344715579",
+      "kind": "peak",
+      "latitude": 45.8992786,
+      "longitude": 6.9130467,
+      "name": "Aiguille de Blaitière"
+    },
+    {
+      "elevationMeters": 3445,
+      "id": "node/367945274",
+      "kind": "peak",
+      "latitude": 45.9042308,
+      "longitude": 6.9188413,
+      "name": "Aiguille des Grands Charmoz"
+    },
+    {
+      "elevationMeters": 3474,
+      "id": "node/367945275",
+      "kind": "saddle",
+      "latitude": 45.8835712,
+      "longitude": 6.9018713,
+      "name": "Col du Plan"
+    },
+    {
+      "elevationMeters": 3422,
+      "id": "node/367945276",
+      "kind": "peak",
+      "latitude": 45.8876199,
+      "longitude": 6.9176383,
+      "name": "Dent du Requin"
+    },
+    {
+      "elevationMeters": 2844,
+      "id": "node/369467780",
+      "kind": "peak",
+      "latitude": 45.9122272,
+      "longitude": 6.9125998,
+      "name": "Aiguille de l'M"
+    },
+    {
+      "elevationMeters": 2511,
+      "id": "node/3695453069",
+      "kind": "peak",
+      "latitude": 45.9582539,
+      "longitude": 6.8580281,
+      "name": "Aiguille Pourrie"
+    },
+    {
+      "elevationMeters": 1844,
+      "id": "node/3822582233",
+      "kind": "peak",
+      "latitude": 45.9521464,
+      "longitude": 6.9181174,
+      "name": "Tête des Prapators"
+    },
+    {
+      "elevationMeters": null,
+      "id": "node/4181371241",
+      "kind": "settlement",
+      "latitude": 45.8931216,
+      "longitude": 6.8053073,
+      "name": "La Griaz d'en-Haut"
+    },
+    {
+      "elevationMeters": null,
+      "id": "node/4181371242",
+      "kind": "settlement",
+      "latitude": 45.8947345,
+      "longitude": 6.8030167,
+      "name": "La Griaz"
+    },
+    {
+      "elevationMeters": null,
+      "id": "node/4181371243",
+      "kind": "settlement",
+      "latitude": 45.892261,
+      "longitude": 6.8217184,
+      "name": "Le Bois Rond"
+    },
+    {
+      "elevationMeters": null,
+      "id": "node/4181371244",
+      "kind": "settlement",
+      "latitude": 45.8962316,
+      "longitude": 6.8103941,
+      "name": "Le Bourgeat"
+    },
+    {
+      "elevationMeters": null,
+      "id": "node/4181371246",
+      "kind": "settlement",
+      "latitude": 45.8946655,
+      "longitude": 6.8162306,
+      "name": "Le Pont"
+    },
+    {
+      "elevationMeters": null,
+      "id": "node/4181371247",
+      "kind": "settlement",
+      "latitude": 45.8902037,
+      "longitude": 6.8061441,
+      "name": "Le Tourchet"
+    },
+    {
+      "elevationMeters": null,
+      "id": "node/4181371251",
+      "kind": "settlement",
+      "latitude": 45.9006145,
+      "longitude": 6.8332049,
+      "name": "Les Granges"
+    },
+    {
+      "elevationMeters": null,
+      "id": "node/4181371255",
+      "kind": "settlement",
+      "latitude": 45.8958602,
+      "longitude": 6.8192507,
+      "name": "Petit Pont"
+    },
+    {
+      "elevationMeters": null,
+      "id": "node/4181371256",
+      "kind": "settlement",
+      "latitude": 45.8962522,
+      "longitude": 6.8266376,
+      "name": "Taconnaz"
+    },
+    {
+      "elevationMeters": null,
+      "id": "node/4181371258",
+      "kind": "settlement",
+      "latitude": 45.8982551,
+      "longitude": 6.8295142,
+      "name": "Vers le Nant"
+    },
+    {
+      "elevationMeters": 2525,
+      "id": "node/436622732",
+      "kind": "peak",
+      "latitude": 45.9339121,
+      "longitude": 6.8378343,
+      "name": "Le Brévent"
+    },
+    {
+      "elevationMeters": 2595,
+      "id": "node/469385452",
+      "kind": "peak",
+      "latitude": 45.9678109,
+      "longitude": 6.8702027,
+      "name": "Index de la Glière"
+    },
+    {
+      "elevationMeters": 2836,
+      "id": "node/469385453",
+      "kind": "peak",
+      "latitude": 45.9697327,
+      "longitude": 6.8638452,
+      "name": "Aiguille de la Glière Sud"
+    },
+    {
+      "elevationMeters": 2663,
+      "id": "node/469385458",
+      "kind": "peak",
+      "latitude": 45.9661689,
+      "longitude": 6.8660415,
+      "name": "Chapelle de la Glière"
+    },
+    {
+      "elevationMeters": 2610,
+      "id": "node/469385459",
+      "kind": "saddle",
+      "latitude": 45.9641519,
+      "longitude": 6.8590359,
+      "name": "Col des Lacs Noirs"
+    },
+    {
+      "elevationMeters": 2549,
+      "id": "node/469385462",
+      "kind": "peak",
+      "latitude": 45.9541716,
+      "longitude": 6.8503443,
+      "name": "Aiguille de Charlanon"
+    },
+    {
+      "elevationMeters": 2412,
+      "id": "node/469385464",
+      "kind": "peak",
+      "latitude": 45.9466701,
+      "longitude": 6.8452123,
+      "name": "Clocher de Planpraz"
+    },
+    {
+      "elevationMeters": 2323,
+      "id": "node/469385467",
+      "kind": "peak",
+      "latitude": 45.958353,
+      "longitude": 6.8011236,
+      "name": "Pointe Noire de Pormenaz"
+    },
+    {
+      "elevationMeters": 2850,
+      "id": "node/503688799",
+      "kind": "peak",
+      "latitude": 45.9252469,
+      "longitude": 6.9453206,
+      "name": "Diamant des Flammes de Pierre"
+    },
+    {
+      "elevationMeters": 1710,
+      "id": "node/7925500129",
+      "kind": "peak",
+      "latitude": 45.9666522,
+      "longitude": 6.8229792,
+      "name": "Tête de Jeubon"
+    },
+    {
+      "elevationMeters": 2655,
+      "id": "node/7944517093",
+      "kind": "peak",
+      "latitude": 45.9473407,
+      "longitude": 6.933939,
+      "name": "Aiguille à Bochard"
+    },
+    {
+      "elevationMeters": 2414,
+      "id": "node/800899410",
+      "kind": "saddle",
+      "latitude": 45.9554001,
+      "longitude": 6.8546215,
+      "name": "Col Cornu"
+    },
+    {
+      "elevationMeters": 2461,
+      "id": "node/815242077",
+      "kind": "saddle",
+      "latitude": 45.9605104,
+      "longitude": 6.8567813,
+      "name": "Col de la Glière"
+    },
+    {
+      "elevationMeters": 2461,
+      "id": "node/9957878297",
+      "kind": "peak",
+      "latitude": 45.9463895,
+      "longitude": 6.8438042,
+      "name": "Pointe des Vioz"
+    },
+    {
+      "elevationMeters": null,
+      "id": "relation/8294449",
+      "kind": "parking",
+      "latitude": 45.925943801596965,
+      "longitude": 6.8737885597459,
+      "name": "Médiathèque"
+    },
+    {
+      "elevationMeters": null,
+      "id": "way/1174248131",
+      "kind": "parking",
+      "latitude": 45.9077268660574,
+      "longitude": 6.821920187622687,
+      "name": "P1"
+    },
+    {
+      "elevationMeters": null,
+      "id": "way/126201819",
+      "kind": "parking",
+      "latitude": 45.92172969363885,
+      "longitude": 6.872458013876451,
+      "name": "Allobroges"
+    },
+    {
+      "elevationMeters": null,
+      "id": "way/1413085993",
+      "kind": "parking",
+      "latitude": 45.90533048564289,
+      "longitude": 6.810731623725817,
+      "name": "P3"
+    },
+    {
+      "elevationMeters": null,
+      "id": "way/1413085995",
+      "kind": "parking",
+      "latitude": 45.90535076035582,
+      "longitude": 6.817004946073919,
+      "name": "P2"
+    },
+    {
+      "elevationMeters": null,
+      "id": "way/1418939902",
+      "kind": "parking",
+      "latitude": 45.90518587603808,
+      "longitude": 6.809238094856025,
+      "name": "P4"
+    },
+    {
+      "elevationMeters": null,
+      "id": "way/1421554765",
+      "kind": "parking",
+      "latitude": 45.915162230091994,
+      "longitude": 6.868710633258692,
+      "name": "Parking camping-car"
+    },
+    {
+      "elevationMeters": null,
+      "id": "way/1443419749",
+      "kind": "hut",
+      "latitude": 45.9045659,
+      "longitude": 6.9244968,
+      "name": "Cabane de la Tour-Rouge"
+    },
+    {
+      "elevationMeters": null,
+      "id": "way/146403995",
+      "kind": "parking",
+      "latitude": 45.92303015027152,
+      "longitude": 6.877456694015219,
+      "name": "Parking Biollay"
+    },
+    {
+      "elevationMeters": 1254,
+      "id": "way/190317464",
+      "kind": "shelter",
+      "latitude": 45.9385661,
+      "longitude": 6.8006389,
+      "name": "Les Péchots"
+    },
+    {
+      "elevationMeters": null,
+      "id": "way/210106886",
+      "kind": "parking",
+      "latitude": 45.9176727198222,
+      "longitude": 6.872987718948542,
+      "name": "Parking autocars du Grépon"
+    },
+    {
+      "elevationMeters": null,
+      "id": "way/231452319",
+      "kind": "parking",
+      "latitude": 45.92651114466371,
+      "longitude": 6.867807767365321,
+      "name": "Parking du Savoy"
+    },
+    {
+      "elevationMeters": null,
+      "id": "way/232431306",
+      "kind": "parking",
+      "latitude": 45.915183247536966,
+      "longitude": 6.848554168604027,
+      "name": "Lac à l'Anglais"
+    },
+    {
+      "elevationMeters": null,
+      "id": "way/242255857",
+      "kind": "parking",
+      "latitude": 45.92378967859919,
+      "longitude": 6.872821443506575,
+      "name": "Parking du Poilu"
+    },
+    {
+      "elevationMeters": null,
+      "id": "way/25970095",
+      "kind": "parking",
+      "latitude": 45.91711146949645,
+      "longitude": 6.871423859755383,
+      "name": "Centre Ville (Grépon)"
+    },
+    {
+      "elevationMeters": null,
+      "id": "way/261363552",
+      "kind": "parking",
+      "latitude": 45.91991180486942,
+      "longitude": 6.870140530815352,
+      "name": "Oustalet"
+    },
+    {
+      "elevationMeters": 1448,
+      "id": "way/278204166",
+      "kind": "hut",
+      "latitude": 45.94106945967466,
+      "longitude": 6.8064386149186635,
+      "name": "Le vieux Chéppy"
+    },
+    {
+      "elevationMeters": null,
+      "id": "way/291292204",
+      "kind": "parking",
+      "latitude": 45.9167176211952,
+      "longitude": 6.867053730965552,
+      "name": "Courmayeur"
+    },
+    {
+      "elevationMeters": null,
+      "id": "way/368628322",
+      "kind": "parking",
+      "latitude": 45.92360087258734,
+      "longitude": 6.8808450075914624,
+      "name": "Planards"
+    },
+    {
+      "elevationMeters": null,
+      "id": "way/368628323",
+      "kind": "parking",
+      "latitude": 45.92448168067505,
+      "longitude": 6.87887684504913,
+      "name": "Planards et Montenvers"
+    },
+    {
+      "elevationMeters": null,
+      "id": "way/484720257",
+      "kind": "parking",
+      "latitude": 45.92441061971469,
+      "longitude": 6.8627942032057545,
+      "name": "Parking du Brévent"
+    },
+    {
+      "elevationMeters": null,
+      "id": "way/589623117",
+      "kind": "parking",
+      "latitude": 45.92213746667168,
+      "longitude": 6.867621512722494,
+      "name": "Parking de l'Outa"
+    },
+    {
+      "elevationMeters": null,
+      "id": "way/729485405",
+      "kind": "parking",
+      "latitude": 45.90072373214753,
+      "longitude": 6.840170808855015,
+      "name": "Camping GCU de Chamonix-Les Bossons"
+    },
+    {
+      "elevationMeters": null,
+      "id": "way/88949447",
+      "kind": "parking",
+      "latitude": 45.89287379264211,
+      "longitude": 6.800888701851782,
+      "name": "Le Tourchet"
+    },
+    {
+      "elevationMeters": null,
+      "id": "way/97310814",
+      "kind": "parking",
+      "latitude": 45.92428274621017,
+      "longitude": 6.867135921253876,
+      "name": "Parking Sous-Terrain Saint-Michel"
+    },
+    {
+      "elevationMeters": 2516,
+      "id": "way/97315471",
+      "kind": "hut",
+      "latitude": 45.884727751788446,
+      "longitude": 6.9296790317348345,
+      "name": "Refuge du Requin"
+    },
+    {
+      "elevationMeters": null,
+      "id": "way/97320262",
+      "kind": "parking",
+      "latitude": 45.92510375327779,
+      "longitude": 6.862542160345767,
+      "name": "Parking du Brévent"
+    },
+    {
+      "elevationMeters": 2493,
+      "id": "way/97322551",
+      "kind": "hut",
+      "latitude": 45.900026758324074,
+      "longitude": 6.927623460824632,
+      "name": "Refuge de L'Envers des Aiguilles"
+    },
+    {
+      "elevationMeters": 2207,
+      "id": "way/97326381",
+      "kind": "hut",
+      "latitude": 45.90554147296344,
+      "longitude": 6.882677783371587,
+      "name": "Refuge du Plan de L'Aiguille"
+    }
+  ]
+}

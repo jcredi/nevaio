@@ -24,19 +24,24 @@ export const initialView = {
 export const snowManifestUrl =
   import.meta.env.VITE_SNOW_MANIFEST_URL || "/snow/latest.json";
 
-// The static OSM object index (spec amendment v1.11) - the panel's identity
-// contract, and later the key for each object's snow history. The MapTiler
-// basemap is visual context only; docs/research/maptiler-outdoor-objects.md
-// measures why its rendered features cannot play this role.
+// The static, sharded OSM object index (spec amendment v1.11) - the panel's
+// identity contract, and later the key for each object's snow history. The
+// MapTiler basemap is visual context only; see
+// docs/research/maptiler-outdoor-objects.md for why its rendered features
+// cannot play this role.
 //
-// Today this is a small committed fixture in public/objects/, built from real
-// OSM objects around Monte Rosa, Gran San Bernardo, Chamonix and Solda so the
-// selection prototype can be exercised for real. When the pipeline publishes a
-// spatially scoped shard, point VITE_OBJECT_INDEX_URL at it: the R2 bucket
-// host is already in the CSP's connect-src, so no _headers change is needed
-// for that host - any other host would need one.
+// This URL points at the entry-point document; every shard path inside it is
+// resolved against this URL and must stay in its directory, so this one value
+// is the whole trust anchor (the same rule the snow manifest uses).
+//
+// Today it is a fixture in public/object-index/, cut from the real published
+// artifact and covering Monte Rosa, Gran San Bernardo, Chamonix and Solda, so
+// the selection prototype runs on real records. Point
+// VITE_OBJECT_INDEX_URL at the R2 publication to swap it in: the bucket host
+// is already in the CSP's connect-src, so no _headers change is needed for
+// that host - any other host would need one.
 export const objectIndexUrl =
-  import.meta.env.VITE_OBJECT_INDEX_URL || "/objects/index.json";
+  import.meta.env.VITE_OBJECT_INDEX_URL || "/object-index/object-index.json";
 
 // Approximate Alps + Italian Apennines bounding box (west, south, east,
 // north), used only to bias place-search results (spec section 6.1) toward

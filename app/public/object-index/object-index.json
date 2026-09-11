@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "objectCount": 445,
+  "shards": [
+    {
+      "tile": "31TGL",
+      "path": "objects/31TGL.json",
+      "bounds": [
+        6.8006389,
+        45.8809117,
+        6.9487617,
+        45.9697327
+      ],
+      "objectCount": 115,
+      "bytes": 22500,
+      "sha256": "9a7d236dfddc34cce892ad9831d10b6bbf63e00d163a1887e8271f2da8a16f2e"
+    },
+    {
+      "tile": "32TLR",
+      "path": "objects/32TLR.json",
+      "bounds": [
+        7.1001042,
+        45.8203724,
+        7.2454615,
+        45.9169357
+      ],
+      "objectCount": 155,
+      "bytes": 29776,
+      "sha256": "870c7b9937d28758c7ac41f1d437f24657f6a3b2ca0e6d43da6fed55df6b325b"
+    },
+    {
+      "tile": "32TMR",
+      "path": "objects/32TMR.json",
+      "bounds": [
+        7.8378157,
+        45.8822039,
+        7.95902,
+        45.9975752
+      ],
+      "objectCount": 88,
+      "bytes": 17106,
+      "sha256": "81ecf2eb2c99e20f3e8858cac11f3792c8c5cbeb316abd6b9d1ecd13091ee077"
+    },
+    {
+      "tile": "32TPS",
+      "path": "objects/32TPS.json",
+      "bounds": [
+        10.536679,
+        46.4620335,
+        10.679344685029875,
+        46.5580278
+      ],
+      "objectCount": 87,
+      "bytes": 17932,
+      "sha256": "7a5f3bc47bb4b6a6c6a4d28820bb2955c78f4d375f3609fc8dd7297cd3c4b094"
+    }
+  ]
+}

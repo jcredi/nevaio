@@ -1,0 +1,702 @@
+{
+  "schemaVersion": 1,
+  "tile": "32TPS",
+  "objects": [
+    {
+      "elevationMeters": 3049,
+      "id": "node/10056177328",
+      "kind": "peak",
+      "latitude": 46.4976497,
+      "longitude": 10.6563461,
+      "name": "Vertainen"
+    },
+    {
+      "elevationMeters": 3185,
+      "id": "node/10549110634",
+      "kind": "peak",
+      "latitude": 46.5041431,
+      "longitude": 10.6440083,
+      "name": "Pederknott"
+    },
+    {
+      "elevationMeters": 3164,
+      "id": "node/10550534330",
+      "kind": "peak",
+      "latitude": 46.4620335,
+      "longitude": 10.6262245,
+      "name": "Innerer Kofel - Cima di Dentro"
+    },
+    {
+      "elevationMeters": 2702,
+      "id": "node/10550534331",
+      "kind": "peak",
+      "latitude": 46.4648475,
+      "longitude": 10.66086,
+      "name": "Äußerer Kofel - Cima di Fuori"
+    },
+    {
+      "elevationMeters": 2908,
+      "id": "node/10717279661",
+      "kind": "peak",
+      "latitude": 46.5426093,
+      "longitude": 10.599153,
+      "name": "Vorderes Schöneck - Dossobello di Fuori"
+    },
+    {
+      "elevationMeters": null,
+      "id": "node/11149553830",
+      "kind": "shelter",
+      "latitude": 46.481641,
+      "longitude": 10.5383313,
+      "name": "Rifugio Quinto Alpini"
+    },
+    {
+      "elevationMeters": 3061,
+      "id": "node/1376869135",
+      "kind": "peak",
+      "latitude": 46.5144372,
+      "longitude": 10.6779039,
+      "name": "Kalfanwand - Croda della Calva"
+    },
+    {
+      "elevationMeters": 3128,
+      "id": "node/1383107054",
+      "kind": "peak",
+      "latitude": 46.5252842,
+      "longitude": 10.5423681,
+      "name": "Tabarettaspitze - Punta Tabaretta"
+    },
+    {
+      "elevationMeters": null,
+      "id": "node/1430428742",
+      "kind": "shelter",
+      "latitude": 46.5345928,
+      "longitude": 10.6122442,
+      "name": "bench"
+    },
+    {
+      "elevationMeters": null,
+      "id": "node/1432090842",
+      "kind": "shelter",
+      "latitude": 46.5020934,
+      "longitude": 10.5950846,
+      "name": "überfahrene Lärche"
+    },
+    {
+      "elevationMeters": 3123,
+      "id": "node/158717545",
+      "kind": "saddle",
+      "latitude": 46.4980343,
+      "longitude": 10.6293266,
+      "name": "Passo del Madriccio"
+    },
+    {
+      "elevationMeters": 3535,
+      "id": "node/1777819985",
+      "kind": "shelter",
+      "latitude": 46.4960144,
+      "longitude": 10.5481201,
+      "name": "Hochjochbiwak - Bivacco Città di Cantù"
+    },
+    {
+      "elevationMeters": 3214,
+      "id": "node/1836648041",
+      "kind": "peak",
+      "latitude": 46.5046966,
+      "longitude": 10.6194011,
+      "name": "Vordere Schöntaufspitze"
+    },
+    {
+      "elevationMeters": 3230,
+      "id": "node/1876589044",
+      "kind": "peak",
+      "latitude": 46.4800848,
+      "longitude": 10.60904,
+      "name": "Eisseespitze - Punta del Lago Gelato"
+    },
+    {
+      "elevationMeters": 3300,
+      "id": "node/1876589694",
+      "kind": "peak",
+      "latitude": 46.4858142,
+      "longitude": 10.6220593,
+      "name": "Butzenspitze - Cima Pozzo"
+    },
+    {
+      "elevationMeters": 3265,
+      "id": "node/1876589786",
+      "kind": "peak",
+      "latitude": 46.4915969,
+      "longitude": 10.6292183,
+      "name": "Madritschspitze - Cima Madriccio"
+    },
+    {
+      "elevationMeters": 3313,
+      "id": "node/1876590450",
+      "kind": "peak",
+      "latitude": 46.5097562,
+      "longitude": 10.6383246,
+      "name": "Hinterer Pederspitz - Punta Peder di Dentro"
+    },
+    {
+      "elevationMeters": 3147,
+      "id": "node/1876590531",
+      "kind": "saddle",
+      "latitude": 46.5136192,
+      "longitude": 10.6388912,
+      "name": "Pederjoch - Passo Peder"
+    },
+    {
+      "elevationMeters": 2682,
+      "id": "node/2519193569",
+      "kind": "saddle",
+      "latitude": 46.5437355,
+      "longitude": 10.5432969,
+      "name": "Hochleitenjoch - Forcella Punta Alta"
+    },
+    {
+      "elevationMeters": 2798,
+      "id": "node/2519193570",
+      "kind": "peak",
+      "latitude": 46.5463191,
+      "longitude": 10.5394156,
+      "name": "Hochleitenspitz - Punta Alta"
+    },
+    {
+      "elevationMeters": 2537,
+      "id": "node/2519196363",
+      "kind": "peak",
+      "latitude": 46.5358245,
+      "longitude": 10.5490419,
+      "name": "Stierberg - Monte del Toro"
+    },
+    {
+      "elevationMeters": 3905,
+      "id": "node/26864153",
+      "kind": "peak",
+      "latitude": 46.5090956,
+      "longitude": 10.5449304,
+      "name": "Ortler - Ortles"
+    },
+    {
+      "elevationMeters": 3275,
+      "id": "node/2763592677",
+      "kind": "peak",
+      "latitude": 46.4642896,
+      "longitude": 10.6171058,
+      "name": "Cima Tre Cannoni"
+    },
+    {
+      "elevationMeters": 2859,
+      "id": "node/2834734795",
+      "kind": "peak",
+      "latitude": 46.5402707,
+      "longitude": 10.5416316,
+      "name": "Bärenköpfl - Monte dell'Orso"
+    },
+    {
+      "elevationMeters": 2538,
+      "id": "node/2834734798",
+      "kind": "peak",
+      "latitude": 46.5320457,
+      "longitude": 10.555135,
+      "name": "Marltschneide - Dosso Marlet"
+    },
+    {
+      "elevationMeters": 3422,
+      "id": "node/307292986",
+      "kind": "peak",
+      "latitude": 46.5214043,
+      "longitude": 10.6411545,
+      "name": "Plattenspitze / Punta delle Laste"
+    },
+    {
+      "elevationMeters": 3527,
+      "id": "node/3730627571",
+      "kind": "saddle",
+      "latitude": 46.4967072,
+      "longitude": 10.5473583,
+      "name": "Hochjoch - Giogo Alto"
+    },
+    {
+      "elevationMeters": 2610,
+      "id": "node/393892579",
+      "kind": "hut",
+      "latitude": 46.4696416,
+      "longitude": 10.6730592,
+      "name": "Martellerhütte - Rifugio Martello"
+    },
+    {
+      "elevationMeters": 3318,
+      "id": "node/394921961",
+      "kind": "peak",
+      "latitude": 46.5580278,
+      "longitude": 10.6482874,
+      "name": "Kleine Angelus Spitze - L'Angelo Piccolo"
+    },
+    {
+      "elevationMeters": 3325,
+      "id": "node/394921970",
+      "kind": "peak",
+      "latitude": 46.5028467,
+      "longitude": 10.6285696,
+      "name": "Hintere Schöntaufspitze - Punta Beltovo di Dentro"
+    },
+    {
+      "elevationMeters": 3735,
+      "id": "node/421818424",
+      "kind": "peak",
+      "latitude": 46.4923192,
+      "longitude": 10.5501983,
+      "name": "Monte Zebrù"
+    },
+    {
+      "elevationMeters": 3545,
+      "id": "node/425371500",
+      "kind": "peak",
+      "latitude": 46.537427,
+      "longitude": 10.6359581,
+      "name": "Vertainspitze - Cima Vertana"
+    },
+    {
+      "elevationMeters": 3461,
+      "id": "node/425371505",
+      "kind": "peak",
+      "latitude": 46.5274901,
+      "longitude": 10.6491766,
+      "name": "Schildspitze / Punta dello Scudo"
+    },
+    {
+      "elevationMeters": 3521,
+      "id": "node/425371507",
+      "kind": "peak",
+      "latitude": 46.5449175,
+      "longitude": 10.6483827,
+      "name": "Hohe Angelusspitze - L'Angelo Grande"
+    },
+    {
+      "elevationMeters": 3462,
+      "id": "node/425372051",
+      "kind": "peak",
+      "latitude": 46.5291906,
+      "longitude": 10.6595857,
+      "name": "Mittlere Pederspitze - Punta Peder di Mezzo"
+    },
+    {
+      "elevationMeters": 3406,
+      "id": "node/425372052",
+      "kind": "peak",
+      "latitude": 46.5292547,
+      "longitude": 10.6708682,
+      "name": "Äußere Pederspitze - Punta Peder di Fuori"
+    },
+    {
+      "elevationMeters": 3362,
+      "id": "node/452507212",
+      "kind": "saddle",
+      "latitude": 46.4795961,
+      "longitude": 10.5556565,
+      "name": "Colle delle Miniere"
+    },
+    {
+      "elevationMeters": 3405,
+      "id": "node/452507214",
+      "kind": "peak",
+      "latitude": 46.4787703,
+      "longitude": 10.5521678,
+      "name": "Cima della Miniera"
+    },
+    {
+      "elevationMeters": 3851,
+      "id": "node/452511591",
+      "kind": "peak",
+      "latitude": 46.4787047,
+      "longitude": 10.5684946,
+      "name": "Königspitze - Gran Zebrù"
+    },
+    {
+      "elevationMeters": 3375,
+      "id": "node/452522308",
+      "kind": "saddle",
+      "latitude": 46.4752435,
+      "longitude": 10.5639322,
+      "name": "Col Pale Rosse"
+    },
+    {
+      "elevationMeters": 3388,
+      "id": "node/452522311",
+      "kind": "peak",
+      "latitude": 46.4706884,
+      "longitude": 10.5917663,
+      "name": "Schrötterhorn - Corno di Solda"
+    },
+    {
+      "elevationMeters": 3256,
+      "id": "node/476029779",
+      "kind": "saddle",
+      "latitude": 46.4626695,
+      "longitude": 10.6023248,
+      "name": "Langenfernerjoch - Passo del Cevedale"
+    },
+    {
+      "elevationMeters": 3446,
+      "id": "node/4793800710",
+      "kind": "peak",
+      "latitude": 46.4726456,
+      "longitude": 10.5624768,
+      "name": "Cima Pale Rosse - Croce Jacopo"
+    },
+    {
+      "elevationMeters": 3845,
+      "id": "node/4793817706",
+      "kind": "peak",
+      "latitude": 46.5047786,
+      "longitude": 10.5423768,
+      "name": "Ortler Vorgipfel - Ortles Anticima"
+    },
+    {
+      "elevationMeters": 3405,
+      "id": "node/564938421",
+      "kind": "saddle",
+      "latitude": 46.4845677,
+      "longitude": 10.557902,
+      "name": "Suldenjoch - Passo di Solda"
+    },
+    {
+      "elevationMeters": 3238,
+      "id": "node/565432844",
+      "kind": "saddle",
+      "latitude": 46.4718446,
+      "longitude": 10.5867377,
+      "name": "Cedecpass - Passo di Cedec"
+    },
+    {
+      "elevationMeters": 3352,
+      "id": "node/6654134678",
+      "kind": "saddle",
+      "latitude": 46.497763,
+      "longitude": 10.536679,
+      "name": "Ortlerpass - Passo dell'Ortles"
+    },
+    {
+      "elevationMeters": 3376,
+      "id": "node/673011106",
+      "kind": "peak",
+      "latitude": 46.468735,
+      "longitude": 10.6003479,
+      "name": "Cima di Solda - Suldenspitze"
+    },
+    {
+      "elevationMeters": 3724,
+      "id": "node/673011942",
+      "kind": "peak",
+      "latitude": 46.4900848,
+      "longitude": 10.554011,
+      "name": "Monte Zebrù Südostgipfel - Cima di Sud Est"
+    },
+    {
+      "elevationMeters": 3298,
+      "id": "node/673019470",
+      "kind": "saddle",
+      "latitude": 46.4734715,
+      "longitude": 10.5772708,
+      "name": "Königsjoch - Passo della Bottiglia"
+    },
+    {
+      "elevationMeters": 2890,
+      "id": "node/6746969096",
+      "kind": "peak",
+      "latitude": 46.4825942,
+      "longitude": 10.6392702,
+      "name": "Butzenköpfl"
+    },
+    {
+      "elevationMeters": 3196,
+      "id": "node/7978141579",
+      "kind": "saddle",
+      "latitude": 46.5320804,
+      "longitude": 10.6778917,
+      "name": "Lyfipass - Passo Livi"
+    },
+    {
+      "elevationMeters": 3288,
+      "id": "node/7989180199",
+      "kind": "saddle",
+      "latitude": 46.5294053,
+      "longitude": 10.6463663,
+      "name": "Rosimjoch - Passo di Rosim"
+    },
+    {
+      "elevationMeters": 3145,
+      "id": "node/7992802637",
+      "kind": "peak",
+      "latitude": 46.518918,
+      "longitude": 10.6584577,
+      "name": "Drischlwand - Croda della Trebbia"
+    },
+    {
+      "elevationMeters": 2929,
+      "id": "node/7992887178",
+      "kind": "peak",
+      "latitude": 46.4953208,
+      "longitude": 10.6476205,
+      "name": "Sonnenwand - Croda del Sole"
+    },
+    {
+      "elevationMeters": 2941,
+      "id": "node/7992887273",
+      "kind": "peak",
+      "latitude": 46.4793569,
+      "longitude": 10.6534666,
+      "name": "Mutspitze"
+    },
+    {
+      "elevationMeters": 2797,
+      "id": "node/7992887302",
+      "kind": "peak",
+      "latitude": 46.5044195,
+      "longitude": 10.6553238,
+      "name": "Schöberköfel"
+    },
+    {
+      "elevationMeters": 3174,
+      "id": "node/7992887321",
+      "kind": "saddle",
+      "latitude": 46.5050651,
+      "longitude": 10.6356971,
+      "name": "Schöntaufjoch - Passo del Beltovo"
+    },
+    {
+      "elevationMeters": 3320,
+      "id": "node/8000814225",
+      "kind": "peak",
+      "latitude": 46.535462,
+      "longitude": 10.6679302,
+      "name": "Gamsspitz - Cima dei Camosci"
+    },
+    {
+      "elevationMeters": 3370,
+      "id": "node/8000824852",
+      "kind": "peak",
+      "latitude": 46.5321518,
+      "longitude": 10.6730473,
+      "name": "Lyfihorn - Corno Livi"
+    },
+    {
+      "elevationMeters": 3260,
+      "id": "node/8007198165",
+      "kind": "saddle",
+      "latitude": 46.4881638,
+      "longitude": 10.6264778,
+      "name": "Butzenpass - Passo del Pozzo"
+    },
+    {
+      "elevationMeters": 2834,
+      "id": "node/8007288732",
+      "kind": "peak",
+      "latitude": 46.4637872,
+      "longitude": 10.6470218,
+      "name": "Mittlerer Kofel - Cima di Mezzo"
+    },
+    {
+      "elevationMeters": 3072,
+      "id": "node/8014088438",
+      "kind": "peak",
+      "latitude": 46.4673571,
+      "longitude": 10.6190638,
+      "name": "Innerer Kofel - Cima di dentro"
+    },
+    {
+      "elevationMeters": 2835,
+      "id": "node/8018907850",
+      "kind": "peak",
+      "latitude": 46.4673575,
+      "longitude": 10.6761259,
+      "name": "Kuenzenspitze - Punta la Cuna"
+    },
+    {
+      "elevationMeters": 3431,
+      "id": "node/8032751206",
+      "kind": "peak",
+      "latitude": 46.5530747,
+      "longitude": 10.6504364,
+      "name": "Hochofenwand - Croda del Forno"
+    },
+    {
+      "elevationMeters": 3302,
+      "id": "node/8032751215",
+      "kind": "saddle",
+      "latitude": 46.5507948,
+      "longitude": 10.6495607,
+      "name": "Ofenwandscharte - Passo del Forno"
+    },
+    {
+      "elevationMeters": 2792,
+      "id": "node/8032751243",
+      "kind": "peak",
+      "latitude": 46.5536039,
+      "longitude": 10.6626501,
+      "name": "Niedere Ofenwand - Croda del Forno di Sotto"
+    },
+    {
+      "elevationMeters": 2871,
+      "id": "node/813803464",
+      "kind": "saddle",
+      "latitude": 46.5351276,
+      "longitude": 10.5414536,
+      "name": "Bärenkopfscharte - Forcella dell'Orso"
+    },
+    {
+      "elevationMeters": 2903,
+      "id": "node/813803468",
+      "kind": "saddle",
+      "latitude": 46.530708,
+      "longitude": 10.542192,
+      "name": "Tabarettascharte - Passo della Tabaretta"
+    },
+    {
+      "elevationMeters": 2856,
+      "id": "node/8165253474",
+      "kind": "peak",
+      "latitude": 46.5513498,
+      "longitude": 10.5954469,
+      "name": "Sattel - Monte dell'Argento"
+    },
+    {
+      "elevationMeters": 3128,
+      "id": "node/817642690",
+      "kind": "peak",
+      "latitude": 46.5504076,
+      "longitude": 10.6048,
+      "name": "Hinteres Schöneck - Dossobello di Dentro"
+    },
+    {
+      "elevationMeters": 2770,
+      "id": "node/8199463089",
+      "kind": "peak",
+      "latitude": 46.5035717,
+      "longitude": 10.6076178,
+      "name": "Schöntaufwand - Croda del Beltovo"
+    },
+    {
+      "elevationMeters": 2556,
+      "id": "node/8214754913",
+      "kind": "peak",
+      "latitude": 46.5099637,
+      "longitude": 10.5837508,
+      "name": "Scheibenkopf - Monte del Bersaglio"
+    },
+    {
+      "elevationMeters": 3150,
+      "id": "node/847222456",
+      "kind": "saddle",
+      "latitude": 46.4746773,
+      "longitude": 10.6060673,
+      "name": "Eisseepass - Passo del Lago Gelato"
+    },
+    {
+      "elevationMeters": 1906,
+      "id": "node/908835164",
+      "kind": "settlement",
+      "latitude": 46.5280433,
+      "longitude": 10.5842617,
+      "name": "Sulden - Solda"
+    },
+    {
+      "elevationMeters": 3337,
+      "id": "node/908835319",
+      "kind": "saddle",
+      "latitude": 46.5416446,
+      "longitude": 10.6439511,
+      "name": "Angelusscharte - Passo dell'Angelo"
+    },
+    {
+      "elevationMeters": 3391,
+      "id": "node/977737348",
+      "kind": "peak",
+      "latitude": 46.4725518,
+      "longitude": 10.5804294,
+      "name": "Kreilspitze - Punta Graglia"
+    },
+    {
+      "elevationMeters": 2264,
+      "id": "way/122266665",
+      "kind": "hut",
+      "latitude": 46.48157412988314,
+      "longitude": 10.679344685029875,
+      "name": "Zufallhütte - Rifugio Nino Corsi"
+    },
+    {
+      "elevationMeters": 3285,
+      "id": "way/151544119",
+      "kind": "shelter",
+      "latitude": 46.46334304087132,
+      "longitude": 10.602162534349123,
+      "name": "Rifugio Invernale Alessandro Guasti"
+    },
+    {
+      "elevationMeters": 2877,
+      "id": "way/151750040",
+      "kind": "hut",
+      "latitude": 46.48164426825082,
+      "longitude": 10.538200139536137,
+      "name": "Rifugio Quinto Alpini"
+    },
+    {
+      "elevationMeters": 2661,
+      "id": "way/152221841",
+      "kind": "hut",
+      "latitude": 46.501497327936754,
+      "longitude": 10.583316372956467,
+      "name": "Hintergrathütte - Rifugio del Coston"
+    },
+    {
+      "elevationMeters": 3029,
+      "id": "way/152260076",
+      "kind": "hut",
+      "latitude": 46.52764699990614,
+      "longitude": 10.543437781409851,
+      "name": "Payerhütte - Rifugio Payer"
+    },
+    {
+      "elevationMeters": null,
+      "id": "way/241622421",
+      "kind": "parking",
+      "latitude": 46.52813511350717,
+      "longitude": 10.590571475453382,
+      "name": "Düsseldorfer Hütte"
+    },
+    {
+      "elevationMeters": 3316,
+      "id": "way/291949621",
+      "kind": "shelter",
+      "latitude": 46.5184745,
+      "longitude": 10.541241799999996,
+      "name": "Lombardi-Biwakhütte - Bivacco Lombardi"
+    },
+    {
+      "elevationMeters": 2721,
+      "id": "way/76382087",
+      "kind": "hut",
+      "latitude": 46.5472931804558,
+      "longitude": 10.61775754537433,
+      "name": "Düsseldorfer Hütte (Zaytalhütte) - Rifugio Serristori"
+    },
+    {
+      "elevationMeters": 2556,
+      "id": "way/77383435",
+      "kind": "hut",
+      "latitude": 46.529993705914436,
+      "longitude": 10.550827160065102,
+      "name": "Tabarettahütte - Rifugio Tabaretta"
+    },
+    {
+      "elevationMeters": null,
+      "id": "way/77383519",
+      "kind": "parking",
+      "latitude": 46.52878328681421,
+      "longitude": 10.586959868067389,
+      "name": "Hotel Post"
+    }
+  ]
+}
