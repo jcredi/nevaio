@@ -1,5 +1,56 @@
 # Working session log
 
+## 2026-09-11 - Collapse the hut/shelter duplicates in the object index
+
+A staffed refuge is routinely mapped twice in OSM: once as
+`tourism=alpine_hut` for the institution and once as `amenity=shelter` for the
+building, a few metres apart. `Rifugio Quinto Alpini` was the case that
+surfaced it during the selection work - two objects, 10 m apart, one real
+place. Decided: **the hut wins and the shelter is dropped.**
+
+The reason is the tap rule, not tidiness. Two co-located records both match a
+tap, so `selection.ts` refuses it as ambiguous and offers a choice between two
+names that are the same name - the panel's worst outcome, produced entirely by
+an artefact of mapping practice. Both would also carry identical snow
+histories once those exist. `classify_object` already prefers the hut when one
+object holds both tags; `drop_shadowed_shelters` extends that same precedence
+across a pair of objects.
+
+The rule requires an identical name (case- and whitespace-folded) *and*
+physical proximity, and it never drops a hut, so nothing leaves the index
+without a better-typed equivalent remaining.
+
+**The threshold is not load-bearing, which is why it was measured before being
+chosen.** Across the whole 211,865-object index there are exactly 10
+same-named hut/shelter pairs within a kilometre. Eight are under 11 m, then
+one at 51 m and one at 137 m, and then *nothing at all* out to 1 km. Any
+threshold from 150 m upward removes the same 10 objects. `SHELTER_DEDUPE_METRES
+= 250` sits in that empty band: comfortably clear of the widest real pair,
+far short of a distance that could reach a different place. All ten are
+genuinely one place - Bivacco Caldarini, Capanna Garnerone, Malga Bordolona di
+Sotto, Rifugio Quinto Alpini and the rest. Index: 211,865 -> 211,855.
+
+Distance uses a local flat-Earth step rather than the footprint's UTM
+machinery. That was deliberate: this is a "same building or not" question over
+tens of metres, and routing a naming rule through a projection it does not
+need would couple two modules for no accuracy that matters here.
+
+**Rejected:** merging the pair into one record that keeps the shelter's id as
+an alias. It would mean inventing an identity-mapping layer, and the whole
+point of `node/123` ids is that they are OSM's, not ours. Also rejected:
+deduplicating in the frontend, which would put a second copy of the rule in a
+second language and leave the wasted bytes on the wire.
+
+The committed fixture in `app/public/object-index/` was regenerated through
+the pipeline's own serializer so it stays a true cut of the published artifact
+- 445 -> 444 objects, every `bytes`/`sha256`/`bounds` re-verified against the
+payloads. That also fixed something incidental: the fixture had been written
+pretty-printed, so its bytes were a form the pipeline never emits (`_serialize`
+ships compact, deliberately - it is a third of the bytes on a phone). It is
+now byte-identical to the real artifact, and 100K -> 72K on disk. 174 pipeline tests, 76 frontend tests, build clean.
+
+**Still open:** whether `bytes`/`sha256` stay in the shard-index contract.
+
 ## 2026-09-11 - Probe the real basemap style, then build object selection
 
 Two halves of plan item 2's frontend work: find out what the MapTiler Outdoor

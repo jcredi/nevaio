@@ -13,6 +13,7 @@ from nevaio_pipeline.object_index import (
     build_object_index,
     build_sharded_index,
     classify_object,
+    drop_shadowed_shelters,
     shard_object_index,
     write_index_document,
     write_sharded_index,
@@ -288,6 +289,77 @@ class IndexDocumentTests(unittest.TestCase):
     def test_rejects_non_feature_collection_documents(self) -> None:
         with self.assertRaisesRegex(ValueError, "FeatureCollection"):
             build_index_document({"type": "Feature", "features": []})
+
+
+
+class ShelterDeduplicationTests(unittest.TestCase):
+    """One real place must be one selectable target.
+
+    Distances below are metres, converted to a longitude offset at 45 deg N so
+    the cases read as ground distance rather than as decimal degrees.
+    """
+
+    def _east_of(self, longitude: float, metres: float) -> float:
+        from math import cos, degrees, radians
+
+        return longitude + degrees(metres / (6_371_008.8 * cos(radians(45.5))))
+
+    def test_drops_a_shelter_duplicating_the_hut_beside_it(self) -> None:
+        # The observed case: Rifugio Quinto Alpini, mapped twice 10 m apart.
+        index = build_object_index(
+            [
+                feature("way", 151750040, {"tourism": "alpine_hut", "name": "Rifugio Quinto Alpini"}),
+                feature(
+                    "node",
+                    11149553830,
+                    {"amenity": "shelter", "name": "Rifugio Quinto Alpini"},
+                    [self._east_of(7.5, 10.0), 45.5],
+                ),
+            ]
+        )
+        self.assertEqual([(entry.id, entry.kind) for entry in index], [("way/151750040", "hut")])
+
+    def test_matches_names_ignoring_case_and_spacing(self) -> None:
+        index = build_object_index(
+            [
+                feature("node", 1, {"tourism": "wilderness_hut", "name": "Bivacco  Caldarini"}),
+                feature("node", 2, {"amenity": "shelter", "name": "bivacco caldarini"}),
+            ]
+        )
+        self.assertEqual([entry.id for entry in index], ["node/1"])
+
+    def test_keeps_shelters_that_are_a_different_place(self) -> None:
+        far = feature(
+            "node",
+            2,
+            {"amenity": "shelter", "name": "Rifugio Campo"},
+            [self._east_of(7.5, 900.0), 45.5],
+        )
+        other = feature("node", 3, {"amenity": "shelter", "name": "Bivacco Altro"})
+        index = build_object_index(
+            [feature("node", 1, {"tourism": "alpine_hut", "name": "Rifugio Campo"}), far, other]
+        )
+        self.assertEqual(
+            [entry.id for entry in index], ["node/1", "node/2", "node/3"]
+        )
+
+    def test_never_drops_a_hut_and_leaves_other_kinds_alone(self) -> None:
+        entries = build_object_index(
+            [
+                feature("node", 1, {"tourism": "alpine_hut", "name": "Col Alto"}),
+                feature("node", 2, {"tourism": "wilderness_hut", "name": "Col Alto"}),
+                feature("node", 3, {"natural": "saddle", "name": "Col Alto"}),
+                feature("node", 4, {"amenity": "parking", "name": "Col Alto"}),
+            ]
+        )
+        self.assertEqual([entry.id for entry in entries], ["node/1", "node/2", "node/3", "node/4"])
+
+    def test_is_a_no_op_where_there_are_no_huts(self) -> None:
+        shelters = build_object_index(
+            [feature("node", 1, {"amenity": "shelter", "name": "Ricovero"})]
+        )
+        self.assertEqual(drop_shadowed_shelters(shelters), shelters)
+
 
 
 if __name__ == "__main__":

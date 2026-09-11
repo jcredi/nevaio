@@ -54,11 +54,11 @@ routing.
      geocoding hit, not an index record, so it needs the same matching
      question answered again - most likely reusing `resolveSelection` at the
      result's coordinates rather than trusting the geocoder's own identity.
-   - Open contract questions for the pipeline, from the first consumer:
-     whether `bytes`/`sha256` stay in the contract (the frontend does verify
-     them), and whether two OSM objects for one building - `Rifugio Quinto
-     Alpini` appears as both `shelter` and `hut`, 10 m apart - should be
-     deduplicated upstream or surfaced as a choice.
+   - One open contract question from the first consumer: whether
+     `bytes`/`sha256` stay in the shard index (the frontend does verify them).
+     The hut/shelter duplicate question is closed - the pipeline drops a
+     shelter that duplicates a same-named hut beside it, see `worklog.md`
+     (2026-09-11).
    - Anything needing to know where Nevaio shows snow must ask
      `nevaio_pipeline.footprint`, not re-derive it.
 

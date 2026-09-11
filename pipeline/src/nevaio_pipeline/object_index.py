@@ -20,7 +20,7 @@ import argparse
 from dataclasses import asdict, dataclass
 import hashlib
 import json
-from math import isfinite
+from math import cos, hypot, isfinite, radians
 from pathlib import Path
 import re
 from typing import Literal, Mapping, Sequence
@@ -133,6 +133,80 @@ def _elevation(tags: Mapping[str, object]) -> float | None:
     return elevation if isfinite(elevation) else None
 
 
+# --- Hut/shelter de-duplication -------------------------------------------
+#
+# A staffed refuge is routinely mapped twice: once as `tourism=alpine_hut` for
+# the institution and once as `amenity=shelter` for the building, a few metres
+# apart. `Rifugio Quinto Alpini` is the case that surfaced it - two OSM objects,
+# 10 m apart, one real place. Both were selectable, both would get their own
+# identical snow history, and the tap rule in `app/src/objects/selection.ts`
+# would refuse the tap as ambiguous rather than answer it: the panel's worst
+# outcome, produced by an artefact of mapping practice.
+#
+# The hut wins. It is the object a user is looking for, it carries the useful
+# type, and `classify_object` already prefers it when one object holds both
+# tags; this extends the same precedence across the pair. The rule requires
+# both an identical name and physical proximity, so two genuinely different
+# places - a bivouac near a refuge of another name, or two `Rifugio` shelters
+# in different valleys - are untouched. It never drops a hut, so no object
+# disappears from the index without an equivalent, better-typed one remaining.
+
+SHELTER_DEDUPE_METRES = 250.0
+_EARTH_RADIUS_METRES = 6_371_008.8
+
+
+def _match_name(name: str) -> str:
+    """Fold a name for matching only; the published name keeps its own form."""
+
+    return " ".join(name.split()).casefold()
+
+
+def _metres_apart(
+    longitude_a: float,
+    latitude_a: float,
+    longitude_b: float,
+    latitude_b: float,
+) -> float:
+    """Approximate ground distance, good to well under a metre at these ranges.
+
+    A local flat-Earth step is deliberate: this module answers a "same building
+    or not" question over tens of metres, and reaching for the footprint's UTM
+    machinery would tie a naming rule to a projection it does not need.
+    """
+
+    mean_latitude = radians((latitude_a + latitude_b) / 2)
+    east = radians(longitude_b - longitude_a) * cos(mean_latitude) * _EARTH_RADIUS_METRES
+    north = radians(latitude_b - latitude_a) * _EARTH_RADIUS_METRES
+    return hypot(east, north)
+
+
+def drop_shadowed_shelters(
+    entries: Sequence[ObjectIndexEntry],
+    within_metres: float = SHELTER_DEDUPE_METRES,
+) -> tuple[ObjectIndexEntry, ...]:
+    """Drop each shelter that duplicates a same-named hut close beside it."""
+
+    huts_by_name: dict[str, list[ObjectIndexEntry]] = {}
+    for entry in entries:
+        if entry.kind == "hut":
+            huts_by_name.setdefault(_match_name(entry.name), []).append(entry)
+    if not huts_by_name:
+        return tuple(entries)
+
+    return tuple(
+        entry
+        for entry in entries
+        if not (
+            entry.kind == "shelter"
+            and any(
+                _metres_apart(entry.longitude, entry.latitude, hut.longitude, hut.latitude)
+                <= within_metres
+                for hut in huts_by_name.get(_match_name(entry.name), ())
+            )
+        )
+    )
+
+
 def build_object_index(
     features: Sequence[Mapping[str, object]],
     footprint: Footprint | None = None,
@@ -143,6 +217,10 @@ def build_object_index(
     plus ``properties.osmType``, ``properties.osmId``, and ``properties.tags``.
     Unapproved tags are ignored, while malformed approved records fail instead
     of being published as a target that cannot later be matched to history.
+
+    A shelter that merely duplicates a same-named hut beside it is dropped -
+    see :func:`drop_shadowed_shelters` - so one real place is one selectable
+    target.
 
     ``footprint`` restricts the result to objects Nevaio actually has snow for.
     It stays optional so the classification and identity rules can be tested
@@ -187,7 +265,7 @@ def build_object_index(
         )
         seen_ids.add(object_id)
 
-    return tuple(sorted(entries, key=lambda entry: entry.id))
+    return tuple(sorted(drop_shadowed_shelters(entries), key=lambda entry: entry.id))
 
 
 INDEX_FILENAME = "object-index.json"
