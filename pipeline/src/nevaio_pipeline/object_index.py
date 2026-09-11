@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import asdict, dataclass
+import hashlib
 import json
 from math import isfinite
 from pathlib import Path
@@ -189,6 +190,20 @@ def build_object_index(
     return tuple(sorted(entries, key=lambda entry: entry.id))
 
 
+INDEX_FILENAME = "object-index.json"
+
+
+def _features(feature_collection: Mapping[str, object]) -> Sequence[Mapping[str, object]]:
+    if feature_collection.get("type") != "FeatureCollection":
+        raise ValueError("OSM input must be a GeoJSON FeatureCollection")
+    features = feature_collection.get("features")
+    if not isinstance(features, Sequence) or isinstance(features, (str, bytes)):
+        raise ValueError("GeoJSON FeatureCollection.features must be an array")
+    if not all(isinstance(feature, Mapping) for feature in features):
+        raise ValueError("GeoJSON FeatureCollection.features must contain objects")
+    return features
+
+
 def build_index_document(
     feature_collection: Mapping[str, object],
     footprint: Footprint | None = None,
@@ -201,19 +216,23 @@ def build_index_document(
     the explicit feature contract described by :func:`build_object_index`.
     """
 
-    if feature_collection.get("type") != "FeatureCollection":
-        raise ValueError("OSM input must be a GeoJSON FeatureCollection")
-    features = feature_collection.get("features")
-    if not isinstance(features, Sequence) or isinstance(features, (str, bytes)):
-        raise ValueError("GeoJSON FeatureCollection.features must be an array")
-    if not all(isinstance(feature, Mapping) for feature in features):
-        raise ValueError("GeoJSON FeatureCollection.features must contain objects")
-
-    index = build_object_index(features, footprint)
+    index = build_object_index(_features(feature_collection), footprint)
     return {
         "schemaVersion": 1,
         "objects": [entry.to_document() for entry in index],
     }
+
+
+def _read_source(input_path: Path) -> Mapping[str, object]:
+    try:
+        source = json.loads(input_path.read_text(encoding="utf-8"))
+    except OSError as error:
+        raise ValueError(f"could not read OSM input: {input_path}") from error
+    except json.JSONDecodeError as error:
+        raise ValueError(f"OSM input is not valid JSON: {input_path}") from error
+    if not isinstance(source, Mapping):
+        raise ValueError("OSM input must be a JSON object")
+    return source
 
 
 def write_index_document(
@@ -223,16 +242,7 @@ def write_index_document(
 ) -> int:
     """Convert a normalized local GeoJSON file to a deterministic index file."""
 
-    try:
-        source = json.loads(input_path.read_text(encoding="utf-8"))
-    except OSError as error:
-        raise ValueError(f"could not read OSM input: {input_path}") from error
-    except json.JSONDecodeError as error:
-        raise ValueError(f"OSM input is not valid JSON: {input_path}") from error
-    if not isinstance(source, Mapping):
-        raise ValueError("OSM input must be a JSON object")
-
-    document = build_index_document(source, footprint)
+    document = build_index_document(_read_source(input_path), footprint)
     output_path.write_text(
         json.dumps(document, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
@@ -240,16 +250,176 @@ def write_index_document(
     return len(document["objects"])
 
 
+
+
+# --- Sharding -------------------------------------------------------------
+#
+# 211,865 records is 39 MB of JSON. That is not a startup download for the
+# mobile-first app in docs/spec.md section 10, so the shippable artifact is a
+# small index of shards plus one payload per MGRS tile: the biggest shard is
+# ~1.4 MB (~280 KB over the wire) and a viewport touches a handful of them.
+#
+# The split key is the tile the object sits in, because the footprint already
+# speaks in tiles and inventing a second grid would mean two spatial
+# vocabularies for one dataset. Granules overlap by 9.8 km, so an object can be
+# in several; it is filed under the first in sorted order, which keeps every
+# object in exactly one shard and needs no client-side de-duplication.
+#
+# Each shard entry therefore carries the bounds of the objects it actually
+# holds, not its granule's bounds. A client intersects the viewport with those
+# and fetches what overlaps - no MGRS arithmetic in the browser, and no second
+# definition of the footprint to drift from this one.
+
+SHARD_DIRECTORY = "objects"
+
+
+@dataclass(frozen=True)
+class IndexShard:
+    """One tile's slice of the index, with the bounds of what it holds."""
+
+    tile: str
+    entries: tuple[ObjectIndexEntry, ...]
+
+    @property
+    def path(self) -> str:
+        return f"{SHARD_DIRECTORY}/{self.tile}.json"
+
+    def bounds(self) -> list[float]:
+        """Return [west, south, east, north] around this shard's objects."""
+
+        longitudes = [entry.longitude for entry in self.entries]
+        latitudes = [entry.latitude for entry in self.entries]
+        return [min(longitudes), min(latitudes), max(longitudes), max(latitudes)]
+
+    def to_document(self) -> dict[str, object]:
+        return {
+            "schemaVersion": 1,
+            "tile": self.tile,
+            "objects": [entry.to_document() for entry in self.entries],
+        }
+
+
+def shard_object_index(
+    entries: Sequence[ObjectIndexEntry],
+    footprint: Footprint,
+) -> tuple[IndexShard, ...]:
+    """Split an index into per-tile shards, sorted by tile.
+
+    Tiles with no eligible object get no shard at all: an empty payload is a
+    request that can only ever return nothing.
+    """
+
+    grouped: dict[str, list[ObjectIndexEntry]] = {}
+    for entry in entries:
+        tiles = footprint.containing_tiles(entry.longitude, entry.latitude)
+        if not tiles:
+            raise ValueError(f"object outside the footprint cannot be sharded: {entry.id}")
+        grouped.setdefault(tiles[0], []).append(entry)
+    return tuple(
+        IndexShard(tile=tile, entries=tuple(grouped[tile])) for tile in sorted(grouped)
+    )
+
+
+def _serialize(document: Mapping[str, object]) -> bytes:
+    """Serialize a published artifact compactly and reproducibly.
+
+    Published payloads carry no indentation: it is a third of the bytes on a
+    phone connection and buys nothing a formatter cannot. The single-file
+    local build keeps its readable form; this is the one that ships.
+    """
+
+    text = json.dumps(document, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+    return (text + "\n").encode("utf-8")
+
+
+def build_shard_index_document(
+    shards: Sequence[IndexShard],
+    payloads: Mapping[str, bytes],
+) -> dict[str, object]:
+    """Describe the shard set: where each one is, what it covers, and its hash.
+
+    The digests are of the shard bytes themselves, so this stays a pure
+    function of the input - no timestamp, no provider metadata - while giving
+    a consumer something to validate a fetched payload against.
+    """
+
+    return {
+        "schemaVersion": 1,
+        "objectCount": sum(len(shard.entries) for shard in shards),
+        "shards": [
+            {
+                "tile": shard.tile,
+                "path": shard.path,
+                "objectCount": len(shard.entries),
+                "bounds": shard.bounds(),
+                "bytes": len(payloads[shard.tile]),
+                "sha256": hashlib.sha256(payloads[shard.tile]).hexdigest(),
+            }
+            for shard in shards
+        ],
+    }
+
+
+def build_sharded_index(
+    feature_collection: Mapping[str, object],
+    footprint: Footprint,
+) -> dict[str, bytes]:
+    """Return the complete publishable artifact set, keyed by relative path."""
+
+    entries = build_object_index(_features(feature_collection), footprint)
+    shards = shard_object_index(entries, footprint)
+    payloads = {shard.tile: _serialize(shard.to_document()) for shard in shards}
+    files = {shard.path: payloads[shard.tile] for shard in shards}
+    files[INDEX_FILENAME] = _serialize(build_shard_index_document(shards, payloads))
+    return files
+
+
+def write_sharded_index(
+    input_path: Path,
+    output_dir: Path,
+    footprint: Footprint | None = None,
+) -> tuple[int, int]:
+    """Write the shard index and its payloads under ``output_dir``.
+
+    Returns (object count, shard count). Existing files are overwritten; stale
+    shards from a previous, wider footprint are not removed here, because
+    deciding what may be deleted from a published location belongs to the
+    publisher, not to a local format conversion.
+    """
+
+    source = _read_source(input_path)
+    files = build_sharded_index(source, footprint or mvp_footprint())
+    for relative_path, payload in sorted(files.items()):
+        destination = output_dir / relative_path
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(payload)
+    index = json.loads(files[INDEX_FILENAME])
+    return int(index["objectCount"]), len(index["shards"])
+
+
 def main(argv: Sequence[str] | None = None) -> None:
     """Build a local object index; downloading and publication are separate."""
 
     parser = argparse.ArgumentParser(description="Build Nevaio's static OSM object index")
     parser.add_argument("--input", type=Path, required=True, help="normalized OSM GeoJSON input")
-    parser.add_argument("--output", type=Path, required=True, help="public index JSON output")
+    destination = parser.add_mutually_exclusive_group(required=True)
+    destination.add_argument("--output", type=Path, help="one readable index JSON, for local inspection")
+    destination.add_argument(
+        "--output-dir",
+        type=Path,
+        help=f"publishable shard set: {INDEX_FILENAME} plus {SHARD_DIRECTORY}/<TILE>.json",
+    )
     args = parser.parse_args(argv)
     footprint = mvp_footprint()
-    count = write_index_document(args.input, args.output, footprint)
-    print(f"wrote {count} approved OSM object(s) inside the snow footprint to {args.output}")
+    if args.output is not None:
+        count = write_index_document(args.input, args.output, footprint)
+        print(f"wrote {count} approved OSM object(s) inside the snow footprint to {args.output}")
+        return
+    count, shards = write_sharded_index(args.input, args.output_dir, footprint)
+    print(
+        f"wrote {count} approved OSM object(s) inside the snow footprint "
+        f"across {shards} shard(s) in {args.output_dir}"
+    )
 
 
 if __name__ == "__main__":

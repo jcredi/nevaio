@@ -7,7 +7,13 @@ set -euo pipefail
 
 usage() {
   cat <<'EOF'
-Usage: pipeline/tools/build_osm_object_index.sh --output OUTPUT.json SOURCE.osm.pbf [SOURCE.osm.pbf ...]
+Usage: pipeline/tools/build_osm_object_index.sh --output OUTPUT.json SOURCE.osm.pbf [...]
+       pipeline/tools/build_osm_object_index.sh --output-dir OUTPUT_DIR SOURCE.osm.pbf [...]
+
+--output writes one readable index file, for local inspection. --output-dir
+writes the publishable form: object-index.json plus objects/<TILE>.json, split
+by MGRS tile because the whole index is far too large for one browser
+download. Either way the result is scoped to Nevaio's snow footprint.
 
 Requires: osmium on PATH and a Python environment able to import
 nevaio_pipeline from pipeline/src. SOURCE extracts can overlap: identical OSM
@@ -21,12 +27,14 @@ if ! command -v osmium >/dev/null; then
   exit 2
 fi
 
-output=""
-if [[ "${1:-}" == "--output" ]]; then
-  output="${2:-}"
+destination_flag=""
+destination=""
+if [[ "${1:-}" == "--output" || "${1:-}" == "--output-dir" ]]; then
+  destination_flag="$1"
+  destination="${2:-}"
   shift 2
 fi
-if [[ -z "$output" || "$#" -eq 0 ]]; then
+if [[ -z "$destination" || "$#" -eq 0 ]]; then
   usage >&2
   exit 2
 fi
@@ -76,4 +84,4 @@ normalized="$work_dir/normalized.geojson"
 PYTHONPATH="$repo_root/pipeline/src" "$python_bin" -m nevaio_pipeline.osmium_export \
   "${normalized_args[@]}" --output "$normalized"
 PYTHONPATH="$repo_root/pipeline/src" "$python_bin" -m nevaio_pipeline.object_index \
-  --input "$normalized" --output "$output"
+  --input "$normalized" "$destination_flag" "$destination"

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -7,10 +8,14 @@ import unittest
 
 from nevaio_pipeline.footprint import Footprint, mvp_footprint, parse_mgrs_tile, unproject_utm
 from nevaio_pipeline.object_index import (
+    INDEX_FILENAME,
     build_index_document,
     build_object_index,
+    build_sharded_index,
     classify_object,
+    shard_object_index,
     write_index_document,
+    write_sharded_index,
 )
 
 
@@ -105,6 +110,94 @@ class FootprintFilterTests(unittest.TestCase):
         broken["properties"]["tags"]["name"] = "   "
         with self.assertRaisesRegex(ValueError, "name for node/1"):
             build_object_index([broken], mvp_footprint())
+
+
+class ShardedIndexTests(unittest.TestCase):
+    """The publishable artifact: a small index of shards plus one per tile."""
+
+    def _collection(self, features):
+        return {"type": "FeatureCollection", "features": features}
+
+    def setUp(self) -> None:
+        self.footprint = mvp_footprint()
+        # Deliberately in three different tiles, two of them in different UTM
+        # zones, so a shard key cannot accidentally be a single-zone accident.
+        self.features = [
+            feature("node", 1, {"natural": "peak", "name": "Mont Blanc"}, [6.8651, 45.8326]),
+            feature("node", 2, {"natural": "peak", "name": "Gran Sasso"}, [13.5594, 42.4700]),
+            feature("node", 3, {"tourism": "alpine_hut", "name": "Rifugio"}, [13.6000, 42.4800]),
+            feature("node", 4, {"place": "city", "name": "Paris"}, [2.3522, 48.8566]),
+        ]
+
+    def test_each_object_lands_in_exactly_one_shard(self) -> None:
+        entries = build_object_index(self.features, self.footprint)
+        shards = shard_object_index(entries, self.footprint)
+        self.assertEqual([shard.tile for shard in shards], ["31TGL", "33TUH"])
+        self.assertEqual(sum(len(shard.entries) for shard in shards), len(entries))
+        # Mont Blanc is inside both 31TGL and 32TLR; the first sorted covering
+        # tile owns it, so no client ever sees it twice.
+        self.assertEqual([entry.name for entry in shards[0].entries], ["Mont Blanc"])
+        self.assertEqual(
+            sorted(entry.name for entry in shards[1].entries), ["Gran Sasso", "Rifugio"]
+        )
+
+    def test_a_tile_with_no_objects_gets_no_shard(self) -> None:
+        entries = build_object_index(self.features, self.footprint)
+        shards = shard_object_index(entries, self.footprint)
+        self.assertLess(len(shards), len(self.footprint.squares))
+
+    def test_shard_index_describes_bounds_size_and_digest_of_each_payload(self) -> None:
+        files = build_sharded_index(self._collection(self.features), self.footprint)
+        index = json.loads(files[INDEX_FILENAME])
+        self.assertEqual(index["schemaVersion"], 1)
+        self.assertEqual(index["objectCount"], 3)
+        self.assertEqual([shard["tile"] for shard in index["shards"]], ["31TGL", "33TUH"])
+        for shard in index["shards"]:
+            with self.subTest(tile=shard["tile"]):
+                payload = files[shard["path"]]
+                self.assertEqual(shard["bytes"], len(payload))
+                self.assertEqual(shard["sha256"], hashlib.sha256(payload).hexdigest())
+                objects = json.loads(payload)["objects"]
+                self.assertEqual(shard["objectCount"], len(objects))
+                west, south, east, north = shard["bounds"]
+                for obj in objects:
+                    self.assertTrue(west <= obj["longitude"] <= east)
+                    self.assertTrue(south <= obj["latitude"] <= north)
+
+    def test_shard_bounds_track_the_objects_not_the_granule(self) -> None:
+        # A viewport test against granule bounds would fetch shards that hold
+        # nothing nearby; these bounds are tight around the real objects.
+        files = build_sharded_index(self._collection(self.features), self.footprint)
+        index = json.loads(files[INDEX_FILENAME])
+        bounds = {shard["tile"]: shard["bounds"] for shard in index["shards"]}
+        self.assertEqual(bounds["31TGL"], [6.8651, 45.8326, 6.8651, 45.8326])
+        self.assertEqual(bounds["33TUH"], [13.5594, 42.47, 13.6, 42.48])
+
+    def test_identical_input_gives_byte_identical_artifacts(self) -> None:
+        first = build_sharded_index(self._collection(self.features), self.footprint)
+        second = build_sharded_index(self._collection(list(reversed(self.features))), self.footprint)
+        self.assertEqual(first, second)
+        self.assertNotIn(b"\n  ", first[INDEX_FILENAME])
+
+    def test_writes_the_index_and_its_payloads_under_one_directory(self) -> None:
+        with TemporaryDirectory() as directory:
+            input_path = Path(directory) / "objects.geojson"
+            output_dir = Path(directory) / "out"
+            input_path.write_text(json.dumps(self._collection(self.features)), encoding="utf-8")
+            self.assertEqual(write_sharded_index(input_path, output_dir), (3, 2))
+            index = json.loads((output_dir / INDEX_FILENAME).read_text(encoding="utf-8"))
+            for shard in index["shards"]:
+                payload = (output_dir / shard["path"]).read_bytes()
+                self.assertEqual(hashlib.sha256(payload).hexdigest(), shard["sha256"])
+            self.assertEqual(
+                sorted(path.name for path in (output_dir / "objects").iterdir()),
+                ["31TGL.json", "33TUH.json"],
+            )
+
+    def test_refuses_to_shard_an_object_outside_the_footprint(self) -> None:
+        entries = build_object_index(self.features)
+        with self.assertRaisesRegex(ValueError, "outside the footprint"):
+            shard_object_index(entries, self.footprint)
 
 
 class BuildObjectIndexTests(unittest.TestCase):
