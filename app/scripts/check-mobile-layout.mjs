@@ -11,6 +11,12 @@
 import { chromium } from "playwright";
 
 const URL = process.env.NEVAIO_URL ?? "http://127.0.0.1:5173";
+// Not the 44px ideal: this is a secondary control in a deliberately compact
+// UI, and 32 is what the pill can be without crowding the search bar above it.
+// It exists to catch the pill silently collapsing back to its 26px label size
+// while still being a picker.
+const MIN_TOUCH_TARGET = 32;
+
 const VIEWS = [
   ["small phone", { width: 320, height: 568 }],
   ["standard phone", { width: 390, height: 844 }],
@@ -23,6 +29,11 @@ try {
     await page.goto(URL, { waitUntil: "domcontentloaded" });
     await page.waitForSelector(".search-bar");
     await page.waitForSelector(".maplibregl-ctrl-top-right");
+    // The AS-OF date appears only once a snow manifest has loaded and may
+    // never appear at all (no published snapshot, or none reachable from
+    // here). Wait for it, but treat its absence as a state to skip rather
+    // than a failure - this script guards layout, not data availability.
+    await page.waitForSelector(".snow-date:not([hidden])", { timeout: 10_000 }).catch(() => {});
 
     const layout = await page.evaluate(() => {
       const search = document.querySelector(".search-bar")?.getBoundingClientRect();
@@ -30,9 +41,21 @@ try {
         .querySelector(".maplibregl-ctrl-top-right")
         ?.getBoundingClientRect();
       if (!search || !controls) throw new Error("Expected mobile controls were not rendered");
+      // The AS-OF date sits directly under the search bar and grows when the
+      // catalogue turns it into a picker; it is absent when no snow snapshot
+      // loaded at all, which is a legitimate state rather than a failure.
+      const dateElement = document.querySelector(".snow-date");
+      const date = dateElement?.hidden ? undefined : dateElement?.getBoundingClientRect();
       return {
-        search: { left: search.left, right: search.right },
+        search: { left: search.left, right: search.right, bottom: search.bottom },
         controls: { left: controls.left, right: controls.right },
+        date: date && {
+          left: date.left,
+          right: date.right,
+          top: date.top,
+          height: date.height,
+          interactive: dateElement.classList.contains("snow-date--interactive"),
+        },
         viewportWidth: window.innerWidth,
         documentWidth: document.documentElement.scrollWidth,
       };
@@ -53,6 +76,35 @@ try {
       `${name}: search ${layout.search.left}-${layout.search.right}px, ` +
         `controls ${layout.controls.left}-${layout.controls.right}px`,
     );
+
+    // The date pill became a real control with the historical picker, so it
+    // now has to earn its space: clear of the search bar above it, inside the
+    // screen, and big enough to hit with a thumb.
+    if (layout.date) {
+      const { date } = layout;
+      if (date.top < layout.search.bottom) {
+        throw new Error(
+          `${name}: the AS-OF date (top ${date.top}px) is under the search bar ` +
+            `(bottom ${layout.search.bottom}px)`,
+        );
+      }
+      if (date.left < 0 || date.right > layout.viewportWidth) {
+        throw new Error(
+          `${name}: the AS-OF date (${date.left}-${date.right}px) is off a ` +
+            `${layout.viewportWidth}px screen`,
+        );
+      }
+      if (date.interactive && date.height < MIN_TOUCH_TARGET) {
+        throw new Error(
+          `${name}: the AS-OF date picker is ${date.height}px tall, under the ` +
+            `${MIN_TOUCH_TARGET}px touch minimum`,
+        );
+      }
+      console.log(
+        `${name}: AS-OF date ${date.left}-${date.right}px, ${date.height}px tall` +
+          `${date.interactive ? " (picker)" : " (label)"}`,
+      );
+    }
 
     // Open the object panel on a known indexed object (Dufourspitze) and
     // re-check: the panel is a bottom sheet, and the snow control has to lift

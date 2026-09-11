@@ -1,5 +1,93 @@
 # Working session log
 
+## 2026-09-11 - The historical date picker (spec section 5.3) is complete
+
+The storage half shipped earlier today; this is the frontend half, so the
+whole item leaves the plan. `dates.json` is fetched and validated at startup,
+each available AS-OF date resolves to its own archived manifest, and selecting
+one replaces the snow overlay.
+
+**Four pieces.** `map/dateCatalogueSchema.ts` is the runtime validator, a
+mirror of `validate_date_catalogue` in the pipeline: exact field sets at both
+levels, bounded size, explicit-UTC `generatedAt`, dates unique and newest
+first, the span held to the catalogue's own `maxDates`, one run backing at most
+one date, and the `manifest` key re-derived from the date and run rather than
+trusted. `map/dateCatalogue.ts` is the fetch. `ui/snowDateControl.ts` is the
+display. `map/snowOverlay.ts` gained `removeSnowOverlay` and now clears any
+existing overlay before fetching a new manifest.
+
+**Decisions worth not re-deriving:**
+
+*The catalogue URL is derived from the snow manifest URL, not configured.*
+`dates.json` is published beside `latest.json`, so `dateCatalogueUrlFor` just
+resolves it there. One build-time URL stays the single trust anchor for the
+whole snow layer, and no misconfiguration can point the two objects at
+different hosts. Rejected: a second `VITE_*` variable.
+
+*The map always opens on `latest.json`, never on the catalogue's newest entry.*
+`latest.json` is the trust anchor and the only object guaranteed to exist, so
+the first paint never waits on the catalogue. The picker is layered on after.
+
+*The picker is a native `<select>`.* On a phone that gives the platform's own
+picker, real touch behaviour, and keyboard and screen reader support for
+nothing. With no UI framework yet (spec section 15 item 8) a hand-rolled popup
+would be ours to maintain, and it would be worse.
+
+*Fewer than two dates renders the old non-interactive label, not a
+single-option select.* A control that cannot change anything is a promise the
+data does not keep. This is the state production is in right now.
+
+*The old overlay comes off before the new manifest is fetched.* So a failed
+date swap shows no snow rather than the previous date's raster under the new
+date's label. This is the same section 5.4 argument that removed the
+checked-in sample raster: a wrong date misleads exactly as a stale one does.
+The picker deliberately stays visible through that failure, because it is the
+only way back to a date that works.
+
+*A date on the map but absent from the catalogue is shown as a disabled
+option.* The two public objects disagreeing is a real transient (a stale cache,
+a publication caught mid-flight); relabelling the map to fit the catalogue
+would be a lie, and hiding the picker would strand the user.
+
+*The toggle survives a date change.* Someone who turned the snow layer off did
+not ask for it back by looking at another date. `SnowControl` gained
+`setOverlay` and re-renders from scratch, because the swap builds a new overlay
+object and a stale closure would drive a layer no longer on the map.
+
+**Rejected: sharing the URL-trust helpers with `manifestSchema.ts`.** It would
+save about forty lines and mean refactoring a security-sensitive file to do it.
+`objectIndexSchema.ts` already keeps its own copies; three network-facing
+validators that each read end to end are worth more than one shared helper
+module, and that is now a deliberate convention rather than an accident.
+
+**Verified against production, not only fixtures.** The scheduled publication
+completed during this session, so `dates.json` is live: the new validator
+accepts the real bytes and resolves the real archived manifest URL. The
+archived manifest differs from `latest.json` in exactly one field,
+`manifestUrl`, each naming its own key - `validateTileManifest` accepts both
+unchanged and resolves identical tile URLs, which is the property plan item 3
+asked to preserve.
+
+The interactive path cannot be exercised in production yet - there is one
+available date, so the label stays a label until tomorrow's run. It was driven
+instead in a real browser at 390 CSS px against a three-date local fixture:
+options render newest first with "(latest)" on the newest, selecting a date
+swaps the raster source to that run, the selection sticks, and turning snow off
+before a swap leaves it off after.
+
+`npm run check-mobile-layout` gained an AS-OF date check - clear of the search
+bar, on screen, and at least 32px tall while interactive. The pill grew from 26
+to 32px to be thumb-sized; 32 rather than the usual 44 is what it can be
+without crowding the search bar above it, and the guard exists to catch it
+silently collapsing back to label size while still being a picker. 90 frontend
+tests (up from 76), 174 pipeline tests, build clean.
+
+**Still open:** the local preview now wants `dates.json` and `asof-*.json`
+under `app/public/snow/` beside the `latest.json` that was already ignored;
+both are gitignored the same way. There is no committed fixture for them, so
+the interactive path has no automated regression test - only the validator
+does.
+
 ## 2026-09-11 - Handset check passes; three sequencing choices recorded
 
 **The mobile pass (former plan item 1) is closed.** The owner verified the UI

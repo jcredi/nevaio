@@ -60,28 +60,41 @@ function buildLegend(): HTMLElement {
   return legend;
 }
 
-function formatProductDate(iso: string): string {
-  const date = new Date(`${iso}T00:00:00Z`);
-  return Number.isNaN(date.valueOf())
-    ? iso
-    : date.toLocaleDateString("en-GB", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-        timeZone: "UTC",
-      });
-}
-
-/** Compact snow layer control, kept beside the map rather than above it. */
+/**
+ * Compact snow layer control, kept beside the map rather than above it.
+ *
+ * The AS-OF date is not rendered here - it lives in `SnowDateControl`, under
+ * the search bar, because selecting a historical date replaces the overlay and
+ * the date display has to outlive that swap.
+ */
 export class SnowControl implements IControl {
   private container!: HTMLElement;
-  private dateControl: HTMLElement | null = null;
 
-  constructor(private readonly overlay: SnowOverlay | null) {}
+  constructor(private overlay: SnowOverlay | null) {}
+
+  /**
+   * Point the control at a different overlay, or at none.
+   *
+   * Selecting a historical date builds a new overlay object, so the toggle has
+   * to be rebound or it would keep driving a layer that is no longer on the
+   * map. Rendered from scratch rather than patched: there are only two shapes,
+   * and reconciling them by hand is how a control ends up claiming a layer
+   * exists when it does not.
+   */
+  setOverlay(overlay: SnowOverlay | null): void {
+    this.overlay = overlay;
+    if (this.container) this.render();
+  }
 
   onAdd(): HTMLElement {
     this.container = document.createElement("div");
     this.container.className = "maplibregl-ctrl snow-ctrl";
+    this.render();
+    return this.container;
+  }
+
+  private render(): void {
+    this.container.replaceChildren();
 
     // No published snapshot loaded, or it failed validation. Say so and stop:
     // no toggle for a layer that isn't there, and no legend explaining an
@@ -96,7 +109,7 @@ export class SnowControl implements IControl {
         "No snow data is being shown.";
 
       this.container.append(warning);
-      return this.container;
+      return;
     }
 
     // Bound to a local so the narrowing above survives into the change
@@ -124,15 +137,6 @@ export class SnowControl implements IControl {
 
     toggle.append(checkbox, switchTrack, label);
 
-    // Keep the AS-OF date in its future-picker position under search, but do
-    // not imitate a date picker until the historical archive exists.
-    const date = document.createElement("span");
-    date.className = "snow-date";
-    date.textContent = formatProductDate(overlay.date);
-    date.title = overlay.title;
-    document.body.append(date);
-    this.dateControl = date;
-
     const legend = buildLegend();
     legend.hidden = true;
 
@@ -148,12 +152,9 @@ export class SnowControl implements IControl {
     });
 
     this.container.append(toggle, info, legend);
-    return this.container;
   }
 
   onRemove(): void {
     this.container.remove();
-    this.dateControl?.remove();
-    this.dateControl = null;
   }
 }

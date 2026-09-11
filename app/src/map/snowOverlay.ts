@@ -92,6 +92,12 @@ function addTilePreview(
   });
 }
 
+/** Take the snow layer and its source off the map, if they are there. */
+export function removeSnowOverlay(map: Map): void {
+  if (map.getLayer(LAYER_ID)) map.removeLayer(LAYER_ID);
+  if (map.getSource(SOURCE_ID)) map.removeSource(SOURCE_ID);
+}
+
 /**
  * Load the published XYZ snapshot, or return null if there isn't a usable one.
  *
@@ -100,11 +106,18 @@ function addTilePreview(
  * be read as today's conditions - a real hazard for the mountaineering
  * decisions this app is meant to support (spec section 5.4). Saying nothing is
  * the honest answer, and the caller renders that state explicitly.
+ *
+ * Any existing overlay comes off *before* the new manifest is fetched, so
+ * selecting a historical date can never leave the previous date's raster on
+ * screen under the new date's label. A failed swap therefore shows no snow at
+ * all, which is the honest outcome and the one the same section 5.4 argument
+ * demands: the wrong date is as misleading here as the wrong age.
  */
 export async function addSnowOverlay(
   map: Map,
   manifestUrl: string,
 ): Promise<SnowOverlay | null> {
+  removeSnowOverlay(map);
   try {
     const { manifest, tileUrls } = await loadTileManifest(manifestUrl);
     return addTilePreview(map, manifest, tileUrls);

@@ -5,14 +5,17 @@ import {
   snowManifestUrl,
   styleUrl,
 } from "./map/config";
+import { loadDateCatalogue } from "./map/dateCatalogue";
+import type { CatalogueEntry } from "./map/dateCatalogueSchema";
 import { metersPerPixel } from "./map/scale";
 import { SelectionHighlight } from "./map/selectionHighlight";
-import { addSnowOverlay } from "./map/snowOverlay";
+import { addSnowOverlay, type SnowOverlay } from "./map/snowOverlay";
 import { ObjectIndexStore } from "./objects/objectIndex";
 import type { Bounds } from "./objects/objectIndexSchema";
 import { SELECTION_MAX_METERS_PER_PIXEL, resolveSelection } from "./objects/selection";
 import { ObjectPanel, type IndexStatus } from "./ui/objectPanel";
 import { SnowControl } from "./ui/snowControl";
+import { SnowDateControl } from "./ui/snowDateControl";
 import { createSearchBar } from "./ui/searchBar";
 import "./style.css";
 
@@ -74,12 +77,43 @@ objectIndex
     console.error("Object index failed to load", error);
   });
 
+// The snow layer and the AS-OF date that selects it (spec section 5.3). The
+// overlay is replaced wholesale when a historical date is chosen, so both
+// controls are held here and re-pointed rather than rebuilt.
+let snowOverlay: SnowOverlay | null = null;
+const snowControl = new SnowControl(null);
+const snowDate = new SnowDateControl((entry) => void selectDate(entry));
+document.body.append(snowDate.element);
+
+async function showManifest(manifestUrl: string): Promise<void> {
+  // Carry the user's own toggle across a date change: someone who turned the
+  // snow layer off did not ask for it back by looking at another date.
+  const visible = snowOverlay?.isVisible() ?? true;
+  // Null means there is no usable snapshot at this URL; the controls say so
+  // rather than the app going quiet about it.
+  snowOverlay = await addSnowOverlay(map, manifestUrl);
+  snowOverlay?.setVisible(visible);
+  snowControl.setOverlay(snowOverlay);
+  snowDate.setCurrent(snowOverlay?.date ?? null, snowOverlay?.title ?? "");
+}
+
+async function selectDate(entry: CatalogueEntry): Promise<void> {
+  snowDate.setLoading();
+  await showManifest(entry.manifestUrl);
+}
+
 map.on("load", async () => {
   try {
-    // Null means there is no usable published snapshot; the control says so
-    // rather than the app going quiet about it.
-    const overlay = await addSnowOverlay(map, snowManifestUrl);
-    map.addControl(new SnowControl(overlay), "bottom-left");
+    // Always opens on latest.json. It is the build-time trust anchor, it is
+    // the only object guaranteed to exist, and the catalogue is resolved
+    // relative to it - so the map is never waiting on the catalogue to draw.
+    await showManifest(snowManifestUrl);
+    map.addControl(snowControl, "bottom-left");
+
+    // A missing or rejected catalogue simply means no historical dates are on
+    // offer: the display stays the non-interactive label it has always been.
+    const catalogue = await loadDateCatalogue(snowManifestUrl, window.location.href);
+    if (catalogue) snowDate.setCatalogue(catalogue.dates);
   } catch (error) {
     // A missing overlay shouldn't take the basemap down with it.
     console.error("Snow overlay failed to load", error);

@@ -42,7 +42,48 @@ handset on 2026-09-11. Next work is the OSM object panel and A-to-B routing.
    - **Precompute the per-object GFSC time series**, keyed on the same stable
      OSM ids, by batch-sampling the rasters the daily pipeline already
      downloads and backfilling from Copernicus's multi-year archive. No new
-     running server.
+     running server. Shape, from measurements taken 2026-09-11:
+     - **Do the daily increment first; it is nearly free.** `build_preview`
+       already holds every window product's GF/GF-QA/AT arrays in RAM per
+       tile, so sampling is one numpy fancy-index - 0.03 ms for a tile's
+       7,878 points, ~2 s for the whole run. Take the pixel index from the
+       product's own affine transform, never from `footprint.parse_mgrs_tile`:
+       the real granule origin is offset by up to 40 m from the 100 km grid
+       (measured, and the offset differs per tile), so a footprint-derived
+       index is off by a column for two thirds of objects. Footprint still
+       owns *which* tile covers a point.
+     - **Backfill chunk = one calendar month, all tiles**, as a separate
+       `workflow_dispatch` matrix: ~1,740 tile-dates and ~2.3 GB per chunk,
+       far inside a 6-hour job, and at most 31 product dates per tile so
+       `select_window_products` is reused unchanged. 12 chunks per year of
+       history; the Free plan allows 20 concurrent jobs and 256 matrix jobs
+       per run, and Actions is unmetered on a public repo. Resume by HEADing
+       each month shard's public R2 URL, so a failed chunk costs one chunk
+       and no state lives between runs. Sampling needs the raster stack, so
+       chunks hand artifacts to a publish job exactly as the daily workflow
+       does - the publisher stays boto3-only.
+     - **Artifact `series/<TILE>/<YYYY-MM>.bin`**: object-major, fixed 2-byte
+       cell (GF byte, then GF-QA in 2 bits and AT age in 4 - real ages were
+       0-6 days and spec 7.1 caps validity at 14), one column per calendar
+       day. One object's month is then a 62-byte HTTP Range read, so the
+       frontend needs no per-object objects in R2; ~155 MB per year of
+       history for all 211,855 objects. Row order must be a permanent
+       per-tile slot map published beside the index, not the index shard's
+       order, or the next OSM refresh invalidates every offset.
+     - **Depth: two years first** - that satisfies every spec 7.1 preset
+       including the previous-year comparison - then extend backwards a month
+       at a time. HR-WSI reaches back to September 2016 (~1.3 MB per
+       tile-date, 27 GB per year of downloads).
+     - Two assumptions still unverified and cheap to check before building:
+       GitHub-runner throughput to CloudFerro (read one render run's step
+       timings), and whether the bucket's CORS policy passes a browser Range
+       request (`ExposeHeaders` is `ETag` only today).
+     - Not worth doing, each measured and rejected: HTTP range reads inside
+       the source products (they *are* COGs, but 1024 px blocks over 1830 px
+       is four blocks and a layer is only ~200 KB, so a whole-file GET wins);
+       deduplicating co-located objects (208,993 distinct pixels for 211,855
+       objects - 1.4%); sampling every granule covering an object instead of
+       its home shard's (+26% points sampled for +0.3 pp of valid marks).
    - **Then the chart itself** (spec section 7.1), including its honest
      treatment of cloud/no-data/stale gaps. The panel currently shows a
      labelled placeholder, on purpose.
@@ -58,31 +99,16 @@ handset on 2026-09-11. Next work is the OSM object panel and A-to-B routing.
    - Anything needing to know where Nevaio shows snow must ask
      `nevaio_pipeline.footprint`, not re-derive it.
 
-2. **The date picker for historical AS-OF dates (spec section 5.3).** The
-   storage half shipped on 2026-09-11 - see `worklog.md` for the schema and
-   the retention argument. R2 now carries `dates.json` (the authoritative
-   catalogue, newest first, `{asOfDate, runId, manifest}` per entry) and one
-   `asof-<date>-<runId>.json` manifest per available date, latest plus 30
-   preceding. What remains is the frontend: fetch and validate `dates.json` at
-   startup with a runtime validator alongside `manifestSchema.ts`, resolve
-   each entry's relative `manifest` key against the catalogue's own URL, and
-   let the compact control select one. An archived date manifest is
-   `latest.json`-shaped and lives in the same directory, so
-   `validateTileManifest` accepts it unchanged - keep it that way. A date
-   absent from the catalogue is unavailable: no falling back to latest, to a
-   nearby date, or to anything recomposed in the browser. No CSP change is
-   needed; the new objects are on the R2 origin `_headers` already allows.
-   The latest-date text stays non-interactive until the picker lands.
-3. **A-to-B routing + snow/elevation profile (spec section 8).** Needs a hosted
+2. **A-to-B routing + snow/elevation profile (spec section 8).** Needs a hosted
    routing provider chosen (spec section 15 item 6). **Decided 2026-09-11: the
    choice is made from a costed shortlist rather than cold** - a written
    options/pros-cons/recommendation pass covering the routing provider and the
    elevation/DEM source (section 15 item 7) comes first, then the owner picks.
-   That research is queued and does not block items 1-2. Firm requirement, stronger
+   That research is queued and does not block item 1. Firm requirement, stronger
    than sections 8.4-8.5 currently read: observation freshness and quality must
    be shown clearly and prominently on the route profile, not "where
    practical". Spec section 15 item 11.
-4. **Repository structure refactor, stage 3 onward**
+3. **Repository structure refactor, stage 3 onward**
    ([`../REFACTOR.md`](../REFACTOR.md)). Stages 1 (dissolve `recon/`) and 2
    (package the pipeline) are done - 2026-09-09. Sequencing decided that day
    and worth not re-deriving: stage 3 regroups the frontend into feature

@@ -50,3 +50,5 @@ Thumbs.db
 # editor
 .vscode/
 .idea/
+app/public/snow/dates.json
+app/public/snow/asof-*.json
