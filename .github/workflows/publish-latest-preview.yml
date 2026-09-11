@@ -152,22 +152,40 @@ jobs:
             args+=(--max-missing-tiles "${MAX_MISSING_TILES}")
           fi
           python -m nevaio_pipeline.publish "${args[@]}"
-      - name: Verify public pointer matches this publication
+      # Reads only public URLs and the receipt this job already wrote; no
+      # credentials, no new dependency. It also fetches the date catalogue,
+      # because that object is what decides which historical dates the app
+      # offers - an unvalidated or stale catalogue is a silent outage.
+      - name: Verify public pointer and date catalogue match this publication
         env:
           R2_PUBLIC_BASE_URL: ${{ vars.R2_PUBLIC_BASE_URL }}
         run: |
           curl --fail --show-error --retry 5 --max-time 60 \
             --output "${RUNNER_TEMP}/published-latest.json" \
             "${R2_PUBLIC_BASE_URL%/}/latest.json"
+          curl --fail --show-error --retry 5 --max-time 60 \
+            --output "${RUNNER_TEMP}/published-dates.json" \
+            "${R2_PUBLIC_BASE_URL%/}/dates.json"
           python - <<'PY'
           import json, os
           from pathlib import Path
+          from nevaio_pipeline.artifact_validation import validate_date_catalogue
+          from nevaio_pipeline.catalogue import date_manifest_key
           temp = Path(os.environ["RUNNER_TEMP"])
           actual = json.loads((temp / "published-latest.json").read_text())
           expected = json.loads((temp / "publication-receipt.json").read_text())
           if actual != expected:
               raise SystemExit("Public pointer does not match this publication")
-          print(f"Verified run {expected['runId']}")
+          catalogue = validate_date_catalogue((temp / "published-dates.json").read_bytes())
+          published = {
+              "asOfDate": expected["asOfDate"],
+              "runId": expected["runId"],
+              "manifest": date_manifest_key(expected["asOfDate"], expected["runId"]),
+          }
+          if published not in catalogue["dates"]:
+              raise SystemExit("Date catalogue does not advertise this publication")
+          print(f"Verified run {expected['runId']}: "
+                f"{len(catalogue['dates'])} AS-OF dates available")
           PY
       - name: Preserve publication metadata
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -175,6 +193,7 @@ jobs:
           name: latest-gfsc-preview-metadata
           path: |
             ${{ runner.temp }}/published-latest.json
+            ${{ runner.temp }}/published-dates.json
             ${{ runner.temp }}/publication-receipt.json
           if-no-files-found: error
           retention-days: 7
