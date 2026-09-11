@@ -138,3 +138,12 @@ Use an explicit, sufficiently large scratch location instead of `/tmp` if the
 machine's temporary volume is small: a full-area window run downloads roughly
 1 GB of GeoTIFFs. Never commit them. Omit `--keep-runs` to leave every existing
 run in place; it is the only flag here that deletes anything.
+
+Any publication - local included - also writes that date's own manifest
+(`asof-<date>-<runId>.json`) and rewrites the public date catalogue
+(`dates.json`), which is authoritative about which historical AS-OF dates the
+app will offer. A local run against the production bucket therefore changes
+what the deployed picker lists, not just `latest.json`. See
+[`../pipeline/README.md`](../pipeline/README.md) for the objects and the
+retention rules; a full 31-date archive is roughly 4.0 GB of the 10 GB free
+allowance.

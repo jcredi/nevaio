@@ -22,6 +22,14 @@ restricted to the `main` branch. There are no repository-level copies - that is
 deliberate, because a repository secret can be read by a workflow on any
 branch, which would defeat the environment restriction.
 
+The publisher's dependency surface is still exactly boto3. The AS-OF date
+archive added `nevaio_pipeline/catalogue.py`, which imports only the standard
+library and `config.py`, and its catalogue validator lives in the existing
+stdlib-only `artifact_validation.py`. The publish job's one workflow change is
+inside the already credential-free verification step, which now also fetches
+and validates `dates.json`; no new step, secret, environment reference,
+action, or package.
+
 Inputs are bounded and type-restricted: GFSC layers open as GTiff only, are
 validated for shape, resolution, CRS and origin before any array is allocated,
 and per-object and per-run size ceilings apply. See "Input boundaries" in
@@ -53,6 +61,19 @@ no snow layer at all and the control says "Snow data unavailable". The archived
 sample that used to fill that gap was removed on 2026-09-09: a months-old
 raster that reads as current conditions is a hazard, not a graceful
 degradation.
+
+The AS-OF date archive (2026-09-11) was shaped around that rule rather than
+against it. Each archived date's manifest is published at the bucket root as
+`asof-<date>-<runId>.json`, in the same directory as `latest.json`, precisely
+so an archived date validates through the unchanged `validateTileManifest`
+path; a `dates/` prefix would have moved the manifest's directory and forced
+that validator open. The catalogue `dates.json` names each manifest by a
+*relative* key, to be resolved against the catalogue's own URL, so a poisoned
+catalogue cannot send the browser to another host - the frontend validator
+that consumes it must enforce that, not merely assume it. Both objects are on
+the R2 origin `app/public/_headers` already allows, so the archive needed no
+CSP change. The same "unavailable, never substituted" rule applies per date:
+a date absent from the catalogue must show nothing, not the latest map.
 
 Geocoder responses are treated as untrusted: a feature whose centre is missing
 or not a finite, real coordinate is discarded rather than passed to the map.
@@ -96,7 +117,7 @@ Recorded so they are not "fixed" by someone acting in good faith:
 ```sh
 cd app && npm test                                   # 33 frontend cases
 PYTHONPATH=pipeline/src pipeline/.venv/bin/python \
-  -m unittest discover -s pipeline/tests -t pipeline            # 83 cases
+  -m unittest discover -s pipeline/tests -t pipeline           # 139 cases
 cd app && npm audit --package-lock-only --ignore-scripts
 ```
 

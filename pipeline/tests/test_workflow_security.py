@@ -68,6 +68,18 @@ class WorkflowSecurityTests(unittest.TestCase):
             self.assertNotIn("working-directory", step)
             self.assertNotRegex(step.get("run", ""), r"(?:cd|source|bash|python)\s+[^\n]*rendered-runs")
 
+    def test_publication_is_verified_against_public_objects_without_secrets(self):
+        publish = self.workflow["jobs"]["publish"]["steps"]
+        verify = next(s for s in publish if s["name"].startswith("Verify public pointer"))
+        # Both public contracts are checked, and the catalogue through the
+        # same validator the frontend's contract is written against.
+        self.assertIn("/latest.json", verify["run"])
+        self.assertIn("/dates.json", verify["run"])
+        self.assertIn("validate_date_catalogue", verify["run"])
+        # Reading public URLs needs no credentials, and must not acquire any.
+        self.assertNotIn("secrets.", str(verify))
+        self.assertEqual(set(verify["env"]), {"R2_PUBLIC_BASE_URL"})
+
     def test_publisher_lock_excludes_render_stack_and_every_entry_has_hashes(self):
         root = Path(__file__).resolve().parents[1]
         for name in ("requirements.txt", "requirements-publish.txt"):
