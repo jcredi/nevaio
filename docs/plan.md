@@ -39,15 +39,14 @@ routing.
    make a small, testable selection prototype. The MapTiler style supplies
    visual context only: use a Nevaio-owned static OSM object index with stable
    IDs as the click/history contract, published to R2 beside the precomputed
-   time series. The local regional-extract filter is fixture-validated and
-   date-matched Alps/Italy extracts are acquired and the first full build is
-   valid, but its 244,011-record/45 MB result is too broad to ship as one
-   browser download. Next, derive the exact snow/MGRS footprint and spatially
-   shard or filter the static index to that scope; only then batch-sample the
-   rasters the daily pipeline already downloads and backfill from Copernicus's
-   multi-year archive - no new running server. Do not use a full-area query
-   against a shared public Overpass instance. See `worklog.md` (2026-09-06,
-   2026-09-10, 2026-09-11).
+   time series. That index is built, scoped to the snow footprint and sharded
+   by MGRS tile: 211,865 objects, an 11 KB index of shards plus 54 payloads,
+   largest 278 KiB gzipped. Next, batch-sample the rasters the daily pipeline
+   already downloads and backfill from Copernicus's multi-year archive - no new
+   running server - and publish the shard set to R2. Do not use a full-area
+   query against a shared public Overpass instance. Anything needing to know
+   where Nevaio shows snow must ask `nevaio_pipeline.footprint`, not re-derive
+   it. See `worklog.md` (2026-09-06, 2026-09-10, 2026-09-11).
 3. **30-day historical AS-OF map dates (spec section 5.3).** Publish a bounded
    R2 catalogue of available dates plus each date's immutable manifest/tiles,
    and raise retention from the current seven rollback runs to cover the latest

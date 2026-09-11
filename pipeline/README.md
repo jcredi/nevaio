@@ -33,13 +33,20 @@ which is the useful control when a published run looks wrong.
 
 The future object panel and historical chart use Nevaio's own static OSM index,
 not MapTiler's rendered feature properties. The pure
-`nevaio_pipeline.object_index` core currently accepts a **normalized** local
-GeoJSON FeatureCollection and writes deterministic `schemaVersion: 1` JSON:
+`nevaio_pipeline.object_index` core accepts a **normalized** local GeoJSON
+FeatureCollection and writes deterministic `schemaVersion: 1` JSON, in two
+forms:
 
 ```sh
+# One readable file - local inspection, not shippable (39 MB).
 PYTHONPATH=pipeline/src pipeline/.venv/bin/python -m nevaio_pipeline.object_index \
   --input /path/to/normalized-osm-objects.geojson \
   --output /path/to/object-index.json
+
+# The publishable form: object-index.json plus objects/<TILE>.json.
+PYTHONPATH=pipeline/src pipeline/.venv/bin/python -m nevaio_pipeline.object_index \
+  --input /path/to/normalized-osm-objects.geojson \
+  --output-dir /path/to/index/
 ```
 
 Every input feature must be a Point with `properties.osmType` (`node`, `way`,
@@ -49,6 +56,49 @@ parking, and city/town/village/hamlet settlements. It rejects malformed
 eligible records and duplicate OSM identities; it deliberately does **not**
 download OSM data, publish to R2, or sample snow yet. Those are the next
 adapters, not implicit side effects of a local format conversion.
+
+### Snow footprint
+
+Both forms keep only objects inside Nevaio's snow footprint. An object outside
+it would be a selectable target whose every answer is "no data", and the
+regional OSM extracts are much wider than the area the app shows snow for.
+
+`footprint.py` is the one definition of that area, derived from
+`config.MVP_MGRS_TILES`: it decodes an MGRS tile id into the 109.8 km granule
+it names (north-west corner on the lettered 100 km square's north-west corner)
+and answers whether a WGS84 point is inside the union of them, in each
+granule's own UTM zone rather than in a longitude/latitude box that would be
+wrong by kilometres at the corners. `raster_io.py` takes its tile-to-EPSG rule
+from the same module. Anything else that needs to ask "is this inside Nevaio?"
+must ask it too - a second outline would drift.
+
+It is pure standard library, deliberately: the MGRS set exists precisely so
+production carries no spatial-library stack. The transverse Mercator is the
+Kruger series, pinned in `tests/test_footprint.py` against PROJ reference
+values it matches to nanometres - four orders of magnitude finer than the 60 m
+pixels the footprint is made of.
+
+### Shards
+
+Scoped to the footprint the index is still 211,865 objects and 39 MB, so the
+publishable artifact is split by MGRS tile:
+
+- `object-index.json` - the index of shards. Per shard: `tile`, `path`,
+  `objectCount`, `bounds` (`[west, south, east, north]` around the objects it
+  actually holds), `bytes` and `sha256` of the payload.
+- `objects/<TILE>.json` - that tile's objects, in the same record shape as the
+  single-file build.
+
+Granules overlap by 9.8 km, so an object can be inside several; it is filed
+under the first covering tile in sorted order. Every object is therefore in
+exactly one shard and a consumer never de-duplicates. A consumer picks shards
+by intersecting its viewport with each shard's `bounds` - no MGRS arithmetic in
+the browser, and no second definition of the footprint to drift from this one.
+A tile with no eligible object gets no shard.
+
+Shard payloads are compact JSON (no indentation); the single-file build keeps
+its readable formatting because it is for reading. Neither carries a timestamp
+or provider metadata, so identical input gives byte-identical output.
 
 ### Regional extract adapter
 
@@ -61,9 +111,11 @@ pipeline job yet and has no network or R2 side effect:
 
 ```sh
 pipeline/tools/build_osm_object_index.sh \
-  --output /tmp/nevaio-object-index.json \
+  --output-dir /tmp/nevaio-object-index/ \
   /path/to/region-a.osm.pbf /path/to/region-b.osm.pbf
 ```
+
+`--output FILE.json` builds the single readable file instead.
 
 Use extracts made from the same OSM snapshot where they overlap. Identical
 overlap is deduplicated; conflicting duplicate IDs fail, which prevents a

@@ -1,5 +1,97 @@
 # Working session log
 
+## 2026-09-11 - Scope and shard the OSM object index
+
+The 244,011-record / 45 MB index was unshippable because the Geofabrik Alps
+and Italy extracts are far wider than the area Nevaio actually shows snow for.
+That area was, until now, only implicit: `config.MVP_MGRS_TILES` listed 58 MGRS
+squares and nothing could ask them a geographic question, and `raster_io` was
+the only code that decoded a tile id at all (its first two characters, into a
+UTM EPSG code).
+
+`pipeline/src/nevaio_pipeline/footprint.py` is now the single definition. It
+decodes a tile id into the 109.8 km granule it names - north-west corner on the
+lettered 100 km square's north-west corner, so the granule reaches 9.8 km east
+and south beyond it - and answers whether a WGS84 point is inside the union of
+the 58. Containment is tested in each granule's own UTM zone, because a
+longitude/latitude box around a UTM square is wrong by kilometres at the
+corners and because granules genuinely overlap across the 31/32 and 32/33 zone
+seams (Mont Blanc is in both 31TGL and 32TLR; Rome in both 32TQM and 33TTG).
+`raster_io` now takes its tile-to-EPSG rule from the same module.
+
+It is pure standard library, which was the point: the MGRS set was resolved
+once against Copernicus's own reference precisely so production carries no
+spatial-library stack, and a footprint test that pulled one in would hand that
+saving straight back. The transverse Mercator is the Kruger series to n^6,
+pinned in the tests against PROJ reference values it reproduces to nanometres -
+four orders of magnitude finer than the 60 m pixels the footprint is made of.
+The one thing that needed care was the MGRS row lettering: even zones shift by
+five letters, the letters repeat every 2000 km, and the latitude band is what
+resolves which repetition is meant.
+
+**Measured, on the real date-matched extracts.** Filtering cut 244,011 records
+/ 47,165,813 bytes to **211,865 records / 40,920,601 bytes** (SHA-256
+`bfd1e43e73b9d4c78db0e4431feed4795eb96f12c567bf1071bd927149cfe379`):
+95,835 settlements (was 110,729), 63,843 peaks (71,581), 25,169 parking
+(31,458), 14,620 saddles (15,585), 6,256 huts (6,501), 6,142 shelters (8,157).
+A full rebuild straight from the two PBFs is byte-identical to filtering the
+earlier unfiltered index, so the two paths agree exactly.
+
+Only 13% went. That is the honest answer and it settles the question the plan
+left open: the extracts were never the main problem. Geofabrik's Alps and Italy
+are already close to the Alpine arc and the Apennine spine; what the footprint
+removes is Sicily, Sardinia, Puglia, the Bavarian and Provencal margins and the
+Po plain gap - real, but not an order of magnitude. **39 MB is not a single
+browser download.** The stated threshold: a startup payload for the
+mobile-first app in spec section 10 should be under about 1 MB compressed and a
+few MB parsed. This is 5.4 MB gzipped and would land ~211,000 objects in a
+phone's JS heap. Six times over on the wire, far worse in memory.
+
+So the publishable artifact is sharded, as the plan anticipated. The split key
+is the MGRS tile, because the footprint already speaks in tiles and inventing a
+second grid would give one dataset two spatial vocabularies. An object inside
+several overlapping granules is filed under the first in sorted order, so every
+object is in exactly one shard and no consumer de-duplicates. Result: an
+11,437-byte `object-index.json` plus 54 `objects/<TILE>.json` payloads
+(four MVP tiles hold no named approved object and get no shard) - largest
+1,461,755 bytes / 278 KiB gzipped (31TGL, 10,662 objects), median 4,244
+objects, smallest 103. A viewport touches a handful.
+
+Each index entry carries the bounds of the objects its shard actually holds,
+not its granule's bounds, plus the payload's byte count and SHA-256. A consumer
+therefore picks shards by intersecting its viewport with plain numbers: no MGRS
+arithmetic in the browser, and no second definition of the footprint to drift
+from this one. The digests are of the bytes themselves, so the artifact set is
+still a pure function of its input - no timestamp, no provider metadata,
+byte-identical output for identical input.
+
+Shard payloads are compact JSON; the single-file `--output` build keeps its
+readable indentation because its only job is being read. 127 tests pass (was
+97), including a granule edge one metre inside and one metre outside, the real
+uncovered gap where the MVP set has no 32TQQ, both UTM-zone seams, and the
+antimeridian longitude wrap that the zone arithmetic has to get right even
+though nothing Nevaio ships is there.
+
+**Rejected.** A spatial library (Shapely/pyproj/GDAL) to answer containment: it
+would undo the reason `MVP_MGRS_TILES` was resolved by hand in the first place,
+and the maths needed here is fully specified in a page of arithmetic. A
+longitude/latitude bounding box per tile, or one box for the whole footprint:
+cheap, but wrong by kilometres at granule corners and unable to represent the
+Po plain gap at all. Sharding on a fresh 1-degree grid instead of the MGRS
+tiles: simpler client arithmetic, but a second spatial vocabulary for one
+dataset, and the shard `bounds` make the client arithmetic identical anyway.
+Duplicating an object into every granule that covers it: it would inflate the
+set by the 9.8 km overlaps and force de-duplication on every consumer. Dropping
+or generalising classes (settlements are 45% of the records) to get under a
+single-file budget: that is a product decision about what is selectable, not a
+size problem, and spec section 15 item 3 already settled the class list.
+
+**Still open.** Nothing samples snow for these objects yet, nothing publishes
+them to R2, and no frontend consumes them. The shard `bounds`/`sha256` contract
+is written but has no reader, so it is provisional until the panel exists. The
+index is also not yet a pipeline job: the build is still the local
+`pipeline/tools/build_osm_object_index.sh`, run by hand against local extracts.
+
 ## 2026-09-10 - Compact snow control and committed 30-day AS-OF archive
 
 The owner confirmed the handset search fix, then redirected the snow UI around
