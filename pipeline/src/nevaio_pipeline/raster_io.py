@@ -20,6 +20,7 @@ from numpy.typing import NDArray
 
 from .asof import DailyProduct
 from .config import GFSC_PIXEL_METRES, GFSC_TILE_PIXELS, MAX_LAYER_BYTES
+from .footprint import utm_epsg
 
 _LAYER_PATTERN = re.compile(
     r"^(?P<product>CLMS_WSI_GFSC_060m_T(?P<tile>\d{2}[A-Z0-9]{3})_"
@@ -30,11 +31,9 @@ _REQUIRED_LAYERS = frozenset({"GF", "GF-QA", "AT"})
 _EXPECTED_DTYPE = {"GF": "uint8", "GF-QA": "uint8", "AT": "uint32"}
 _EXPECTED_NODATA = {"GF": 255, "GF-QA": 255, "AT": 0}
 
-# GFSC is published in northern UTM zones, whose EPSG codes are 32600 + zone.
-# The zone is the first two characters of the MGRS tile, so a product's own
-# name states which CRS it must be in - a raster claiming a different zone is
-# not the tile it is filed under.
-_UTM_NORTH_EPSG_BASE = 32600
+# A product's own MGRS tile name states which CRS it must be in - a raster
+# claiming a different zone is not the tile it is filed under. The mapping
+# lives in `footprint`, which is the module that owns what a tile id means.
 
 # Widest plausible extent of a northern UTM coordinate, used only to reject
 # nonsense georeferencing before any array is allocated.
@@ -229,7 +228,7 @@ def _read_layer(
                 raise ValueError(f"{layer} raster must have one band: {path}")
             if dataset.crs is None:
                 raise ValueError(f"{layer} raster has no CRS: {path}")
-            expected_epsg = _UTM_NORTH_EPSG_BASE + int(tile[:2])
+            expected_epsg = utm_epsg(tile)
             if dataset.crs.to_epsg() != expected_epsg:
                 raise ValueError(
                     f"{layer} raster is in {dataset.crs.to_string()}, expected "
