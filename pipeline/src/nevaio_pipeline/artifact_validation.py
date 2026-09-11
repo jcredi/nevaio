@@ -11,12 +11,21 @@ import stat
 import struct
 import zlib
 
-from .config import ASOF_WINDOW_DAYS, MVP_MGRS_TILES, PREVIEW_MIN_ZOOM, PREVIEW_MAX_ZOOM
+from .catalogue import CATALOGUE_KIND, CATALOGUE_SCHEMA_VERSION, date_manifest_key
+from .config import (
+    ASOF_CATALOGUE_DATES, ASOF_WINDOW_DAYS, MVP_MGRS_TILES,
+    PREVIEW_MIN_ZOOM, PREVIEW_MAX_ZOOM,
+)
 
 MAX_FILES = 50_000
 MAX_TOTAL_BYTES = 2 * 1024**3
 MAX_PNG_BYTES = 1024**2
 MAX_METADATA_BYTES = 64 * 1024
+# A full window is 31 entries of about 90 bytes; this is several times that,
+# and small enough that a corrupted object cannot become a parsing problem.
+MAX_CATALOGUE_BYTES = 16 * 1024
+CATALOGUE_FIELDS = frozenset(("schemaVersion", "kind", "generatedAt", "maxDates", "dates"))
+CATALOGUE_ENTRY_FIELDS = frozenset(("asOfDate", "runId", "manifest"))
 RUN_PATTERN = re.compile(r"\d{8}T\d{6}Z")
 TILE_PATTERN = re.compile(r"tiles/(\d{1,2})/(\d{1,5})/(\d{1,5})\.png")
 FIELDS = frozenset((
@@ -206,3 +215,55 @@ def validate_artifact(runs_dir: Path, *, tiles: list[str] | None = None,
     if as_of:
         _require(metadata["asOfDate"] == _iso_date(as_of).isoformat(), "unexpected AS-OF date")
     return run_dir, metadata
+
+
+def validate_date_catalogue(document: bytes | str) -> dict:
+    """Validate the public AS-OF date catalogue, as the browser will.
+
+    The catalogue is the authority on which historical dates exist (spec
+    section 5.3), so it is a public contract in the same sense `latest.json`
+    is, and it gets the same treatment: exact field sets, no duplicate keys,
+    bounded size, and every derivable value re-derived rather than trusted.
+    The publisher runs this over its own bytes before the PUT, so a bug here
+    fails the run instead of advertising a date the frontend will reject.
+    """
+    raw = document.encode() if isinstance(document, str) else document
+    _require(isinstance(raw, bytes), "catalogue must be bytes or text")
+    _require(0 < len(raw) <= MAX_CATALOGUE_BYTES, "catalogue size outside limits")
+    d = json.loads(raw.decode(), object_pairs_hook=_unique_object)
+    _require(type(d) is dict and d.keys() == CATALOGUE_FIELDS, "unexpected catalogue fields")
+    _require(type(d["schemaVersion"]) is int and d["schemaVersion"] == CATALOGUE_SCHEMA_VERSION,
+             "invalid catalogue schemaVersion")
+    _require(d["kind"] == CATALOGUE_KIND, "unexpected catalogue kind")
+    _require(isinstance(d["generatedAt"], str), "catalogue generatedAt must be a string")
+    generated = datetime.fromisoformat(d["generatedAt"])
+    _require(generated.utcoffset() is not None and generated.utcoffset().total_seconds() == 0,
+             "catalogue generatedAt must be UTC")
+    _require(type(d["maxDates"]) is int and d["maxDates"] == ASOF_CATALOGUE_DATES,
+             "invalid catalogue maxDates")
+
+    entries = d["dates"]
+    _require(type(entries) is list, "catalogue dates must be a list")
+    # Empty is legal and meaningful: it says nothing is available, which the
+    # frontend must honour rather than fall back to the latest map.
+    _require(len(entries) <= d["maxDates"], "catalogue advertises more dates than its window")
+    dates: list[date] = []
+    run_ids: list[str] = []
+    for entry in entries:
+        _require(type(entry) is dict and entry.keys() == CATALOGUE_ENTRY_FIELDS,
+                 "unexpected catalogue entry fields")
+        as_of = _iso_date(entry["asOfDate"])
+        run_id = entry["runId"]
+        _require(isinstance(run_id, str) and RUN_PATTERN.fullmatch(run_id) is not None,
+                 "invalid catalogue run ID")
+        _require(entry["manifest"] == date_manifest_key(entry["asOfDate"], run_id),
+                 "catalogue manifest key does not match its date and run")
+        dates.append(as_of)
+        run_ids.append(run_id)
+    _require(all(later > earlier for later, earlier in zip(dates, dates[1:])),
+             "catalogue dates must be unique and newest first")
+    _require(len(set(run_ids)) == len(run_ids), "a run may back only one catalogue date")
+    if dates:
+        _require((dates[0] - dates[-1]).days < d["maxDates"],
+                 "catalogue spans more than its retention window")
+    return d
