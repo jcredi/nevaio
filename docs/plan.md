@@ -14,48 +14,17 @@ Cloudflare R2 on a daily 04:35 UTC schedule, and has run unattended since
 security review and its remediation closed on 2026-09-09; posture is in
 [`security.md`](security.md). The mobile-first UI was verified on a real
 handset on 2026-09-11. Next work is the OSM object panel and A-to-B routing.
-The object index publisher exists but **has never been run** (2026-09-12), so
-the deployed site still selects objects only inside the four fixture tiles.
+The OSM object index was published to R2 on 2026-09-12 (54 shards, 211,881
+objects, 28.6 MB) and the deployed site now selects objects across all 58
+tiles. What remains of the object panel is the series behind its chart.
 
 ## Next, in order
 
-1. **OSM object panel: publish the index, then the snow history (spec
-   section 7).** Selection is done and runs on a committed fixture: the tap
-   rule, the shard-index/shard validators, lazy shard loading and the minimal
-   panel are in `app/src/features/objects/` and `app/src/features/objects/panel.ts`, and
-   `docs/research/maptiler-outdoor-objects.md` records what the basemap really
-   renders. What remains, in order:
-   - **Run the object index publisher, then wire the frontend to it.** The
-     publisher was built on 2026-09-12 to the 2026-09-11 decision and is
-     unrun: `pipeline/src/nevaio_pipeline/publish_object_index.py` and the
-     `workflow_dispatch` workflow `.github/workflows/publish-osm-object-index.yml`,
-     reusing the `production-r2` environment and the snow data's bucket under
-     the `object-index/` key prefix. In order:
-     - **Decided 2026-09-12: Geofabrik's `alps-latest.osm.pbf` and
-       `italy-latest.osm.pbf`**, now the dispatch input's default. Between them
-       they cover the Alps and the Italian Apennines with overlap, and the
-       build script deduplicates identical objects across extracts (failing on
-       differing snapshots rather than silently picking one), so the overlap
-       costs download time and nothing else. Verified the same day: both URLs
-       resolve, 2.2 GB and 2.1 GB, 4.3 GB total.
-     - **Run the workflow** from the Actions tab - the default input is now
-       correct, so this is a click. It self-verifies the published index
-       against its own receipt. **This is the remaining blocker for everything
-       below**: it gates both the frontend URL flip and the daily per-object
-       sampling, which sits implemented but switched off.
-     - **Point `VITE_OBJECT_INDEX_URL`** at
-       `<R2_PUBLIC_BASE_URL>/object-index/object-index.json`. That is the URL
-       in `app/src/map/config.ts` and nothing else; the bucket host is already
-       in `app/public/_headers`' `connect-src`, so no CSP change is needed.
-       The path shape matches the fixture's, so only the host changes.
-     - **Then delete the fixture** in `app/public/object-index/`, or keep it
-       only as a local-dev fallback - decide deliberately, and remember there
-       is no offline snow data by design.
-     Do not flip the URL before the workflow has run: pointing the deployed app
-     at an unpublished URL turns object selection from correct-over-a-stub into
-     broken. Until it runs, the deployed site selects objects only inside the
-     four fixture tiles - the tap rule is live and correct, the data behind it
-     is a stub.
+1. **OSM object panel: the snow history behind the chart (spec section 7).**
+   Selection, the panel and the chart are done and live against the published
+   R2 index; `docs/research/maptiler-outdoor-objects.md` records why the app
+   carries its own index rather than reading the basemap's features. What is
+   missing is the data the chart draws:
    - **Precompute the per-object GFSC time series**, keyed on the same stable
      OSM ids, by batch-sampling the rasters the daily pipeline already
      downloads and backfilling from Copernicus's multi-year archive. No new
@@ -65,11 +34,14 @@ the deployed site still selects objects only inside the four fixture tiles.
      behind optional flags that default to off. **What remains is the backfill
      itself**: the `workflow_dispatch` matrix described below, and publishing
      `series/` to R2. Shape, from measurements taken 2026-09-11:
-     - The daily increment is **done** (2026-09-12) and stays off until the
-       object index publisher has run: `build_preview` takes optional
-       `--object-index-dir`/`--series-output-dir` and does nothing without
-       them. The pixel index comes from the product's own affine transform,
-       never `footprint.parse_mgrs_tile`, with a regression test pinning it.
+     - The daily increment is **done** (2026-09-12): `build_preview` takes
+       optional `--object-index-dir`/`--series-output-dir` and does nothing
+       without them. The pixel index comes from the product's own affine
+       transform, never `footprint.parse_mgrs_tile`, with a regression test
+       pinning it. **With the index published, the next step is switching this
+       on in the daily workflow** - the render job needs the published index
+       and slot map available to it, which is a workflow change rather than
+       new pipeline code.
      - **Backfill chunk = one calendar month, all tiles**, as a separate
        `workflow_dispatch` matrix: ~1,740 tile-dates and ~2.3 GB per chunk,
        far inside a 6-hour job, and at most 31 product dates per tile so

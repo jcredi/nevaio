@@ -1,5 +1,50 @@
 # Working session log
 
+## 2026-09-12 - The OSM object index is live on R2
+
+Run #1 of `publish-osm-object-index.yml` succeeded in 9 minutes: **54 shards,
+211,881 objects, 28.63 MB**, which is the artifact the plan predicted (54
+files, 28.6 MB) almost exactly. Object selection on the deployed site now
+covers all 58 tiles instead of the four fixture tiles, and
+`app/public/object-index/` is gone.
+
+*A false start worth recording.* The first dispatch never created a run -
+GitHub's API reported `total_count: 0` for the workflow while showing 20 runs
+of the daily snapshot. The workflow was registered and `active`, so this was
+the two-step dispatch UI: the dropdown only submits on its own green "Run
+workflow" button. Checking the API rather than trusting "it should have landed"
+is what found it; there was no log to read because there was no run.
+
+**Verified independently of the workflow's own receipt**, since a publisher
+checking its own work proves less than it looks: the shard `objectCount`s sum
+to the index's declared total, and the largest shard's bytes and sha256 match
+what the index declares exactly. Also checked for drift between the two sides
+of the contract - the artifact carries six kinds (`peak`, `hut`, `saddle`,
+`shelter`, `parking`, `settlement`) and the frontend validator's accepted list
+is exactly that set.
+
+**`check-csp` now asserts the object index leg.** It did not, which meant that
+from the moment selection moved off the fixture, a CSP or CORS regression on
+the app's newest network destination would have passed silently. The leg is
+marked deployed-only, for a subtler reason than the snow legs: the bucket's
+CORS policy *does* allow the fixed local Vite origins - `npm run dev` on :5173
+fetches the index fine, which is how the mobile-layout check opened a panel -
+but `check-csp` serves the built `dist/` on an **ephemeral port**, which no
+origin allowlist can name. It failed as `TypeError: Failed to fetch` before
+being marked, and the comment now says so, because the tempting "fix" is to
+widen `AllowedOrigins` to a wildcard.
+
+Live verification against the deployment: all seven legs pass, no CSP
+violations.
+
+**What this unblocks.** The daily per-object sampling has been implemented and
+switched off since earlier today because it had no published index to key on.
+It now has one, so the next step is turning it on in the daily workflow - the
+render job needs the published index and slot map available to it, which is a
+workflow change rather than new pipeline code. After that, the two-month
+backfill (amendment v1.13's depth, down from two years), then
+`VITE_OBJECT_SERIES_URL`, and the chart stops saying "Not available yet".
+
 ## 2026-09-12 - Spec v1.13: one 30-day window, and what that unbuilds
 
 The owner dropped section 7.1's period options down to a single trailing
