@@ -130,14 +130,18 @@ the deployed site still selects objects only inside the four fixture tiles.
    choice is made from a costed shortlist rather than cold** - a written
    options/pros-cons/recommendation pass covering the routing provider and the
    elevation/DEM source (section 15 item 7) comes first, then the owner picks.
-   **Decided 2026-09-12: OpenRouteService `foot-hiking` for routing, and a
-   precomputed Copernicus GLO-30 extract in R2 for elevation.** Two checks the
-   picks were made conditional on are still outstanding and should happen
-   before either is built on: confirm ORS's real free quota from HeiGIT's own
-   dashboard (the figure in the doc came from a forum post and an aggregator),
-   and `du` the R2 bucket to confirm a GLO-30 extract fits beside the object
-   index and the per-object series. Fallbacks if either fails: Mapbox
-   Directions, MapTiler Terrain-RGB.
+   **Decided 2026-09-12: Mapbox Directions (`mapbox/walking`) for routing, and
+   a precomputed Copernicus GLO-30 extract in R2 for elevation.** ORS was the
+   pick for part of that day and was reversed the same day: its staff forbid
+   delivering a key to a browser and it offers no domain restriction, which
+   this app cannot work around without the backend it deliberately lacks.
+   Before building: **create a separate, URL-restricted Mapbox token** - the
+   default token cannot carry URL restrictions, and using it would discard the
+   one control that makes a public token safe - and add `api.mapbox.com` to
+   `connect-src` in `app/public/_headers` in the same change. Mapbox Directions
+   returns no elevation, so the DEM is still needed; `du` the bucket first to
+   confirm a GLO-30 extract fits beside the object index and the series.
+   Fallback for elevation stays MapTiler Terrain-RGB.
    **The options pass behind this was delivered 2026-09-12:
    [`research/routing-and-dem-options.md`](research/routing-and-dem-options.md).
    The owner's pick is now the open step** - section 15 items 6 and 7 stay
@@ -167,9 +171,11 @@ the deployed site still selects objects only inside the four fixture tiles.
   (1, 2), basemap/terrain provider (4), optional 20 m FSCOG layer (10).
   **Items 6 and 7 were decided 2026-09-12** from
   [`research/routing-and-dem-options.md`](research/routing-and-dem-options.md):
-  routing is **OpenRouteService**'s `foot-hiking` profile, elevation is a
-  **precomputed Copernicus GLO-30 extract into the existing R2 bucket**. Each
-  carries one unfinished check, below.
+  routing is **Mapbox Directions** (`mapbox/walking`), elevation is a
+  **precomputed Copernicus GLO-30 extract into the existing R2 bucket**.
+  Routing was OpenRouteService for part of that day; it is not, because ORS
+  forbids client-side keys and this app has no backend - see the correction in
+  that document before reopening the question.
 - **Expose `Content-Range` and `Accept-Ranges` in the bucket's CORS policy.**
   Owner console work, additive and zero-risk; `r2-setup.md` step 5 already
   carries the updated policy, the live bucket does not. Not a blocker - ranged

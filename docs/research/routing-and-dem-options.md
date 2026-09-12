@@ -159,6 +159,33 @@ for the MVP"). Rejected on the same reasoning the spec already states.
 - Con: pedestrian/hiking-specific profile depth (SAC-scale awareness) not
   confirmed.
 
+> **CORRECTION, 2026-09-12 (same day): this recommendation was wrong, and the
+> decision is Mapbox Directions.** The owner created an ORS account, which
+> confirmed the quota this section could not (Directions 2000/day, 40/min) -
+> but checking ORS properly surfaced the disqualifier this document listed in
+> its own constraints and then failed to apply. ORS staff state plainly that a
+> key must not be delivered to a browser: asked "I shouldn't put it into a js
+> file that gets delivered to a browser... should be used server side only?",
+> the answer is "If you don't want to expose it to the user, that is correct,
+> yes"
+> (https://ask.openrouteservice.org/t/the-api-key-must-be-kept-secret-right/285).
+> Domain whitelisting, which is what makes MapTiler's public key safe here, is
+> only a proposed future feature - there is no equivalent today, and no
+> official workaround for an app with no backend. Nevaio has no backend by
+> design (spec section 11) and Vite inlines `VITE_*` into the public bundle,
+> so the key would sit exposed with no restriction and the 2000/day - a global
+> cap across all users, not per-user - is drainable by anyone who lifts it.
+> Rejected alternatives to switching: a Netlify Function proxy to hold the key
+> (introduces the backend surface the MVP deliberately has none of), and
+> shipping the key anyway (against the provider's own guidance). The lesson
+> worth keeping: apply the client-side-key constraint as a hard filter *first*,
+> before ranking on routing quality.
+>
+> Also measured while confirming this: ORS's own Elevation service is SRTM v4
+> at 90 m, far coarser than Copernicus GLO-30 at 30 m, so it is no substitute
+> for decision B's DEM in Alpine terrain. Decision B is unaffected and in fact
+> reinforced.
+
 ### RECOMMENDATION: OpenRouteService, `foot-hiking` profile
 
 **Reasoning.** It is the only candidate whose routing profile is actually
@@ -376,3 +403,36 @@ otherwise want to state precisely.
    derivable" - but the per-point elevation *profile* 8.4-8.5 needs still
    wants an independent, denser DEM sampling either way, so this does not
    remove the need for Decision B.
+
+## Decision A, as settled 2026-09-12: Mapbox Directions
+
+Verified against Mapbox's own documentation the day it was chosen:
+
+- **`mapbox/walking` is the profile**: "For pedestrian and hiking routing. This
+  profile shows the optimal path by using sidewalks and trails."
+  (https://docs.mapbox.com/api/navigation/directions/)
+- **Public `pk` tokens are built for client-side use**, which is the whole
+  reason this fits: secret `sk` tokens are the ones that must never reach a
+  client. (https://docs.mapbox.com/accounts/guides/tokens/)
+- **URL restrictions are available - but NOT on the default token.** "You can
+  make your access tokens more secure by adding URL restrictions from the
+  account dashboard tokens page or with the Tokens API", and the feature does
+  not support default access tokens. So Nevaio must create a *separate*
+  token, scoped and URL-restricted to its own origins, exactly as the MapTiler
+  key is domain-restricted today. Using the default token would throw away the
+  one control that makes this safe.
+- **Up to 25 coordinates per request.**
+- **The Directions API does not return elevation.** Standard routing responses
+  carry no elevation, so the route profile still needs decision B's DEM - this
+  is not a provider that can absorb both jobs.
+- Free tier is 100,000 requests/month (recorded earlier in this document).
+- **Unconfirmed:** the per-minute rate limit for the walking profile. Mapbox's
+  Directions restrictions page does not state one in the content retrieved.
+  Check it before relying on burst behaviour.
+
+**Cost accepted:** `mapbox/walking` is not trail-difficulty aware the way ORS's
+`foot-hiking` is, and this adds a second mapping vendor beside MapTiler. Both
+were judged worth it against an architecture that cannot hold a secret.
+
+**Implementation note:** adding `api.mapbox.com` to `connect-src` in
+`app/public/_headers` is part of the same change that first calls it.

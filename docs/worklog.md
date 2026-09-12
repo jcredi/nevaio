@@ -1,5 +1,59 @@
 # Working session log
 
+## 2026-09-12 - Routing reversed to Mapbox the same day it was decided
+
+The owner created an ORS account, which confirmed the quota the options pass
+could not source properly: Directions 2000/day and 40/min, matching the forum
+figure the document had flagged as unverified. Confirming it also surfaced the
+thing that actually decides this, and it is not the quota.
+
+**ORS forbids delivering a key to a browser, and Nevaio has no backend.** Their
+staff answer the question directly - asked whether the key should therefore be
+server-side only, "If you don't want to expose it to the user, that is correct,
+yes". Domain whitelisting, the control that makes the MapTiler key safe in this
+same bundle, is only a proposed feature with no equivalent today. Vite inlines
+`VITE_*` into the public bundle by design, so an ORS key would ship exposed and
+unrestricted, and the 2000/day is a global cap across all users rather than
+per-user - drainable by anyone who lifts it.
+
+*This was a miss in the options pass, not new information.* That document
+listed "terms forbid client-side use, or requires a secret that cannot be
+inlined into a public bundle" in its own constraints and then recommended a
+provider that fails it. The correction is written into the document itself
+rather than only here, because the document is what a later reader will find.
+The lesson worth keeping: apply the client-side-key filter *first*, then rank
+what survives on routing quality.
+
+**Decision: Mapbox Directions, `mapbox/walking`.** Verified against Mapbox's
+own docs rather than memory: the profile is "For pedestrian and hiking routing
+... using sidewalks and trails"; public `pk` tokens are built for client-side
+use, which is precisely the property ORS lacks; up to 25 coordinates per
+request. Unconfirmed and worth checking before relying on burst behaviour: the
+walking profile's per-minute rate limit, which Mapbox's restrictions page did
+not state.
+
+*Two things that must happen in the change that first calls it.* A **separate**
+token, scoped and URL-restricted - Mapbox's URL restrictions explicitly do not
+apply to the default token, so using the default would discard the only control
+that makes a public token safe. And `api.mapbox.com` into `connect-src` in
+`app/public/_headers`.
+
+*Costs accepted, recorded so they are not rediscovered as surprises:*
+`mapbox/walking` is not trail-difficulty aware the way ORS `foot-hiking` is,
+and this adds a second mapping vendor beside MapTiler. Both were judged worth
+it against an architecture that cannot hold a secret.
+
+*Rejected:* a Netlify Function proxy holding the ORS key - it would introduce
+exactly the backend surface the MVP deliberately has none of, plus a new
+deploy artifact to secure and rate-limit; and shipping the ORS key anyway,
+against the provider's stated guidance.
+
+**Elevation is unaffected and reinforced.** ORS's own Elevation service is
+SRTM v4 at 90 m, far coarser than Copernicus GLO-30 at 30 m, so it was never a
+substitute in Alpine terrain. Mapbox Directions returns no elevation at all -
+standard routing responses carry none - so the DEM remains a separate job and
+spec section 15 item 7 stands as decided.
+
 ## 2026-09-12 - Four owner decisions recorded
 
 The Netlify deploy that stalled earlier today was an out-of-credits account,
