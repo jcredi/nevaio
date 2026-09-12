@@ -126,8 +126,16 @@ page.on("response", (r) => responses.push({ url: r.url(), status: r.status() }))
 
 // The production bundle deliberately exposes no map handle, so this asserts on
 // the traffic the map actually generates: a basemap style, vector tiles and
-// glyphs from MapTiler, plus the snow manifest and PNG tiles from R2. Anything
-// the CSP blocks simply never appears here.
+// glyphs from MapTiler, plus the snow manifest, PNG tiles and the OSM object
+// index from R2. Anything the CSP blocks simply never appears here.
+//
+// The object index leg is deployed-only for the same reason the snow legs are,
+// but by a subtler route: the bucket's CORS policy does allow the fixed local
+// Vite origins (`npm run dev` on :5173 fetches the index fine), yet this
+// script serves the built `dist/` on an *ephemeral* port, which no origin
+// allowlist can name. Measured 2026-09-12 - it failed as `TypeError: Failed
+// to fetch` before being marked deployed-only. Don't "fix" that by widening
+// the bucket's AllowedOrigins to a wildcard.
 const EXPECTED = [
   ["MapTiler style", /^https:\/\/api\.maptiler\.com\/maps\/outdoor\/style\.json/, false],
   ["MapTiler tiles", /^https:\/\/api\.maptiler\.com\/.*\.(pbf|png|webp|json)/, false],
@@ -135,6 +143,7 @@ const EXPECTED = [
   ["place search", /^https:\/\/api\.maptiler\.com\/geocoding\//, false],
   ["snow manifest", /\/latest\.json/, true],
   ["snow tiles", /\/runs\/.*\/tiles\/.*\.png/, true],
+  ["object index", /\/object-index\/object-index\.json/, true],
 ].filter(([, , deployedOnly]) => DEPLOYED || !deployedOnly);
 
 let failed = false;
