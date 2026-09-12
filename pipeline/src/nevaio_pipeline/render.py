@@ -30,9 +30,14 @@ from .config import (
     PREVIEW_MIN_ZOOM,
 )
 from .fetch import CatalogProduct, discover_window_products, download_products
+from .footprint import utm_zone
 from .mosaic import TileComposite
+from .object_index import SHARD_DIRECTORY, entries_from_shard_document
+from .object_series import array_from_buffer, buffer_from_array, days_in_month, grow_month_array, new_month_array
+from .object_series_sampling import index_tile_objects, sample_daily_product
+from .object_slots import load_or_create_slot_map, validate_slot_map, write_slot_map
 from .publish import publish_to_r2
-from .raster_io import ProductTriplet, discover_product_triplets, load_tile_products
+from .raster_io import LoadedTile, ProductTriplet, discover_product_triplets, load_tile_products
 from .snapshots import render_snapshots, save_snapshot, snapshot_info
 
 
@@ -100,6 +105,72 @@ def _bounds_wgs84(snapshot_paths: Sequence[Path]) -> list[float]:
     ]
 
 
+def _update_object_series(
+    tile: str,
+    loaded: LoadedTile,
+    object_index_dir: Path,
+    series_output_dir: Path,
+) -> None:
+    """Sample every window product's own arrays into this tile's monthly series.
+
+    Reads the tile's already-published object index shard and its permanent
+    slot map (:mod:`nevaio_pipeline.object_slots`), extending the slot map
+    append-only if the shard has grown since the last run, then samples each
+    loaded product (docs/plan.md's "daily increment") into
+    ``series/<TILE>/<YYYY-MM>.bin`` under ``series_output_dir``. A tile with no
+    published shard yet is skipped rather than failing the render - as of
+    2026-09-12 the object index publisher has never been run, so this is the
+    common case today.
+    """
+
+    shard_path = object_index_dir / SHARD_DIRECTORY / f"{tile}.json"
+    if not shard_path.is_file():
+        return
+    entries = entries_from_shard_document(json.loads(shard_path.read_text(encoding="utf-8")))
+    if not entries:
+        return
+    current_ids = tuple(entry.id for entry in entries)
+
+    slot_map = load_or_create_slot_map(object_index_dir, tile, current_ids)
+    write_slot_map(object_index_dir, slot_map)
+    validate_slot_map(slot_map, current_ids)
+
+    grid = loaded.grid
+    pixels = index_tile_objects(
+        entries,
+        slot_map,
+        transform=grid.transform,
+        zone=utm_zone(tile),
+        width=grid.width,
+        height=grid.height,
+    )
+
+    by_month: dict[tuple[int, int], list] = defaultdict(list)
+    for product in loaded.products:
+        by_month[(product.product_date.year, product.product_date.month)].append(product)
+
+    for (year, month), products in sorted(by_month.items()):
+        days = days_in_month(year, month)
+        month_path = series_output_dir / tile / f"{year:04d}-{month:02d}.bin"
+        if month_path.is_file():
+            existing = month_path.read_bytes()
+            cell_bytes_per_day = days * 2
+            if len(existing) % cell_bytes_per_day != 0:
+                raise ValueError(f"corrupt month file, not a whole number of slots: {month_path}")
+            old_slot_count = len(existing) // cell_bytes_per_day
+            array = array_from_buffer(existing, old_slot_count, days)
+            if slot_map.slot_count > old_slot_count:
+                array = grow_month_array(array, slot_map.slot_count)
+        else:
+            array = new_month_array(slot_map.slot_count, year, month)
+
+        for product in products:
+            sample_daily_product(array, pixels, product, days)
+
+        month_path.parent.mkdir(parents=True, exist_ok=True)
+        month_path.write_bytes(buffer_from_array(array))
+
+
 def build_preview(
     *,
     as_of_date: date,
@@ -112,8 +183,19 @@ def build_preview(
     fetch: bool = True,
     publish: bool = False,
     keep_runs: int | None = None,
+    object_index_dir: Path | None = None,
+    series_output_dir: Path | None = None,
 ) -> dict[str, object]:
-    """Run AS-OF window discovery through render and optional R2 publish."""
+    """Run AS-OF window discovery through render and optional R2 publish.
+
+    ``object_index_dir``, when given, turns on the per-object GFSC time series
+    "daily increment" (docs/plan.md): each active tile's already-published
+    object index shard and permanent slot map live there, and every loaded
+    window product is sampled into ``series_output_dir`` (default:
+    ``output_dir / "series"``) as ``series/<TILE>/<YYYY-MM>.bin``. Omitted, no
+    sampling happens and nothing about the existing render changes - this is
+    additive.
+    """
 
     normalized_tiles = tuple(sorted({tile.upper() for tile in tiles}))
     if fetch:
@@ -146,6 +228,8 @@ def build_preview(
             f"(limit {max_missing_tiles}): {', '.join(missing_tiles)}"
         )
 
+    resolved_series_output_dir = series_output_dir or (output_dir / "series")
+
     generated_at = datetime.now(UTC)
     run_id = generated_at.strftime("%Y%m%dT%H%M%SZ")
     snapshot_dir = work_dir / "snapshots" / run_id
@@ -155,6 +239,8 @@ def build_preview(
     for tile in active_tiles:
         window = triplets[tile]
         loaded = load_tile_products(window)
+        if object_index_dir is not None:
+            _update_object_series(tile, loaded, object_index_dir, resolved_series_output_dir)
         composite = compose_as_of(loaded.products, as_of_date)
         snapshot_path = snapshot_dir / f"{tile}.npz"
         save_snapshot(
@@ -252,6 +338,26 @@ def main() -> None:
             "should set it)."
         ),
     )
+    parser.add_argument(
+        "--object-index-dir",
+        type=Path,
+        default=None,
+        help=(
+            "A locally built sharded object index directory (see "
+            "nevaio_pipeline.object_index.write_sharded_index) - object-index.json "
+            "plus objects/<TILE>.json. Turns on the per-object GFSC series daily "
+            "increment: each active tile's shard and permanent slot map "
+            "(slots/<TILE>.json, created or extended here) are read from this "
+            "directory, and every loaded window product is sampled into "
+            "--series-output-dir. Omit to leave the render exactly as before."
+        ),
+    )
+    parser.add_argument(
+        "--series-output-dir",
+        type=Path,
+        default=None,
+        help="Where to write series/<TILE>/<YYYY-MM>.bin (default: <output-dir>/series).",
+    )
     args = parser.parse_args()
     metadata = build_preview(
         as_of_date=args.as_of,
@@ -264,6 +370,8 @@ def main() -> None:
         fetch=not args.skip_fetch,
         publish=args.publish_r2,
         keep_runs=args.keep_runs,
+        object_index_dir=args.object_index_dir,
+        series_output_dir=args.series_output_dir,
     )
     print(json.dumps(metadata, indent=2))
 

@@ -14,6 +14,7 @@ from nevaio_pipeline.object_index import (
     build_sharded_index,
     classify_object,
     drop_shadowed_shelters,
+    entries_from_shard_document,
     shard_object_index,
     write_index_document,
     write_sharded_index,
@@ -199,6 +200,30 @@ class ShardedIndexTests(unittest.TestCase):
         entries = build_object_index(self.features)
         with self.assertRaisesRegex(ValueError, "outside the footprint"):
             shard_object_index(entries, self.footprint)
+
+
+class EntriesFromShardDocumentTests(unittest.TestCase):
+    """Reading a published shard back - what the per-object series sampler needs."""
+
+    def test_round_trips_every_field(self) -> None:
+        features = [
+            feature("node", 1, {"natural": "peak", "name": "Mont Blanc", "ele": "4808"}, [6.8651, 45.8326]),
+            feature("node", 2, {"natural": "peak", "name": "No Elevation"}, [7.0, 45.9]),
+        ]
+        entries = build_object_index(features)
+        shard_document = {
+            "schemaVersion": 1,
+            "tile": "31TGL",
+            "objects": [entry.to_document() for entry in entries],
+        }
+        restored = entries_from_shard_document(shard_document)
+        self.assertEqual(restored, entries)
+        self.assertEqual(restored[0].elevation_meters, 4808.0)
+        self.assertIsNone(restored[1].elevation_meters)
+
+    def test_rejects_a_document_without_an_objects_array(self) -> None:
+        with self.assertRaisesRegex(ValueError, "objects"):
+            entries_from_shard_document({"schemaVersion": 1, "tile": "31TGL"})
 
 
 class BuildObjectIndexTests(unittest.TestCase):

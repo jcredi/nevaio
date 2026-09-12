@@ -268,6 +268,36 @@ def build_object_index(
     return tuple(sorted(drop_shadowed_shelters(entries), key=lambda entry: entry.id))
 
 
+def entry_from_document(document: Mapping[str, object]) -> ObjectIndexEntry:
+    """Inverse of :meth:`ObjectIndexEntry.to_document` - read one published record back.
+
+    Used to read a shard already written to disk (e.g. by the per-object
+    series sampler in ``render.py``) without re-deriving entries from raw OSM
+    input.
+    """
+
+    elevation = document.get("elevationMeters")
+    return ObjectIndexEntry(
+        id=_required_string(document.get("id"), "id"),
+        kind=document.get("kind"),  # type: ignore[arg-type]
+        name=_required_string(document.get("name"), "name"),
+        longitude=float(document["longitude"]),  # type: ignore[arg-type]
+        latitude=float(document["latitude"]),  # type: ignore[arg-type]
+        elevation_meters=None if elevation is None else float(elevation),  # type: ignore[arg-type]
+    )
+
+
+def entries_from_shard_document(document: Mapping[str, object]) -> tuple[ObjectIndexEntry, ...]:
+    """Read back the entries of one shard document (see :class:`IndexShard`)."""
+
+    objects = document.get("objects")
+    if not isinstance(objects, Sequence) or isinstance(objects, (str, bytes)):
+        raise ValueError("shard document 'objects' must be an array")
+    if not all(isinstance(item, Mapping) for item in objects):
+        raise ValueError("shard document 'objects' must contain objects")
+    return tuple(entry_from_document(item) for item in objects)
+
+
 INDEX_FILENAME = "object-index.json"
 
 
