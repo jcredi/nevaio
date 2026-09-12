@@ -73,8 +73,24 @@ function zoomForBounds({ west, south, east, north }: GeocodeBounds): number {
   return 8.3;
 }
 
+/** A point picked from search, in the shape object selection already uses. */
+export type SearchPoint = { longitude: number; latitude: number };
+
+export type SearchBarOptions = {
+  /**
+   * Fired once per result choice (typed, clicked or Enter-selected), right
+   * after the camera is told to fly there. This module knows nothing about
+   * the object index or the tap-selection rule - spec section 6.2's "does
+   * this land on an eligible OSM object" question belongs to whoever wires
+   * search and object selection together (`main.ts`), not to the search box
+   * itself. A search result is a geocoder hit or a typed coordinate, never an
+   * index identity, so the callback hands over only a point.
+   */
+  onSelect?: (point: SearchPoint) => void;
+};
+
 /** Floating search bar for place/coordinate search (spec section 6.1). */
-export function createSearchBar(map: Map): HTMLElement {
+export function createSearchBar(map: Map, options: SearchBarOptions = {}): HTMLElement {
   const container = document.createElement("div");
   container.className = "search-bar";
 
@@ -182,6 +198,7 @@ export function createSearchBar(map: Map): HTMLElement {
     clearButton.hidden = false;
     closeDropdown();
     input.blur();
+    options.onSelect?.({ longitude: result.lon, latitude: result.lat });
   }
 
   function removeMarker(): void {

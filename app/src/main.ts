@@ -12,11 +12,15 @@ import { SelectionHighlight } from "./features/objects/highlight";
 import { addSnowOverlay, type SnowOverlay } from "./features/snow/overlay";
 import { ObjectIndexStore } from "./features/objects/objectIndex";
 import type { Bounds } from "./features/objects/objectIndexSchema";
-import { SELECTION_MAX_METERS_PER_PIXEL, resolveSelection } from "./features/objects/selection";
+import {
+  SELECTION_MAX_METERS_PER_PIXEL,
+  resolveSelection,
+  type Selection,
+} from "./features/objects/selection";
 import { ObjectPanel, type IndexStatus } from "./features/objects/panel";
 import { SnowControl } from "./features/snow/control";
 import { SnowDateControl } from "./features/snow/dateControl";
-import { createSearchBar } from "./features/search/searchBar";
+import { createSearchBar, type SearchPoint } from "./features/search/searchBar";
 import "./style.css";
 
 const map = new maplibregl.Map({
@@ -36,7 +40,6 @@ const map = new maplibregl.Map({
 });
 
 map.addControl(new maplibregl.NavigationControl(), "top-right");
-document.body.append(createSearchBar(map));
 
 // Object selection (spec section 7, amendment v1.11). The identity contract is
 // Nevaio's own static index, never MapTiler's rendered feature properties -
@@ -139,6 +142,16 @@ function indexStatusFor(viewport: Bounds): IndexStatus {
   return objectIndex.failures > 0 ? "unavailable" : "loading";
 }
 
+/** Render a resolved selection and its highlight together - the one place both change. */
+function presentSelection(selection: Selection, status: IndexStatus): void {
+  objectPanel.present(selection, status);
+  if (selection.status === "selected" && status === "ready") {
+    highlight?.show(selection.record);
+  } else {
+    highlight?.clear();
+  }
+}
+
 map.on("click", async (event) => {
   const viewport = viewportBounds();
   // A tap is also a request for the objects here: a user who taps before the
@@ -151,13 +164,64 @@ map.on("click", async (event) => {
     { longitude: event.lngLat.lng, latitude: event.lngLat.lat },
     metersPerPixel(map),
   );
-  objectPanel.present(selection, status);
-  if (selection.status === "selected" && status === "ready") {
-    highlight?.show(selection.record);
-  } else {
-    highlight?.clear();
-  }
+  presentSelection(selection, status);
 });
+
+/**
+ * Ask a search result the same matching question a tap already answers.
+ *
+ * A search hit is a MapTiler geocoding result, not an index record - it can
+ * be missing from the index entirely, or resolve to a record whose name
+ * disagrees with the geocoder's. We never trust the geocoder's own identity
+ * for the panel/history; `resolveSelection` runs again exactly as it would
+ * for a tap at the same point, so "found nothing", "ambiguous", "too coarse a
+ * scale" and "found it, but look what's actually there" all go through the
+ * one honest pipeline `presentSelection` already implements. The search
+ * marker (dropped by the search bar at the geocoder's own coordinate) and the
+ * selection highlight (dropped at the index record's coordinate, if any) can
+ * end up in visibly different places - that gap *is* the answer to "do these
+ * two sources agree", not a bug to hide.
+ *
+ * The scale floor (`SELECTION_MAX_METERS_PER_PIXEL`) applies unchanged: a
+ * search result is just another point on the map, and the floor exists
+ * because coarse-scale proximity matching is unreliable regardless of how the
+ * point arrived. A search that lands zoomed out (e.g. a whole valley or
+ * region) will show the same "zoom in to select" notice a tap would - that is
+ * the deliberate, consistent answer rather than a second invented rule for
+ * "search near enough an object to guess".
+ *
+ * Shards load lazily by viewport (`objectIndex.ts`), so the destination's
+ * shard may not be loaded yet even after the camera arrives. Rather than race
+ * that load against `resolveSelection`, this waits for the fly to finish
+ * (`moveend`, the same signal `refreshShards` already uses elsewhere) and
+ * then awaits `ensureLoaded` itself before resolving - so a fresh search
+ * result is judged against the shard it actually lands in, never a stale or
+ * still-loading one. A `token` guards against a second search superseding
+ * this one mid-flight: only the most recent search may reach the panel.
+ */
+let searchSelectionToken = 0;
+
+function selectSearchResult(point: SearchPoint): void {
+  const token = ++searchSelectionToken;
+
+  void (async () => {
+    // flyTo animates; wait for the camera to actually arrive before reading
+    // scale or viewport, rather than judging the point against where the map
+    // used to be.
+    await new Promise<void>((resolve) => map.once("moveend", () => resolve()));
+    if (token !== searchSelectionToken) return;
+
+    const viewport = viewportBounds();
+    if (indexLoaded && shardsAreWorthLoading()) await objectIndex.ensureLoaded(viewport);
+    if (token !== searchSelectionToken) return;
+
+    const status = indexStatusFor(viewport);
+    const selection = resolveSelection(objectIndex.records(), point, metersPerPixel(map));
+    presentSelection(selection, status);
+  })();
+}
+
+document.body.append(createSearchBar(map, { onSelect: selectSearchResult }));
 
 if (import.meta.env.DEV) {
   // Used by scripts/screenshot.mjs to drive the camera.
