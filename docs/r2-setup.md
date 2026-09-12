@@ -42,11 +42,25 @@ it does not build a historical archive.
        ],
        "AllowedMethods": ["GET", "HEAD"],
        "AllowedHeaders": ["*"],
-       "ExposeHeaders": ["ETag"],
+       "ExposeHeaders": ["ETag", "Content-Range", "Accept-Ranges"],
        "MaxAgeSeconds": 3600
      }
    ]
    ```
+
+   **Not yet applied to the live bucket** (owner console work, as of 2026-09-12 the
+   deployed policy still exposes `ETag` alone - verified by curl that day).
+   `Content-Range`/`Accept-Ranges` were added to the policy above on 2026-09-12, ahead of
+   the per-object snow series (`docs/plan.md` item 1), whose `series/<TILE>/<YYYY-MM>.bin`
+   design reads one object's month as a 62-byte HTTP `Range` request. **Measured the same
+   day against the live bucket: a ranged browser read already worked without them** -
+   preflight passes because `AllowedHeaders: ["*"]` echoes `range`, and the two signals a
+   client needs to trust the response (the `206` status and `Content-Length`) are visible to
+   JS regardless, `Content-Length` being CORS-safelisted. The addition is defence in depth:
+   without `Content-Range` exposed, a client cannot assert which bytes the server actually
+   served, so a cache or proxy silently answering `200` with the whole object would be
+   indistinguishable from a correct partial read. Additive and zero-risk; apply it next time
+   this console screen is open.
 
    Cloudflare documents an existing object as a CORS-policy prerequisite. If
    the new empty bucket does not expose the CORS editor yet, run the workflow

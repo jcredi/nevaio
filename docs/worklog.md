@@ -1,5 +1,99 @@
 # Working session log
 
+## 2026-09-12 - Object index publisher, two assumptions verified, routing/DEM options
+
+Three parallel tracks against `docs/plan.md`: the object index publication
+(item 1's first bullet), the two measurements item 1 flagged as cheap to check
+before building the per-object series, and the costed options pass item 2 says
+must precede the owner's choice. Nothing here is deployed - the workflow has
+not been run and the CORS change is owner console work.
+
+**The object index publisher.** `publish_object_index.py` plus
+`publish-osm-object-index.yml`, built to the 2026-09-11 decision: a separate
+`workflow_dispatch` workflow reusing the `production-r2` environment and the
+same bucket as the snow data. Key prefix is `object-index/`, which cannot
+collide with the snapshot's root-level keys and matches the local fixture's
+own layout, so `VITE_OBJECT_INDEX_URL` becomes `<base>/object-index/object-index.json`
+- a new host, not a new path shape. `object-index.json` uploads *last*, after
+every shard it names, mirroring `publish.py`'s upload-before-pointer ordering,
+so a client can never read an index promising a shard that is not there yet;
+stale shards are deleted only after the new index is live and only among keys
+it no longer names. The module reuses `publish._required_env`/`_delete_keys`
+and imports only `boto3`, so the publish dependency surface is unchanged.
+
+*Held back deliberately:* the fixture in `app/public/object-index/` stays, and
+`VITE_OBJECT_INDEX_URL` still points at it. Both wait until the workflow has
+actually run once - pointing the deployed app at a URL nothing has published
+would take object selection from "correct over a stub" to "broken".
+
+*Open, and not silently decided:* which OSM extracts cover the footprint was
+never recorded anywhere, so the workflow takes the extract URLs as a dispatch
+input rather than inventing a Geofabrik region list. That is a real decision
+someone still has to make and write down.
+
+**`test_workflow_security.py` now covers both workflows.** It asserted the
+daily workflow's trust boundary against a hardcoded filename, so the new
+workflow - a second route to the same publication key - was outside it
+entirely. Added a second class carrying the assertions that generalise, plus
+one specific to the new attack surface: the `workflow_dispatch` extract-URL
+input must arrive as a quoted `env:` var and never as a bare `${{ inputs.* }}`
+inside `run:`, which on this workflow would be shell injection in a job that
+hands an artifact to the credentialed one. The workflow already did it right;
+the test is what keeps it that way. 195 tests pass.
+
+**The guide's documented test command was broken.** `pipeline/.venv/bin/python
+-m unittest discover -s pipeline/tests` errors on 15 of 21 collected tests:
+nothing imports `nevaio_pipeline` without `PYTHONPATH=pipeline/src`, and the
+two tests sharing `tests/artifact_fixture.py` need `-t pipeline`. CI had it
+right all along (`discover -s pipeline/tests -t pipeline`); only the guide was
+wrong. Fixed there, with both parts marked load-bearing.
+
+**Assumption A - runner throughput to CloudFerro: holds, with ~17-30x margin.**
+The useful finding is that the *daily* job already does the backfill's
+workload: `ASOF_WINDOW_DAYS = 31` over 58 tiles is ~1,798 tile-dates against
+the plan's ~1,740 per monthly chunk. Eight real production runs since
+2026-09-06 ran 11.8-20.75 min (avg ~16.5) against a 6-hour budget, and
+backfill sampling is cheaper per object than the compositing those runs do.
+Wall-clock came from the Actions REST API; the 1.23 MB/tile-date rate is
+derived from this log's own 812-product/1.0 GB measurement plus the window
+bump, not a live byte counter - `gh` was unavailable and the log endpoints
+need auth.
+
+**Assumption B - R2 CORS passes a browser Range request: holds today.** A
+62-byte ranged GET from the production origin returns `206` with the correct
+slice and the right `Access-Control-Allow-Origin`; preflight passes because
+`AllowedHeaders: ["*"]` echoes `range`. The plan's worry about
+`ExposeHeaders: ["ETag"]` turns out not to bite - the `206` status and
+`Content-Length` are both readable from JS regardless, `Content-Length` being
+CORS-safelisted. So `series/<TILE>/<YYYY-MM>.bin` can be built as designed.
+Recommended anyway and written into `r2-setup.md` as pending console work:
+expose `Content-Range` and `Accept-Ranges`, so a client can assert the bytes
+actually served and a cache silently answering `200` with the whole object
+stops being indistinguishable from a correct partial read.
+
+**Routing and DEM options** are in `docs/research/routing-and-dem-options.md`.
+Recommendations, for the owner to pick - spec section 15 items 6 and 7 stay
+open: OpenRouteService's `foot-hiking` profile for routing (the only candidate
+purpose-built for trail-difficulty-aware hiking on OSM data, same lineage as
+the rest of the app), with Mapbox Directions as fallback; and a precomputed
+Copernicus GLO-30 extract into the existing R2 bucket for elevation, which
+adds no CSP origin and no request-time rate limit, with MapTiler Terrain-RGB
+as fallback. Both picks are conditional on a check: ORS's free quota came from
+a forum post and an aggregator rather than HeiGIT's own dashboard, and the
+GLO-30 extract competes for the same R2 headroom as the per-object series.
+Neither needs a spec amendment.
+
+*Rejected there, with reasons in the doc:* self-hosted routing, MapTiler's own
+routing (enterprise-logistics beta), Stadia Maps (broadest "commercial use"
+definition, most likely to catch a free public app), Copernicus EEA-10 (2025
+access scopes 10 m to "Public Authorities"), OpenTopoData's public instance
+(1,000 calls/day shared, no SLA).
+
+**Three claimants on R2 headroom now**, where the plan listed two: the object
+index, the per-object series, and - if the DEM recommendation is taken - a
+GLO-30 extract. That makes the `du` against the bucket the plan already calls
+for more than housekeeping; it is now a gate on a product decision.
+
 ## 2026-09-11 - The historical date picker (spec section 5.3) is complete
 
 The storage half shipped earlier today; this is the frontend half, so the

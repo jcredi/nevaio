@@ -6,7 +6,7 @@ of what was done and why lives in [`worklog.md`](worklog.md), newest entry
 first. Do not add a "done" section here; it only grows a third copy of history
 that then drifts.
 
-**Status (2026-09-11).** MVP snow layer is functionally complete and live on
+**Status (2026-09-12).** MVP snow layer is functionally complete and live on
 `https://nevaio.netlify.app`: the real GFSC pipeline composes the frozen spec
 section 9.2 AS-OF rule over a 30-day window across 58 MGRS tiles, publishes to
 Cloudflare R2 on a daily 04:35 UTC schedule, and has run unattended since
@@ -14,6 +14,8 @@ Cloudflare R2 on a daily 04:35 UTC schedule, and has run unattended since
 security review and its remediation closed on 2026-09-09; posture is in
 [`security.md`](security.md). The mobile-first UI was verified on a real
 handset on 2026-09-11. Next work is the OSM object panel and A-to-B routing.
+The object index publisher exists but **has never been run** (2026-09-12), so
+the deployed site still selects objects only inside the four fixture tiles.
 
 ## Next, in order
 
@@ -23,22 +25,32 @@ handset on 2026-09-11. Next work is the OSM object panel and A-to-B routing.
    panel are in `app/src/objects/` and `app/src/ui/objectPanel.ts`, and
    `docs/research/maptiler-outdoor-objects.md` records what the basemap really
    renders. What remains, in order:
-   - **Publish the sharded index to R2** and point `VITE_OBJECT_INDEX_URL` at
-     it. That is the URL in `app/src/map/config.ts` and nothing else; the
-     bucket host is already in `app/public/_headers`' `connect-src`, so no CSP
-     change is needed for that host. Then delete the fixture in
-     `app/public/object-index/`, or keep it only as a local-dev fallback -
-     decide deliberately, and remember there is no offline snow data by design.
-     **Decided 2026-09-11: a new `workflow_dispatch` GitHub Action, reusing the
-     existing `production-r2` environment, into the same bucket as the snow
-     data.** Not a manual upload: the index is rebuilt whenever the OSM
-     extracts refresh, so a repeatable job is worth its cost the second time,
-     and it keeps the publication key inside GitHub. The artifact is 54 files
-     and 28.6 MB, trivial against the free tier. It is a different lifecycle
-     from the daily snapshot, so it is a separate workflow, not a stage bolted
-     onto `publish-latest-preview.yml`.
-     Until then the deployed site selects objects only inside the four fixture
-     tiles - the tap rule is live and correct, the data behind it is a stub.
+   - **Run the object index publisher, then wire the frontend to it.** The
+     publisher was built on 2026-09-12 to the 2026-09-11 decision and is
+     unrun: `pipeline/src/nevaio_pipeline/publish_object_index.py` and the
+     `workflow_dispatch` workflow `.github/workflows/publish-osm-object-index.yml`,
+     reusing the `production-r2` environment and the snow data's bucket under
+     the `object-index/` key prefix. In order:
+     - **Decide which OSM extracts cover the footprint and write it down.**
+       This was never recorded, so the workflow takes the extract URLs as a
+       dispatch input rather than a hardcoded region list. It is the one thing
+       blocking the first run. Geofabrik regional extracts are the expected
+       shape.
+     - **Run the workflow** from the Actions tab with those URLs. It
+       self-verifies the published index against its own receipt.
+     - **Point `VITE_OBJECT_INDEX_URL`** at
+       `<R2_PUBLIC_BASE_URL>/object-index/object-index.json`. That is the URL
+       in `app/src/map/config.ts` and nothing else; the bucket host is already
+       in `app/public/_headers`' `connect-src`, so no CSP change is needed.
+       The path shape matches the fixture's, so only the host changes.
+     - **Then delete the fixture** in `app/public/object-index/`, or keep it
+       only as a local-dev fallback - decide deliberately, and remember there
+       is no offline snow data by design.
+     Do not flip the URL before the workflow has run: pointing the deployed app
+     at an unpublished URL turns object selection from correct-over-a-stub into
+     broken. Until it runs, the deployed site selects objects only inside the
+     four fixture tiles - the tap rule is live and correct, the data behind it
+     is a stub.
    - **Precompute the per-object GFSC time series**, keyed on the same stable
      OSM ids, by batch-sampling the rasters the daily pipeline already
      downloads and backfilling from Copernicus's multi-year archive. No new
@@ -74,10 +86,15 @@ handset on 2026-09-11. Next work is the OSM object panel and A-to-B routing.
        including the previous-year comparison - then extend backwards a month
        at a time. HR-WSI reaches back to September 2016 (~1.3 MB per
        tile-date, 27 GB per year of downloads).
-     - Two assumptions still unverified and cheap to check before building:
-       GitHub-runner throughput to CloudFerro (read one render run's step
-       timings), and whether the bucket's CORS policy passes a browser Range
-       request (`ExposeHeaders` is `ETag` only today).
+     - **Both assumptions this design rested on were checked on 2026-09-12
+       and hold** - see `worklog.md`. Runner throughput: the daily job already
+       does this workload (a 31-day window over 58 tiles is ~1,798 tile-dates
+       against a chunk's ~1,740) and eight real runs took 11.8-20.75 min
+       against a 6-hour budget, so the margin is ~17-30x. Browser Range reads:
+       a 62-byte ranged GET from the production origin already returns `206`
+       with the right bytes and CORS origin; `ExposeHeaders: ["ETag"]` does not
+       bite, because the `206` status and `Content-Length` are readable from JS
+       regardless. Nothing in the design needs to change.
      - Not worth doing, each measured and rejected: HTTP range reads inside
        the source products (they *are* COGs, but 1024 px blocks over 1830 px
        is four blocks and a layer is only ~200 KB, so a whole-file GET wins);
@@ -104,7 +121,14 @@ handset on 2026-09-11. Next work is the OSM object panel and A-to-B routing.
    choice is made from a costed shortlist rather than cold** - a written
    options/pros-cons/recommendation pass covering the routing provider and the
    elevation/DEM source (section 15 item 7) comes first, then the owner picks.
-   That research is queued and does not block item 1. Firm requirement, stronger
+   **That pass was delivered 2026-09-12:
+   [`research/routing-and-dem-options.md`](research/routing-and-dem-options.md).
+   The owner's pick is now the open step** - section 15 items 6 and 7 stay
+   open, not closed by a recommendation. It recommends OpenRouteService
+   `foot-hiking` (fallback: Mapbox Directions) and a precomputed Copernicus
+   GLO-30 extract into the existing R2 bucket (fallback: MapTiler Terrain-RGB),
+   each conditional on one check the doc names - ORS's real free quota from
+   HeiGIT's own dashboard, and whether a GLO-30 extract fits the R2 headroom. Firm requirement, stronger
    than sections 8.4-8.5 currently read: observation freshness and quality must
    be shown clearly and prominently on the route profile, not "where
    practical". Spec section 15 item 11.
@@ -125,6 +149,13 @@ handset on 2026-09-11. Next work is the OSM object panel and A-to-B routing.
   Live ones: route sampling method and "snow-covered percentage" definition
   (1, 2), basemap/terrain provider (4), routing provider (6), elevation/DEM
   source (7), optional 20 m FSCOG layer (10).
+- **Expose `Content-Range` and `Accept-Ranges` in the bucket's CORS policy.**
+  Owner console work, additive and zero-risk; `r2-setup.md` step 5 already
+  carries the updated policy, the live bucket does not. Not a blocker - ranged
+  reads work today (measured 2026-09-12) - but without it a client cannot
+  assert which bytes were served, so a cache answering `200` with the whole
+  object is indistinguishable from a correct partial read. Batch it with the
+  F10 console visit below.
 - **Custom domain in front of the `r2.dev` endpoint** (security F10, optional
   pre-launch). Owner console work; needs an Admin-scoped Cloudflare token.
   `app/public/_headers` pins the bucket host in its CSP and must change in the
@@ -140,10 +171,13 @@ handset on 2026-09-11. Next work is the OSM object panel and A-to-B routing.
 - **R2 free-tier headroom is now the binding constraint on what else ships
   there.** A 31-date archive is roughly 4.0 GB and ~109,000 objects against
   the 10 GB allowance (it was ~0.9 GB at seven runs). The static OSM object
-  index and any precomputed per-object series have to fit in the remaining
+  index, any precomputed per-object series, **and - if the DEM recommendation
+  is taken - a Copernicus GLO-30 extract** have to fit in the remaining
   ~6 GB, or the date window shortens - `config.ASOF_CATALOGUE_DATES` is the
   one dial. Worth an actual `du` against the bucket once a full window exists,
-  since 130 MB/run is a mid-winter figure and summer runs are smaller.
+  since 130 MB/run is a mid-winter figure and summer runs are smaller. With
+  three claimants rather than two (2026-09-12), that `du` is no longer
+  housekeeping - it gates the elevation/DEM decision.
 - **The recovery path is unrehearsed** - revoke the publication key, restore
   trusted code, rebuild dependencies, republish known-good data.
 
