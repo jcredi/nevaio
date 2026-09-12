@@ -54,16 +54,17 @@ the deployed site still selects objects only inside the four fixture tiles.
    - **Precompute the per-object GFSC time series**, keyed on the same stable
      OSM ids, by batch-sampling the rasters the daily pipeline already
      downloads and backfilling from Copernicus's multi-year archive. No new
-     running server. Shape, from measurements taken 2026-09-11:
-     - **Do the daily increment first; it is nearly free.** `build_preview`
-       already holds every window product's GF/GF-QA/AT arrays in RAM per
-       tile, so sampling is one numpy fancy-index - 0.03 ms for a tile's
-       7,878 points, ~2 s for the whole run. Take the pixel index from the
-       product's own affine transform, never from `footprint.parse_mgrs_tile`:
-       the real granule origin is offset by up to 40 m from the 100 km grid
-       (measured, and the offset differs per tile), so a footprint-derived
-       index is off by a column for two thirds of objects. Footprint still
-       owns *which* tile covers a point.
+     running server. **The foundation shipped 2026-09-12** - the permanent
+     slot map (`object_slots.py`), the cell format and offset arithmetic
+     (`object_series.py`), and the daily sampling wired into `build_preview`
+     behind optional flags that default to off. **What remains is the backfill
+     itself**: the `workflow_dispatch` matrix described below, and publishing
+     `series/` to R2. Shape, from measurements taken 2026-09-11:
+     - The daily increment is **done** (2026-09-12) and stays off until the
+       object index publisher has run: `build_preview` takes optional
+       `--object-index-dir`/`--series-output-dir` and does nothing without
+       them. The pixel index comes from the product's own affine transform,
+       never `footprint.parse_mgrs_tile`, with a regression test pinning it.
      - **Backfill chunk = one calendar month, all tiles**, as a separate
        `workflow_dispatch` matrix: ~1,740 tile-dates and ~2.3 GB per chunk,
        far inside a 6-hour job, and at most 31 product dates per tile so
@@ -81,7 +82,14 @@ the deployed site still selects objects only inside the four fixture tiles.
        frontend needs no per-object objects in R2; ~155 MB per year of
        history for all 211,855 objects. Row order must be a permanent
        per-tile slot map published beside the index, not the index shard's
-       order, or the next OSM refresh invalidates every offset.
+       order, or the next OSM refresh invalidates every offset. **Decided
+       2026-09-12: a range read past the end of an older month file is
+       no-data, not an error** - offsets depend only on an object's own slot
+       and slots are append-only, so a slot allocated later is necessarily
+       past an older month's length, which means the object was not in the OSM
+       extract yet. Old month files are therefore never rewritten when the
+       slot map grows, and the frontend must read a 416 as a gap. This is the
+       one thing the decided format had left open.
      - **Depth: two years first** - that satisfies every spec 7.1 preset
        including the previous-year comparison - then extend backwards a month
        at a time. HR-WSI reaches back to September 2016 (~1.3 MB per
@@ -104,10 +112,6 @@ the deployed site still selects objects only inside the four fixture tiles.
    - **Then the chart itself** (spec section 7.1), including its honest
      treatment of cloud/no-data/stale gaps. The panel currently shows a
      labelled placeholder, on purpose.
-   - **Wire place search into the panel**: a search result is a MapTiler
-     geocoding hit, not an index record, so it needs the same matching
-     question answered again - most likely reusing `resolveSelection` at the
-     result's coordinates rather than trusting the geocoder's own identity.
    - One open contract question from the first consumer: whether
      `bytes`/`sha256` stay in the shard index (the frontend does verify them).
      The hut/shelter duplicate question is closed - the pipeline drops a

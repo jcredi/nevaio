@@ -1,5 +1,65 @@
 # Working session log
 
+## 2026-09-12 - Per-object series foundation, and search feeds the panel
+
+Two threads off plan item 1, both pipeline-and-frontend work that needed
+nothing from the owner.
+
+**The per-object GFSC series foundation.** `object_slots.py` (permanent
+append-only per-tile slot map, persisted beside the index), `object_series.py`
+(the decided 2-byte object-major cell, offset arithmetic, 62-byte month read)
+and `object_series_sampling.py` (vectorised sampling off the product's own
+affine transform), wired into `build_preview` behind optional flags that
+default to off - the index publisher has never run, so the daily increment
+stays dark until it has. 259 tests pass. The backfill matrix is deliberately
+not built; it is a later step.
+
+*The one gap in the decided format, now closed.* Nothing said who grows an
+already-written month file when the slot map grows on an OSM refresh. The
+answer is nobody, and the format is already right: offsets depend only on an
+object's own slot, never on the tile's current slot count, and slots are
+append-only, so a slot allocated later is necessarily past an older month's
+length. A read that falls off the end therefore means the object was not in
+the OSM extract that month - genuine absence, which spec 7.1 wants drawn as a
+gap rather than interpolated. So old files are never rewritten and the client
+reads a 416 as no-data, not as failure. Written into the module docstring as
+well as here, because it is the kind of thing a later reader would otherwise
+"fix".
+
+*Flagged, not silently decided:* spec 7.1 defines eligibility as GF present,
+QA/AT usable, age <= 14, but does not say what to call "GF present, QA or AT
+themselves unusable" as distinct from present-but-old. Folded into STALE
+rather than inventing a fifth label. If product wants those distinguished on
+the chart, that is a spec question.
+
+**Place search now resolves through the panel.** A geocoding hit is not an
+index record, so it asks the matching question again instead of trusting the
+geocoder: `resolveSelection` at the result's coordinates, rendered through the
+same panel and highlight path as a tap, so every honest outcome tap-selection
+already has answers identically and no new UI state exists. Where the index
+record's name differs from the geocoder's, the panel shows the index record's
+- the index is the identity source for history lookups. The search marker and
+the highlight are then allowed to visibly diverge, which is what `highlight.ts`
+is for. Shard loading is ordered rather than raced, with a token so a slower
+search cannot overwrite a faster one.
+
+*Judgment call worth revisiting if product disagrees:* a broad-area search
+result shows the same "Zoom in to select" notice a tap would. Special-casing
+search below `SELECTION_MAX_METERS_PER_PIXEL` would be a second unjustified
+rule, and the floor exists because proximity matching is unreliable at that
+scale however the point arrived.
+
+**Netlify did not deploy the stage 3 push.** Built the committed HEAD in a
+clean worktree: it produces `index-CgYk5Iag.js` (820,464 bytes) while the live
+site still served `index-BFfGCs3L.js` (820,510 bytes) some 15 minutes later,
+so the deployed site was still the pre-refactor commit. Ruled out the obvious
+false alarm - the inlined MapTiler key hashes identically in both bundles, so
+the difference is not an env-var artifact. The repo is healthy (tsc clean, all
+tests pass, a live CSP check against the old deploy is clean), so this is a
+deploy-pipeline question. There is no committed `netlify.toml` - the build
+config lives only in the Netlify dashboard - which makes silent config drift
+plausible. Raised with the owner; unresolved at the end of this session.
+
 ## 2026-09-12 - REFACTOR stage 3: the frontend is grouped by feature
 
 `app/src/` was split by technical layer - `map/`, `objects/`, `search/`, `ui/`
