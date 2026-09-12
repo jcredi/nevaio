@@ -114,9 +114,13 @@ the deployed site still selects objects only inside the four fixture tiles.
        deduplicating co-located objects (208,993 distinct pixels for 211,855
        objects - 1.4%); sampling every granule covering an object instead of
        its home shard's (+26% points sampled for +0.3 pp of valid marks).
-   - **Then the chart itself** (spec section 7.1), including its honest
-     treatment of cloud/no-data/stale gaps. The panel currently shows a
-     labelled placeholder, on purpose.
+   - The chart itself (spec section 7.1) **shipped 2026-09-12**, including the
+     honest gap treatment, and renders "Not available yet" until
+     `VITE_OBJECT_SERIES_URL` is set - which waits on the backfill publishing
+     `series/` and `slots/`. One question for product: spec 7.1 does not
+     clearly separate "last year" as a preset from "the comparable period in a
+     previous year" as a comparison; both were implemented, as a trailing
+     365-day preset and a toggle applying to any preset.
    - One open contract question from the first consumer: whether
      `bytes`/`sha256` stay in the shard index (the frontend does verify them).
      The hut/shelter duplicate question is closed - the pipeline drops a
@@ -198,8 +202,8 @@ the deployed site still selects objects only inside the four fixture tiles.
 - **R2 free-tier headroom is now the binding constraint on what else ships
   there.** A 31-date archive is roughly 4.0 GB and ~109,000 objects against
   the 10 GB allowance (it was ~0.9 GB at seven runs). The static OSM object
-  index, any precomputed per-object series, **and - if the DEM recommendation
-  is taken - a Copernicus GLO-30 extract** have to fit in the remaining
+  index, the precomputed per-object series **and a Copernicus GLO-30 extract**
+  have to fit in the remaining
   ~6 GB, or the date window shortens - `config.ASOF_CATALOGUE_DATES` is the
   one dial. Worth an actual `du` against the bucket once a full window exists,
   since 130 MB/run is a mid-winter figure and summer runs are smaller. With

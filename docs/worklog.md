@@ -1,5 +1,51 @@
 # Working session log
 
+## 2026-09-12 - The snow history chart, and a 200 that would have lied
+
+Spec 7.1's chart replaces the object panel's placeholder: hand-rolled inline
+SVG, no charting library (the CSP allowlist permits no arbitrary CDN, and spec
+15 item 8 still defers a UI framework). 140 frontend tests pass, up from 90.
+
+**The honest gap treatment is mechanically enforced, not eyeballed.**
+`seriesChartLayout.ts` joins two valid marks only when they are immediately
+adjacent calendar days and both valid; cloud, no-data, stale, or a day with no
+product each break the line. Gap ticks live below the plot and never enter the
+plotted line or the points, so no code path can draw across a gap, carry a
+value forward, or render a gap as a y=0 reading - and tests assert it rather
+than trusting the drawing code. A stale day's raw GF appears only in its detail
+text, never as a plotted value.
+
+**The catch worth recording.** The first version of `seriesClient.ts` trusted
+any `ok` response as the whole file and sliced client-side. Local testing
+showed a nonexistent path answers `200 text/html` from the SPA fallback, which
+that code would have decoded as snow readings. Now only a `206` is trusted as
+real bytes; 404, 416 and short reads are the documented gap, which is exactly
+the past-EOF rule decided earlier today. This is the same hazard class that
+keeps a sample raster out of this repo: stale or fabricated numbers read as
+current conditions are a real danger for the decisions this app supports.
+
+**With nothing published, the chart says so.** `VITE_OBJECT_SERIES_URL` has no
+fallback - deliberately unlike `objectIndexUrl`, which still has its fixture -
+so the panel renders "Not available yet" and draws no chart rather than
+shipping sample data. No fixture was committed; end-to-end visual checks used a
+throwaway binary generated and deleted locally.
+
+`ObjectRecord` now carries `tile`, stamped from the already-validated shard
+context rather than trusted from wire JSON, which is what lets the client find
+an object's permanent slot. `slotMapSchema.ts` is a fourth network-facing
+validator and keeps its own copies of the primitives, per the convention the
+guide states for the other three.
+
+*Open for product:* spec 7.1 does not clearly separate "last year" as a preset
+from "the comparable period in a previous year" as a comparison. Both were
+implemented - a trailing 365-day preset, and a previous-year toggle applying to
+any active preset - which seemed the more useful reading, but it is a judgment
+call.
+
+*Not verified:* anything against real published data, because none exists. The
+chart's real first test is the day the backfill publishes `series/` and
+`slots/`.
+
 ## 2026-09-12 - Routing reversed to Mapbox the same day it was decided
 
 The owner created an ORS account, which confirmed the quota the options pass
