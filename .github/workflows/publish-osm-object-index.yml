@@ -11,9 +11,16 @@ on:
   workflow_dispatch:
     inputs:
       osm_extract_urls:
-        description: "Space-separated .osm.pbf extract URLs covering the MVP footprint (e.g. Geofabrik regional extracts for the Alps/Apennines)"
+        # Decided 2026-09-12: Geofabrik's alps and italy extracts. Between them
+        # they cover the Alps and the Italian Apennines with overlap, and the
+        # build script deduplicates identical objects across extracts (it fails
+        # on differing snapshots rather than silently picking one), so the
+        # overlap costs download time and nothing else. Overridable here for a
+        # narrower rebuild or a pinned-date extract.
+        description: "Space-separated .osm.pbf extract URLs covering the MVP footprint"
         required: true
         type: string
+        default: "https://download.geofabrik.de/europe/alps-latest.osm.pbf https://download.geofabrik.de/europe/italy-latest.osm.pbf"
 
 permissions:
   contents: read

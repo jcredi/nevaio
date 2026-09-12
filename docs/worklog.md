@@ -1,5 +1,43 @@
 # Working session log
 
+## 2026-09-12 - Four owner decisions recorded
+
+The Netlify deploy that stalled earlier today was an out-of-credits account,
+not a config drift or a build failure - resolved by the owner, and the stage 3
+refactor plus everything after it is live. Worth keeping the diagnostic note
+from the earlier entry: a local bundle hash can never match the deployed one,
+because Netlify inlines `VITE_SNOW_MANIFEST_URL` and a local `.env` typically
+has no such value. The reliable signal is that the delta stayed a constant +46
+bytes across two independent comparisons, which is that URL and nothing else.
+
+**OSM extracts: Geofabrik `alps-latest` and `italy-latest`**, now the object
+index workflow's default input rather than something retyped per run. Together
+they cover the Alps and the Italian Apennines with overlap, which costs only
+download time because the build script deduplicates identical objects across
+extracts and fails loudly on differing snapshots rather than picking one.
+Verified both URLs resolve: 2.2 GB and 2.1 GB, 4.3 GB total, comfortably
+inside the build job's 120-minute timeout since `osmium tags-filter` cuts them
+down immediately. This was the last thing blocking the publisher's first run;
+that run is now a click, and it gates both the frontend URL flip and the daily
+per-object sampling that sits implemented but switched off.
+
+**Routing: OpenRouteService `foot-hiking`. Elevation: a precomputed Copernicus
+GLO-30 extract into the existing R2 bucket.** Spec section 15 items 6 and 7
+are closed, from the options pass written earlier today. Both picks keep the
+condition the doc attached to them, and neither should be built on before the
+condition clears: ORS's real free quota needs confirming from HeiGIT's own
+dashboard rather than the forum post and aggregator the doc had to rely on,
+and the GLO-30 extract needs a `du` against the bucket, since it is now the
+third claimant on the same ~6 GB. Fallbacks stay Mapbox Directions and
+MapTiler Terrain-RGB.
+
+**Chart gap states: "GF present but QA/AT unusable" stays folded into STALE.**
+Spec 7.1 defines eligibility but never named that case, and the implementation
+had already made the call; the owner confirmed it rather than adding a fifth
+state. Four states total - VALID, CLOUD, NO_DATA, STALE - and the encoding is
+unchanged. Had the answer gone the other way it would have been cheap now and
+expensive later, which is why it was worth asking before anything publishes.
+
 ## 2026-09-12 - Per-object series foundation, and search feeds the panel
 
 Two threads off plan item 1, both pipeline-and-frontend work that needed

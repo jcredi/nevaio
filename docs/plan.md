@@ -31,13 +31,18 @@ the deployed site still selects objects only inside the four fixture tiles.
      `workflow_dispatch` workflow `.github/workflows/publish-osm-object-index.yml`,
      reusing the `production-r2` environment and the snow data's bucket under
      the `object-index/` key prefix. In order:
-     - **Decide which OSM extracts cover the footprint and write it down.**
-       This was never recorded, so the workflow takes the extract URLs as a
-       dispatch input rather than a hardcoded region list. It is the one thing
-       blocking the first run. Geofabrik regional extracts are the expected
-       shape.
-     - **Run the workflow** from the Actions tab with those URLs. It
-       self-verifies the published index against its own receipt.
+     - **Decided 2026-09-12: Geofabrik's `alps-latest.osm.pbf` and
+       `italy-latest.osm.pbf`**, now the dispatch input's default. Between them
+       they cover the Alps and the Italian Apennines with overlap, and the
+       build script deduplicates identical objects across extracts (failing on
+       differing snapshots rather than silently picking one), so the overlap
+       costs download time and nothing else. Verified the same day: both URLs
+       resolve, 2.2 GB and 2.1 GB, 4.3 GB total.
+     - **Run the workflow** from the Actions tab - the default input is now
+       correct, so this is a click. It self-verifies the published index
+       against its own receipt. **This is the remaining blocker for everything
+       below**: it gates both the frontend URL flip and the daily per-object
+       sampling, which sits implemented but switched off.
      - **Point `VITE_OBJECT_INDEX_URL`** at
        `<R2_PUBLIC_BASE_URL>/object-index/object-index.json`. That is the URL
        in `app/src/map/config.ts` and nothing else; the bucket host is already
@@ -125,7 +130,15 @@ the deployed site still selects objects only inside the four fixture tiles.
    choice is made from a costed shortlist rather than cold** - a written
    options/pros-cons/recommendation pass covering the routing provider and the
    elevation/DEM source (section 15 item 7) comes first, then the owner picks.
-   **That pass was delivered 2026-09-12:
+   **Decided 2026-09-12: OpenRouteService `foot-hiking` for routing, and a
+   precomputed Copernicus GLO-30 extract in R2 for elevation.** Two checks the
+   picks were made conditional on are still outstanding and should happen
+   before either is built on: confirm ORS's real free quota from HeiGIT's own
+   dashboard (the figure in the doc came from a forum post and an aggregator),
+   and `du` the R2 bucket to confirm a GLO-30 extract fits beside the object
+   index and the per-object series. Fallbacks if either fails: Mapbox
+   Directions, MapTiler Terrain-RGB.
+   **The options pass behind this was delivered 2026-09-12:
    [`research/routing-and-dem-options.md`](research/routing-and-dem-options.md).
    The owner's pick is now the open step** - section 15 items 6 and 7 stay
    open, not closed by a recommendation. It recommends OpenRouteService
@@ -151,8 +164,12 @@ the deployed site still selects objects only inside the four fixture tiles.
 
 - **Spec section 15** is the canonical list of undecided product questions.
   Live ones: route sampling method and "snow-covered percentage" definition
-  (1, 2), basemap/terrain provider (4), routing provider (6), elevation/DEM
-  source (7), optional 20 m FSCOG layer (10).
+  (1, 2), basemap/terrain provider (4), optional 20 m FSCOG layer (10).
+  **Items 6 and 7 were decided 2026-09-12** from
+  [`research/routing-and-dem-options.md`](research/routing-and-dem-options.md):
+  routing is **OpenRouteService**'s `foot-hiking` profile, elevation is a
+  **precomputed Copernicus GLO-30 extract into the existing R2 bucket**. Each
+  carries one unfinished check, below.
 - **Expose `Content-Range` and `Accept-Ranges` in the bucket's CORS policy.**
   Owner console work, additive and zero-risk; `r2-setup.md` step 5 already
   carries the updated policy, the live bucket does not. Not a blocker - ranged
