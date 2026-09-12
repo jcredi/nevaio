@@ -1,0 +1,169 @@
+name: Publish OSM object index
+
+# Decided 2026-09-11 (docs/plan.md): a separate workflow, not a stage bolted
+# onto publish-latest-preview.yml. The sharded OSM object index has its own
+# lifecycle - it changes only when the OSM extracts refresh, not daily - and
+# it publishes into the same R2 bucket as the GFSC snapshot under its own key
+# prefix (object-index/, distinct from runs/, latest.json, dates.json and
+# asof-*.json), so it reuses the production-r2 environment rather than
+# needing a bucket of its own. See pipeline/src/nevaio_pipeline/publish_object_index.py.
+on:
+  workflow_dispatch:
+    inputs:
+      osm_extract_urls:
+        description: "Space-separated .osm.pbf extract URLs covering the MVP footprint (e.g. Geofabrik regional extracts for the Alps/Apennines)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+# The pipeline is a src-layout package but is deliberately NOT pip-installed
+# here, for the same reason publish-latest-preview.yml is not: the publish job
+# holds one dependency (boto3) and nothing else, and a build backend would
+# enlarge that surface. Running from source keeps --require-hashes absolute.
+env:
+  PYTHONPATH: pipeline/src
+
+concurrency:
+  group: publish-osm-object-index
+  cancel-in-progress: false
+
+jobs:
+  build:
+    # Also restrict the production-r2 environment to main in GitHub settings.
+    if: github.ref == 'refs/heads/main'
+    name: Build the sharded index without publication credentials
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - name: Check out trusted source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+      - name: Install locked render dependencies
+        # Same lock the daily snapshot render job uses - it already carries
+        # boto3 (for pipeline.render's own optional --publish-r2) and nothing
+        # this build step needs is outside it; object_index.py and
+        # osmium_export.py are pure standard library.
+        run: |
+          python -m pip install --require-hashes --only-binary=:all: -r pipeline/requirements.txt
+      - name: Run pipeline and isolation tests
+        run: python -m unittest discover -s pipeline/tests -t pipeline
+      - name: Install osmium-tool
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends osmium-tool
+      - name: Download OSM extracts
+        env:
+          OSM_EXTRACT_URLS: ${{ inputs.osm_extract_urls }}
+        run: |
+          mkdir -p "${RUNNER_TEMP}/osm-extracts"
+          read -r -a urls <<< "${OSM_EXTRACT_URLS}"
+          counter=0
+          for url in "${urls[@]}"; do
+            curl --fail --show-error --location --retry 5 --max-time 1800 \
+              --output "${RUNNER_TEMP}/osm-extracts/extract-${counter}.osm.pbf" "${url}"
+            counter=$((counter + 1))
+          done
+      - name: Build the sharded object index
+        run: |
+          shopt -s nullglob
+          extracts=("${RUNNER_TEMP}"/osm-extracts/*.osm.pbf)
+          if [[ ${#extracts[@]} -eq 0 ]]; then
+            echo "no OSM extracts downloaded" >&2
+            exit 1
+          fi
+          PYTHON_BIN="$(command -v python)" pipeline/tools/build_osm_object_index.sh \
+            --output-dir "${RUNNER_TEMP}/object-index" "${extracts[@]}"
+      - name: Validate built artifact before it leaves this job
+        run: |
+          python -m nevaio_pipeline.publish_object_index \
+            --source-dir "${RUNNER_TEMP}/object-index" --check-only
+      - name: Transfer only the built artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: osm-object-index-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/object-index/
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+          include-hidden-files: false
+
+  publish:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    name: Validate and publish on a fresh runner
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: production-r2
+    steps:
+      - name: Check out trusted source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+      - name: Install locked minimal publisher dependencies
+        # Deliberately no shared pip cache and no raster/image libraries.
+        run: |
+          python -m pip install --require-hashes --only-binary=:all: -r pipeline/requirements-publish.txt
+      - name: Download this run's artifact outside the source checkout
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: osm-object-index-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/object-index
+      - name: Validate untrusted artifact without secrets
+        run: |
+          python -m nevaio_pipeline.publish_object_index \
+            --source-dir "${RUNNER_TEMP}/object-index" --check-only
+      - name: Publish validated object index
+        env:
+          R2_ACCOUNT_ID: ${{ vars.R2_ACCOUNT_ID }}
+          R2_BUCKET: ${{ vars.R2_BUCKET }}
+          R2_PUBLIC_BASE_URL: ${{ vars.R2_PUBLIC_BASE_URL }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        run: |
+          python -m nevaio_pipeline.publish_object_index \
+            --source-dir "${RUNNER_TEMP}/object-index" \
+            --receipt "${RUNNER_TEMP}/object-index-receipt.json"
+      # Reads only the public object and this job's own receipt; no
+      # credentials, no new dependency.
+      - name: Verify published index matches this publication
+        env:
+          R2_PUBLIC_BASE_URL: ${{ vars.R2_PUBLIC_BASE_URL }}
+        run: |
+          curl --fail --show-error --retry 5 --max-time 60 \
+            --output "${RUNNER_TEMP}/published-object-index.json" \
+            "${R2_PUBLIC_BASE_URL%/}/object-index/object-index.json"
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          temp = Path(os.environ["RUNNER_TEMP"])
+          published = json.loads((temp / "published-object-index.json").read_text())
+          receipt = json.loads((temp / "object-index-receipt.json").read_text())
+          if (published["objectCount"], len(published["shards"])) != (
+              receipt["objectCount"], receipt["shardCount"]
+          ):
+              raise SystemExit("Published object index does not match this publication")
+          print(
+              f"Verified {receipt['objectCount']} objects across "
+              f"{receipt['shardCount']} shards at {receipt['indexUrl']}"
+          )
+          PY
+      - name: Preserve publication metadata
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: osm-object-index-publication-metadata
+          path: |
+            ${{ runner.temp }}/published-object-index.json
+            ${{ runner.temp }}/object-index-receipt.json
+          if-no-files-found: error
+          retention-days: 7
