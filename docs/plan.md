@@ -34,16 +34,19 @@ tiles. What remains of the object panel is the series behind its chart.
      behind optional flags that default to off. **What remains is the backfill
      itself**: the `workflow_dispatch` matrix described below, and publishing
      `series/` to R2. Shape, from measurements taken 2026-09-11:
-     - The daily increment is **done** (2026-09-12): `build_preview` takes
-       optional `--object-index-dir`/`--series-output-dir` and does nothing
-       without them. The pixel index comes from the product's own affine
-       transform, never `footprint.parse_mgrs_tile`, with a regression test
-       pinning it. **With the index published, the next step is switching this
-       on in the daily workflow** - the render job needs the published index
-       and slot map available to it, which is a workflow change rather than
-       new pipeline code.
-     - **Backfill chunk = one calendar month, all tiles**, as a separate
-       `workflow_dispatch` matrix: ~1,740 tile-dates and ~2.3 GB per chunk,
+     - The daily increment is **done and switched on** (2026-09-12). The
+       render job fetches the published index and slot maps over plain HTTPS
+       and samples during the existing render; the publish job uploads
+       `series/` and the updated slot maps from the one step that already
+       holds secrets. **It has not yet run** - the next scheduled run is
+       04:35 UTC, or dispatch `publish-latest-preview.yml` manually to see it
+       sooner. First run builds every tile's slot map, since none exist yet.
+       The pixel index comes from the product's own affine transform, never
+       `footprint.parse_mgrs_tile`.
+     - **The remaining work is the backfill.** Two chunks (amendment v1.13's
+       depth), then set `VITE_OBJECT_SERIES_URL` and the chart stops saying
+       "Not available yet". **Backfill chunk = one calendar month, all
+       tiles**, as a separate `workflow_dispatch` matrix: ~1,740 tile-dates and ~2.3 GB per chunk,
        far inside a 6-hour job, and at most 31 product dates per tile so
        `select_window_products` is reused unchanged. 12 chunks per year of
        history; the Free plan allows 20 concurrent jobs and 256 matrix jobs

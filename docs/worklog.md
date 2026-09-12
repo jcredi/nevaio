@@ -1,5 +1,58 @@
 # Working session log
 
+## 2026-09-12 - Daily per-object sampling is on, and two silent-corruption bugs
+
+The daily workflow now fetches the published object index and slot maps over
+plain HTTPS (public objects - the render job still gets no credentials, so the
+trust boundary is untouched), samples per-object GFSC during the existing
+render, and publishes `series/` plus the updated slot maps from inside the one
+step that already holds secrets. `test_workflow_security.py` needed no
+assertion changes, which was checked rather than assumed. 273 tests pass. It
+has not run yet; next scheduled run is 04:35 UTC.
+
+**Slot maps live at `object-index/slots/<TILE>.json`** - beside the index, in
+the same prefix, which is what `object_slots.py`'s own path convention
+implies. They are fetched, extended and published back, never rebuilt on a
+runner, because the map is permanent append-only state and a runner holds
+none.
+
+**Two ways that invariant could have been broken silently. Both are the same
+failure class, and neither would ever have surfaced as an error - only as
+plausible wrong numbers on a chart.**
+
+*One: the OSM refresh would have deleted every slot map.*
+`publish_object_index`'s stale-key cleanup listed the whole `object-index/`
+prefix and deleted whatever the new index did not name. A slot map is named by
+nothing that publisher uploads, so the moment slot maps moved in beside the
+index, the next `workflow_dispatch` of the index workflow would have swept
+them all - invalidating every published byte offset. Cleanup is now scoped to
+`object-index/objects/`, with a regression test that says why in its own
+docstring.
+
+*Two: a transient network blip would have rebuilt a tile's ordering.* The
+workflow first treated any failed slot-map fetch as "first run for this tile",
+but `load_or_create_slot_map` builds a **fresh** map when the file is absent.
+So a timeout or 5xx on one tile would rebuild its ordering from scratch,
+dropping the holes left by departed objects and shifting every slot after
+them - silently invalidating that tile's whole published history. Now only a
+literal **404** counts as absence; any other outcome skips the tile entirely
+for that run. One lost day of one tile's samples beats a corrupted history.
+All three branches were simulated against the real bucket, including that the
+step survives `bash -e` (curl's `--write-out` already prints `000` on a
+connection failure, so the guard is `|| true`, not `|| echo 000`, which would
+concatenate two codes).
+
+Both are now in the agent guide, not only here, because both are easy to undo
+by accident and neither announces itself.
+
+**The daily snow snapshot is deliberately insulated from all of it.** An
+unreachable index disables sampling for that run and the snapshot renders and
+publishes exactly as before. It is the app's primary function and has run
+unattended since 2026-08-28; an additive feature does not get to put that at
+risk.
+
+What remains of item 1: the two-month backfill, then `VITE_OBJECT_SERIES_URL`.
+
 ## 2026-09-12 - The OSM object index is live on R2
 
 Run #1 of `publish-osm-object-index.yml` succeeded in 9 minutes: **54 shards,
