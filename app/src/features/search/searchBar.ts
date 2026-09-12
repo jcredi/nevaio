@@ -1,6 +1,6 @@
 import maplibregl, { type Map } from "maplibre-gl";
-import { parseCoordinates } from "../search/coordinates";
-import { geocode, type GeocodeBounds, type GeocodeResult } from "../search/geocode";
+import { parseCoordinates } from "./coordinates";
+import { geocode, type GeocodeBounds, type GeocodeResult } from "./geocode";
 
 type SearchResult =
   | ({ kind: "place" } & GeocodeResult)

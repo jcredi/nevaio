@@ -17,8 +17,8 @@
  * search bar and the snow control have collided twice before; this is the one
  * coupling point, kept explicit rather than hard-coded in two places.
  */
-import type { ObjectRecord } from "../objects/objectIndexSchema.ts";
-import type { Selection } from "../objects/selection.ts";
+import type { ObjectRecord } from "./objectIndexSchema.ts";
+import type { Selection } from "./selection.ts";
 
 /** How each selectable class is named to the user, with its map-ish glyph. */
 const KIND_LABELS: Record<ObjectRecord["kind"], { label: string; icon: string }> = {

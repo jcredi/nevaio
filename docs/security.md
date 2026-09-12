@@ -52,7 +52,7 @@ The deployed mode is the only one that exercises the R2 legs, because the
 bucket's CORS policy allows the production origin alone.
 
 Snow metadata fetched at runtime is validated by
-`app/src/map/manifestSchema.ts` before any value reaches MapLibre. Tile URLs
+`app/src/features/snow/manifestSchema.ts` before any value reaches MapLibre. Tile URLs
 must resolve to the manifest's own origin and its own run directory, so a
 poisoned manifest cannot redirect the browser elsewhere. If the pipeline ever
 changes where tiles live, that validator changes in the same commit or the map

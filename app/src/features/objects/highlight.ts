@@ -8,7 +8,7 @@
  */
 import type { GeoJSONSource, Map as MapLibreMap } from "maplibre-gl";
 
-import type { ObjectRecord } from "../objects/objectIndexSchema.ts";
+import type { ObjectRecord } from "./objectIndexSchema.ts";
 
 const SOURCE_ID = "selected-object";
 const HALO_LAYER_ID = "selected-object-halo";

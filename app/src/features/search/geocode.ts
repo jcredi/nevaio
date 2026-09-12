@@ -14,7 +14,7 @@
  * Nominatim choice is preserved. MapTiler and OSM attribution is already
  * required and present for the basemap.
  */
-import { searchBiasBounds } from "../map/config";
+import { searchBiasBounds } from "../../map/config";
 import {
   parseGeocodeResponse,
   RESULT_LIMIT,

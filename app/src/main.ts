@@ -5,18 +5,18 @@ import {
   snowManifestUrl,
   styleUrl,
 } from "./map/config";
-import { loadDateCatalogue } from "./map/dateCatalogue";
-import type { CatalogueEntry } from "./map/dateCatalogueSchema";
+import { loadDateCatalogue } from "./features/snow/dateCatalogue";
+import type { CatalogueEntry } from "./features/snow/dateCatalogueSchema";
 import { metersPerPixel } from "./map/scale";
-import { SelectionHighlight } from "./map/selectionHighlight";
-import { addSnowOverlay, type SnowOverlay } from "./map/snowOverlay";
-import { ObjectIndexStore } from "./objects/objectIndex";
-import type { Bounds } from "./objects/objectIndexSchema";
-import { SELECTION_MAX_METERS_PER_PIXEL, resolveSelection } from "./objects/selection";
-import { ObjectPanel, type IndexStatus } from "./ui/objectPanel";
-import { SnowControl } from "./ui/snowControl";
-import { SnowDateControl } from "./ui/snowDateControl";
-import { createSearchBar } from "./ui/searchBar";
+import { SelectionHighlight } from "./features/objects/highlight";
+import { addSnowOverlay, type SnowOverlay } from "./features/snow/overlay";
+import { ObjectIndexStore } from "./features/objects/objectIndex";
+import type { Bounds } from "./features/objects/objectIndexSchema";
+import { SELECTION_MAX_METERS_PER_PIXEL, resolveSelection } from "./features/objects/selection";
+import { ObjectPanel, type IndexStatus } from "./features/objects/panel";
+import { SnowControl } from "./features/snow/control";
+import { SnowDateControl } from "./features/snow/dateControl";
+import { createSearchBar } from "./features/search/searchBar";
 import "./style.css";
 
 const map = new maplibregl.Map({

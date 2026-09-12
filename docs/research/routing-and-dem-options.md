@@ -40,7 +40,7 @@ already decided (section 4, section 9) and is out of scope here.
    (`VITE_MAPTILER_API_KEY` is deliberately not marked secret in Netlify -
    Vite inlines all `VITE_*` vars into the client bundle, and the real access
    control is MapTiler's own domain allowlist, not Netlify's secret masking -
-   see `app/src/search/geocode.ts` and `docs/security.md`).
+   see `app/src/features/search/geocode.ts` and `docs/security.md`).
 3. **Attribution and licensing.** OSM/ODbL requires attribution wherever OSM
    data or its derivatives are shown (already carried for the basemap and
    geocoding); Copernicus data requires its own attribution string
@@ -58,7 +58,7 @@ already decided (section 4, section 9) and is out of scope here.
    freshness treatment instead of stitching together two APIs' worth of
    per-point data. Noted per-candidate below where it applies.
 
-Precedent this follows: `app/src/search/geocode.ts` picked MapTiler
+Precedent this follows: `app/src/features/search/geocode.ts` picked MapTiler
 Geocoding over Nominatim specifically because Nominatim's own usage policy
 *prohibits* client-side autocomplete outright (spec amendment v1.9, audit
 F11) - a terms-of-service disqualification, not a quality one. The same

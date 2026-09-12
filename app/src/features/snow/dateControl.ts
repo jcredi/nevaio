@@ -1,4 +1,4 @@
-import type { CatalogueEntry } from "../map/dateCatalogueSchema";
+import type { CatalogueEntry } from "./dateCatalogueSchema";
 
 /** Render an AS-OF date the way a reader in the Alps expects to see it. */
 export function formatProductDate(iso: string): string {

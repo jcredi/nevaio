@@ -27,7 +27,7 @@
  *                      "longitude": 7.8, "latitude": 45.9,
  *                      "elevationMeters": 4554 } ] }
  *
- * Written in the same spirit as `../map/manifestSchema.ts`: these arrive over
+ * Written in the same spirit as `../snow/manifestSchema.ts`: these arrive over
  * the network, TypeScript types check nothing at runtime, so this is the
  * actual gate. In particular each shard `path` is resolved against the index's
  * own URL and must stay on that origin and in that directory, so a poisoned

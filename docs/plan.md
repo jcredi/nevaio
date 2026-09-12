@@ -22,7 +22,7 @@ the deployed site still selects objects only inside the four fixture tiles.
 1. **OSM object panel: publish the index, then the snow history (spec
    section 7).** Selection is done and runs on a committed fixture: the tap
    rule, the shard-index/shard validators, lazy shard loading and the minimal
-   panel are in `app/src/objects/` and `app/src/ui/objectPanel.ts`, and
+   panel are in `app/src/features/objects/` and `app/src/features/objects/panel.ts`, and
    `docs/research/maptiler-outdoor-objects.md` records what the basemap really
    renders. What remains, in order:
    - **Run the object index publisher, then wire the frontend to it.** The
@@ -132,16 +132,16 @@ the deployed site still selects objects only inside the four fixture tiles.
    than sections 8.4-8.5 currently read: observation freshness and quality must
    be shown clearly and prominently on the route profile, not "where
    practical". Spec section 15 item 11.
-3. **Repository structure refactor, stage 3 onward**
+3. **Repository structure refactor, stage 4**
    ([`../REFACTOR.md`](../REFACTOR.md)). Stages 1 (dissolve `recon/`) and 2
-   (package the pipeline) are done - 2026-09-09. Sequencing decided that day
-   and worth not re-deriving: stage 3 regroups the frontend into feature
-   folders and had to come *after* the mobile pass, because its own instruction
-   is to "preserve responsive styling" and that styling was broken - it needed
-   a known-good baseline to preserve. **That baseline now exists** (handset
-   check, 2026-09-11), so stage 3 is unblocked. Stage 4
-   (contracts) waits for the OSM object panel, which is the work that would
-   actually consume a shared encoding.
+   (package the pipeline) are done - 2026-09-09; stage 3 (regroup the frontend
+   into `app/src/features/`) is done - 2026-09-12. Stage 4 (contracts) waits
+   for the OSM object panel, which is the work that would actually consume a
+   shared encoding - so it is gated on item 1, not on anything structural.
+   When it starts, note that `REFACTOR.md`'s target tree was written
+   2026-09-09 and has already drifted once: it names frontend files that no
+   longer exist and renames that later work made wrong. Verify against the
+   repository, as that document's own instructions say.
 
 ## Open
 

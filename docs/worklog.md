@@ -1,5 +1,50 @@
 # Working session log
 
+## 2026-09-12 - REFACTOR stage 3: the frontend is grouped by feature
+
+`app/src/` was split by technical layer - `map/`, `objects/`, `search/`, `ui/`
+- so one feature's validator, map layer and UI control sat in three folders.
+It is now grouped by feature, which is what `REFACTOR.md` asked for and what
+stage 4's contracts work will read.
+
+`src/features/snow/` (`overlay.ts`, `manifestSchema.ts`, `dateCatalogue.ts`,
+`dateCatalogueSchema.ts`, `control.ts`, `dateControl.ts`),
+`src/features/search/` (`geocode.ts`, `geocodeResult.ts`, `coordinates.ts`,
+`searchBar.ts`) and `src/features/objects/` (`objectIndex.ts`,
+`objectIndexSchema.ts`, `selection.ts`, `panel.ts`, `highlight.ts`), with
+tests beside the code they cover. Every move is a `git mv`, so history
+follows. No behavior changed; no file's contents changed beyond import paths
+and two doc comments.
+
+**`src/map/` survives, deliberately, holding only what no single feature
+owns**: `config.ts` and `scale.ts`. Collapsing it into a feature would have
+forced an arbitrary choice - `config.ts` carries the style URL, the initial
+view, the overlay URL *and* the search bias bounds, so it belongs to all three
+features and none.
+
+**Deviation from `REFACTOR.md`'s target tree, recorded because it was
+deliberate.** That tree renames `manifestSchema.ts` to `manifest.ts`, but it
+was written 2026-09-09, before `dateCatalogueSchema.ts` and
+`objectIndexSchema.ts` existed. The guide now treats those three as a
+deliberate trio of network-facing validators that each read end to end on
+their own, so all three keep the `*Schema.ts` name; renaming one of them would
+have broken the symmetry the guide points at. The same tree also still lists
+`nominatim.ts`, which place search stopped using in v1.9. Stage 4 should
+verify that tree against the repository rather than trust it.
+
+**Verified, not assumed:** `npm run build` (tsc -b clean), `npm test` (90
+pass), `npm run check-mobile-layout` at 320 and 390 CSS px - the actual
+acceptance criterion, since stage 3's own instruction is to preserve
+responsive styling - and `npm run check-csp` against the real build, no
+violations. `src/style.css` stays one file on purpose: the responsive rules
+cross features, and splitting them is what broke the mobile layout before.
+
+**Not touched:** `docs/worklog.md` history, `docs/archive/`, and the dated
+records in `docs/research/` still carry pre-move paths. Rewriting them would
+contradict the append-only convention and the point of a dated record; this
+entry is the forwarding address. Live docs - the guide, the plan,
+`security.md` - were updated.
+
 ## 2026-09-12 - Object index publisher, two assumptions verified, routing/DEM options
 
 Three parallel tracks against `docs/plan.md`: the object index publication

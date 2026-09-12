@@ -7,7 +7,7 @@
  */
 import type { Map as MapLibreMap } from "maplibre-gl";
 
-import { distanceMeters } from "../objects/selection.ts";
+import { distanceMeters } from "../features/objects/selection.ts";
 
 /** Long enough to be insensitive to unproject rounding, short enough to be local. */
 const SAMPLE_PIXELS = 64;
