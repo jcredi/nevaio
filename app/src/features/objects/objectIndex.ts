@@ -2,12 +2,12 @@
  * The loading boundary for the static, sharded OSM object index.
  *
  * Everything provider-specific about *where* the index comes from lives here
- * and nowhere else. Today it is a small fixture in `public/object-index/`
- * shaped exactly like the real artifact; when the pipeline publishes to R2 the
- * change is the URL in `../map/config.ts`, and nothing else.
+ * and nowhere else. Since 2026-09-12 that is the real R2 publication - 54
+ * shards, 211,881 objects - and the old `public/object-index/` fixture is
+ * gone; the URL is the one in `../map/config.ts` and nothing else.
  *
- * The R2 bucket host is already in `app/public/_headers`' `connect-src` (it
- * serves the snow manifest), so that swap needs no new CSP origin. Any *other*
+ * The R2 bucket host was already in `app/public/_headers`' `connect-src` (it
+ * serves the snow manifest), so this needed no new CSP origin. Any *other*
  * host would.
  *
  * Shards are fetched lazily. The full published set is 54 shards / 39 MB; a

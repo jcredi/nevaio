@@ -34,14 +34,15 @@ export const snowManifestUrl =
 // resolved against this URL and must stay in its directory, so this one value
 // is the whole trust anchor (the same rule the snow manifest uses).
 //
-// Today it is a fixture in public/object-index/, cut from the real published
-// artifact and covering Monte Rosa, Gran San Bernardo, Chamonix and Solda, so
-// the selection prototype runs on real records. Point
-// VITE_OBJECT_INDEX_URL at the R2 publication to swap it in: the bucket host
-// is already in the CSP's connect-src, so no _headers change is needed for
-// that host - any other host would need one.
+// Published to R2 on 2026-09-12 by .github/workflows/publish-osm-object-index.yml
+// (54 shards, 211,881 objects, 28.6 MB), so this now defaults to the real
+// artifact and the local fixture is gone. The bucket host is already in the
+// CSP's connect-src, so no _headers change was needed for it - any other host
+// would need one. VITE_OBJECT_INDEX_URL still overrides, which is how a local
+// build points at a rebuilt index without a commit.
 export const objectIndexUrl =
-  import.meta.env.VITE_OBJECT_INDEX_URL || "/object-index/object-index.json";
+  import.meta.env.VITE_OBJECT_INDEX_URL ||
+  "https://pub-1b43c7d267ad44228b11f94fc251b9ac.r2.dev/object-index/object-index.json";
 
 // The per-object GFSC time series (spec section 7.1) - a permanent per-tile
 // slot map plus `series/<TILE>/<YYYY-MM>.bin` month files, published beside
