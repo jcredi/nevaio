@@ -331,25 +331,37 @@ jobs:
       - name: Verify per-object series publication
         env:
           R2_PUBLIC_BASE_URL: ${{ vars.R2_PUBLIC_BASE_URL }}
+        # Fetches with curl, then parses local files - the same shape as the
+        # "Verify public pointer" step above, and deliberately NOT
+        # urllib.request. Cloudflare's r2.dev endpoint answers **403** to
+        # Python's default `User-Agent: Python-urllib/3.12` while serving the
+        # identical URL to curl; that is what failed this step on its first
+        # real run (2026-09-12) after the publish itself had fully succeeded.
+        # Do not "fix" a recurrence by spoofing a User-Agent header - fetch
+        # with curl, which is what every other verification here already does.
         run: |
-          python - <<'PY'
-          import json, os, urllib.request
+          python - <<'PY' > "${RUNNER_TEMP}/series-tiles.txt"
+          import json, os
           from pathlib import Path
-          temp = Path(os.environ["RUNNER_TEMP"])
-          base = os.environ["R2_PUBLIC_BASE_URL"].rstrip("/")
-          receipt = json.loads((temp / "object-series-receipt.json").read_text())
-          if receipt["seriesFilesPublished"] == 0 and receipt["slotFilesPublished"] == 0:
-              print("Nothing to verify: the per-object sampling increment did not run this time.")
-              raise SystemExit(0)
-          for tile in receipt["tiles"]:
-              url = f"{base}/object-index/slots/{tile}.json"
-              with urllib.request.urlopen(url, timeout=30) as response:
-                  if response.status != 200:
-                      raise SystemExit(f"Slot map for {tile} did not publish: HTTP {response.status}")
-                  json.loads(response.read())
-          print(f"Verified {len(receipt['tiles'])} tile slot map(s) published "
-                f"alongside {receipt['seriesFilesPublished']} series file(s)")
+          receipt = json.loads((Path(os.environ["RUNNER_TEMP"]) / "object-series-receipt.json").read_text())
+          if receipt["seriesFilesPublished"] or receipt["slotFilesPublished"]:
+              print("\n".join(receipt["tiles"]))
           PY
+          if [[ ! -s "${RUNNER_TEMP}/series-tiles.txt" ]]; then
+            echo "Nothing to verify: the per-object sampling increment did not run this time."
+            exit 0
+          fi
+          verified=0
+          while IFS= read -r tile; do
+            [[ -z "${tile}" ]] && continue
+            curl --fail --silent --show-error --retry 5 --max-time 60 \
+              --output "${RUNNER_TEMP}/published-slots-${tile}.json" \
+              "${R2_PUBLIC_BASE_URL%/}/object-index/slots/${tile}.json"
+            python -c "import json,sys; json.load(open(sys.argv[1]))" \
+              "${RUNNER_TEMP}/published-slots-${tile}.json"
+            verified=$((verified + 1))
+          done < "${RUNNER_TEMP}/series-tiles.txt"
+          echo "Verified ${verified} tile slot map(s) published"
       - name: Preserve publication metadata
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
