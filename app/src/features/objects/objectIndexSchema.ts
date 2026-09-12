@@ -57,6 +57,15 @@ export type ObjectRecord = {
   latitude: number;
   /** Metres, or null where OSM has no usable `ele` tag - frequently null. */
   elevationMeters: number | null;
+  /**
+   * The MGRS tile this record's shard is published under - stamped from the
+   * shard's own already-validated `tile` field, never from the record's own
+   * JSON (a record on the wire carries no `tile` of its own; one shard is
+   * always exactly one tile). This is the key the snow-history feature needs
+   * to find the object's slot map (`slotMapSchema.ts`) and its
+   * `series/<TILE>/<YYYY-MM>.bin` files - see `seriesClient.ts`.
+   */
+  tile: string;
 };
 
 /** west, south, east, north, in degrees. */
@@ -193,7 +202,7 @@ function resolveShardUrl(candidate: unknown, field: string, base: URL): string {
   return resolved.href;
 }
 
-function validateRecord(value: unknown, field: string): ObjectRecord {
+function validateRecord(value: unknown, field: string, tile: string): ObjectRecord {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     fail(`${field} must be a JSON object`);
   }
@@ -224,7 +233,7 @@ function validateRecord(value: unknown, field: string): ObjectRecord {
     );
   }
 
-  return { id, kind: kind as ObjectKind, name, longitude, latitude, elevationMeters };
+  return { id, kind: kind as ObjectKind, name, longitude, latitude, elevationMeters, tile };
 }
 
 function requireDocument(document: unknown, what: string): Record<string, unknown> {
@@ -334,7 +343,7 @@ export function validateObjectShard(document: unknown, expected: ShardDescriptor
   const objects: ObjectRecord[] = [];
   const seen = new Set<string>();
   for (const [index, entry] of source.objects.entries()) {
-    const record = validateRecord(entry, `objects[${index}]`);
+    const record = validateRecord(entry, `objects[${index}]`, tile);
     // Ids are globally unique by construction; a duplicate inside one shard
     // would make a selection ambiguous for no good reason.
     if (seen.has(record.id)) fail(`duplicate object id ${record.id} in shard ${tile}`);

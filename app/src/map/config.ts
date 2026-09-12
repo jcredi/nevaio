@@ -43,6 +43,18 @@ export const snowManifestUrl =
 export const objectIndexUrl =
   import.meta.env.VITE_OBJECT_INDEX_URL || "/object-index/object-index.json";
 
+// The per-object GFSC time series (spec section 7.1) - a permanent per-tile
+// slot map plus `series/<TILE>/<YYYY-MM>.bin` month files, published beside
+// the object index (`docs/plan.md` item 1; `app/src/features/objects/seriesClient.ts`
+// is the reader). Unlike `objectIndexUrl` and `snowManifestUrl`, this has
+// deliberately **no committed local fixture fallback**: the backfill has not
+// run and nothing is published yet, and a checked-in snow-history fixture
+// would ship inside `public/` and be indistinguishable from a real reading -
+// exactly the hazard documented in `docs/agent-guide.md` for the removed
+// offline snow raster. Until this is set, the history section reports the
+// series as unavailable rather than showing anything.
+export const objectSeriesUrl: string | null = import.meta.env.VITE_OBJECT_SERIES_URL || null;
+
 // Approximate Alps + Italian Apennines bounding box (west, south, east,
 // north), used only to bias place-search results (spec section 6.1) toward
 // the MVP geographic scope - not a hard filter, so exact correctness here

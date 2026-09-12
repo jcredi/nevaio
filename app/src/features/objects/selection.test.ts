@@ -26,6 +26,7 @@ const DUFOURSPITZE: ObjectRecord = {
   longitude: 7.866757,
   latitude: 45.936924,
   elevationMeters: 4634,
+  tile: "32TMR",
 };
 const NORDEND: ObjectRecord = {
   id: "node/414760066",
@@ -34,6 +35,7 @@ const NORDEND: ObjectRecord = {
   longitude: 7.869,
   latitude: 45.943,
   elevationMeters: 4609,
+  tile: "32TMR",
 };
 const CAPANNA_MARGHERITA: ObjectRecord = {
   id: "node/307196932",
@@ -42,6 +44,7 @@ const CAPANNA_MARGHERITA: ObjectRecord = {
   longitude: 7.876944,
   latitude: 45.926944,
   elevationMeters: 4554,
+  tile: "32TMR",
 };
 
 /** A scale comfortably inside the floor: MapLibre z14-ish at this latitude. */

@@ -2,6 +2,7 @@ import maplibregl from "maplibre-gl";
 import {
   initialView,
   objectIndexUrl,
+  objectSeriesUrl,
   snowManifestUrl,
   styleUrl,
 } from "./map/config";
@@ -41,10 +42,20 @@ const map = new maplibregl.Map({
 
 map.addControl(new maplibregl.NavigationControl(), "top-right");
 
+// The snow layer and the AS-OF date that selects it (spec section 5.3). The
+// overlay is replaced wholesale when a historical date is chosen, so both
+// controls are held here and re-pointed rather than rebuilt. Declared before
+// the object panel because the panel's history chart (spec section 7.1)
+// anchors its presets on whatever this date is *at render time*.
+let snowOverlay: SnowOverlay | null = null;
+const snowControl = new SnowControl(null);
+const snowDate = new SnowDateControl((entry) => void selectDate(entry));
+document.body.append(snowDate.element);
+
 // Object selection (spec section 7, amendment v1.11). The identity contract is
 // Nevaio's own static index, never MapTiler's rendered feature properties -
 // see docs/research/maptiler-outdoor-objects.md.
-const objectPanel = new ObjectPanel();
+const objectPanel = new ObjectPanel(objectSeriesUrl, () => snowOverlay?.date ?? null);
 document.body.append(objectPanel.element);
 
 const objectIndex = new ObjectIndexStore(objectIndexUrl, window.location.href);
@@ -79,14 +90,6 @@ objectIndex
     indexFailed = true;
     console.error("Object index failed to load", error);
   });
-
-// The snow layer and the AS-OF date that selects it (spec section 5.3). The
-// overlay is replaced wholesale when a historical date is chosen, so both
-// controls are held here and re-pointed rather than rebuilt.
-let snowOverlay: SnowOverlay | null = null;
-const snowControl = new SnowControl(null);
-const snowDate = new SnowDateControl((entry) => void selectDate(entry));
-document.body.append(snowDate.element);
 
 async function showManifest(manifestUrl: string): Promise<void> {
   // Carry the user's own toggle across a date change: someone who turned the

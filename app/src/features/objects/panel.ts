@@ -1,11 +1,13 @@
 /**
- * The object information panel (spec section 7) - first slice.
+ * The object information panel (spec section 7).
  *
- * Shows the identity of the selected OSM object and reserves the place the
- * snow history will go. It deliberately shows *no* snow numbers: the
- * per-object time series does not exist yet, and an empty chart that looked
- * like data would be exactly the hazard section 5.4 and the missing-overlay
- * behaviour already guard against.
+ * Shows the identity of the selected OSM object and, below it, the snow
+ * history chart (spec section 7.1, `historyChart.ts`). The chart is honest
+ * about what it does not have: with no `VITE_OBJECT_SERIES_URL` configured
+ * (true everywhere today - `docs/plan.md` item 1's backfill has not run) it
+ * shows a plain "not available yet" note rather than an empty or invented
+ * chart, the same posture the missing-overlay behaviour and spec section 5.4
+ * already require of the map layer.
  *
  * No UI framework (spec section 15 item 8): plain DOM, and every text node is
  * set with `textContent`, never `innerHTML`, so an index name cannot become
@@ -19,6 +21,7 @@
  */
 import type { ObjectRecord } from "./objectIndexSchema.ts";
 import type { Selection } from "./selection.ts";
+import { ObjectHistorySection } from "./historyChart.ts";
 
 /** How each selectable class is named to the user, with its map-ish glyph. */
 const KIND_LABELS: Record<ObjectRecord["kind"], { label: string; icon: string }> = {
@@ -59,7 +62,19 @@ export class ObjectPanel {
   private onChoose: ((record: ObjectRecord) => void) | null = null;
   private onClosed: (() => void) | null = null;
 
-  constructor() {
+  /**
+   * `seriesBaseUrl` is `objectSeriesUrl` from `app/src/map/config.ts`, read
+   * once by `main.ts` and injected here - the same pattern `objectIndexUrl`
+   * and `snowManifestUrl` already follow, so this module still imports no
+   * config and stays as easy to reason about as the rest of the objects
+   * feature. `getAsOfIso` is a getter rather than a value because the map's
+   * AS-OF date (spec section 5.3) can change after the panel is built, and
+   * every chart preset is anchored on whatever it is *at render time*.
+   */
+  constructor(
+    private readonly seriesBaseUrl: string | null,
+    private readonly getAsOfIso: () => string | null,
+  ) {
     this.element = element("section", "object-panel");
     this.element.hidden = true;
     this.element.setAttribute("aria-live", "polite");
@@ -197,18 +212,13 @@ export class ObjectPanel {
     // lookup will key on, and what makes a wrong match checkable.
     addFact("OSM object", record.id);
 
-    const placeholder = element("div", "object-panel__history");
-    placeholder.append(
-      element("p", "object-panel__history-title", "Snow history"),
-      element(
-        "p",
-        "object-panel__history-note",
-        "Not available yet. The per-object GFSC time series is not published, " +
-          "so this panel shows no snow values rather than an empty chart.",
-      ),
-    );
+    const history = new ObjectHistorySection({
+      record,
+      seriesBaseUrl: this.seriesBaseUrl,
+      asOfIso: this.getAsOfIso(),
+    });
 
-    this.body.replaceChildren(facts, placeholder);
+    this.body.replaceChildren(facts, history.element);
     this.reveal();
   }
 

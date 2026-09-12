@@ -79,7 +79,7 @@ body {
 .maplibregl-ctrl-bottom-left {
   /* Keep the on-map snow controls above the visible attribution footer, and
      above the object panel while it is open. The panel publishes its own
-     height as --object-panel-height (see src/ui/objectPanel.ts); this is the
+     height as --object-panel-height (see src/features/objects/panel.ts); this is the
      single place the two layouts are coupled. */
   bottom: calc(env(safe-area-inset-bottom) + 2.25rem + var(--object-panel-height, 0px));
   left: env(safe-area-inset-left);
@@ -637,13 +637,18 @@ body {
   overflow-wrap: anywhere;
 }
 
-.object-panel__history {
+/* Snow history chart (spec section 7.1) - hand-rolled inline SVG, no charting
+   library (spec section 15 item 8). `historyChart.ts` builds the markup;
+   these rules are purely presentational, so the honesty rules (no line across
+   a gap, gap ticks never in the value area) live entirely in the geometry the
+   SVG already encodes, not in CSS. */
+.object-history {
   margin-top: 0.75rem;
   padding-top: 0.625rem;
   border-top: 1px solid rgba(15, 23, 42, 0.1);
 }
 
-.object-panel__history-title {
+.object-history__title {
   font-size: 0.625rem;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -651,12 +656,239 @@ body {
   color: var(--text-secondary);
 }
 
-.object-panel__history-note {
+.object-history__note {
   margin-top: 0.25rem;
   font-size: 0.75rem;
   font-weight: 500;
   /* This is a "you are not looking at data" caveat, like the snow notice. */
   color: var(--text-warning);
+}
+
+.object-history__controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  margin-top: 0.5rem;
+}
+
+.object-history__preset {
+  /* Comfortable touch target - docs/spec.md section 10 - even though the
+     label itself is short. */
+  min-height: 2rem;
+  padding: 0.3125rem 0.625rem;
+  border: 1px solid rgba(15, 23, 42, 0.14);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.6);
+  font: inherit;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.object-history__preset--active {
+  border-color: var(--accent-strong);
+  background: rgba(56, 189, 248, 0.18);
+  color: var(--text-primary);
+}
+
+.object-history__preset:focus-visible {
+  outline: 2px solid var(--accent-strong);
+  outline-offset: 2px;
+}
+
+.object-history__custom {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  margin-top: 0.5rem;
+}
+
+/* `.object-history__custom`'s own `display: flex` has the same specificity as
+   the UA default `[hidden] { display: none }` and loads later, so it would
+   otherwise win and show the custom-period fields while `hidden` is set -
+   the same fix `.object-panel[hidden]` already needed above. */
+.object-history__custom[hidden] {
+  display: none;
+}
+
+.object-history__date {
+  min-height: 2rem;
+  padding: 0.25rem 0.375rem;
+  border: 1px solid rgba(15, 23, 42, 0.14);
+  border-radius: 0.5rem;
+  font: inherit;
+  font-size: 0.6875rem;
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.object-history__to {
+  font-size: 0.6875rem;
+  color: var(--text-secondary);
+}
+
+.object-history__apply {
+  min-height: 2rem;
+  padding: 0.3125rem 0.625rem;
+  border: 1px solid var(--accent-strong);
+  border-radius: 999px;
+  background: rgba(56, 189, 248, 0.18);
+  font: inherit;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.object-history__compare {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin-top: 0.5rem;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.object-history__chart {
+  margin-top: 0.625rem;
+}
+
+.object-history__chart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.object-history__status {
+  margin-top: 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.object-history__detail {
+  margin-top: 0.375rem;
+  min-height: 1.5em;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.object-history__gridline {
+  stroke: rgba(15, 23, 42, 0.08);
+  stroke-width: 1;
+}
+
+.object-history__axis-label {
+  font-size: 6.5px;
+  fill: var(--text-secondary);
+}
+
+/* The observed line/points: --accent-strong, the same color family the map's
+   own freshest-snow tier uses (see the :root comment above). */
+.object-history__line.object-history__current-year {
+  fill: none;
+  stroke: var(--accent-strong);
+  stroke-width: 1.75;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.object-history__point.object-history__current-year {
+  fill: var(--accent-strong);
+  stroke: white;
+  stroke-width: 0.75;
+  cursor: pointer;
+}
+
+.object-history__point:focus-visible {
+  outline: 2px solid var(--accent-strong);
+  outline-offset: 1px;
+}
+
+/* The previous-year comparison line/points: same shape, visibly muted rather
+   than a second saturated color, so the current period always reads first. */
+.object-history__line.object-history__prior-year {
+  fill: none;
+  stroke: var(--text-secondary);
+  stroke-width: 1.5;
+  stroke-dasharray: 3 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.object-history__point.object-history__prior-year {
+  fill: var(--text-secondary);
+  stroke: white;
+  stroke-width: 0.75;
+  cursor: pointer;
+}
+
+/* Gap ticks: a small mark below the plot area, never inside it - a gap must
+   never be visually confusable with a zero-value reading. Each state gets its
+   own color so "why is there a hole here" never depends on remembering one
+   color for "not a measurement". */
+.object-history__gap {
+  cursor: pointer;
+}
+
+.object-history__gap--cloud {
+  fill: #94a3b8;
+}
+
+.object-history__gap--no_data {
+  fill: #cbd5e1;
+}
+
+.object-history__gap--stale {
+  fill: var(--text-warning);
+}
+
+.object-history__gap.object-history__prior-year {
+  opacity: 0.55;
+}
+
+.object-history__legend {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.625rem;
+  margin-top: 0.5rem;
+}
+
+.object-history__legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.3125rem;
+  font-size: 0.625rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.object-history__swatch {
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 50%;
+  flex: none;
+}
+
+.object-history__swatch--valid {
+  background: var(--accent-strong);
+}
+
+.object-history__swatch--cloud {
+  background: #94a3b8;
+}
+
+.object-history__swatch--no_data {
+  background: #cbd5e1;
+}
+
+.object-history__swatch--stale {
+  background: var(--text-warning);
 }
 
 .object-panel__choices {

@@ -237,6 +237,9 @@ describe("validateObjectShard", () => {
       shardDocument([record({ osmTags: { natural: "peak" } })]),
       descriptor(),
     );
+    // "tile" is expected here too: it is stamped from the shard's own
+    // validated `tile` field (never from the record's own JSON), so it is
+    // part of the contract this test locks down, not a leak from `osmTags`.
     assert.deepEqual(Object.keys(result.objects[0]).sort(), [
       "elevationMeters",
       "id",
@@ -244,6 +247,7 @@ describe("validateObjectShard", () => {
       "latitude",
       "longitude",
       "name",
+      "tile",
     ]);
   });
 
