@@ -56,6 +56,89 @@ jobs:
           python -m pip install --require-hashes --only-binary=:all: -r pipeline/requirements.txt
       - name: Run pipeline and isolation tests
         run: python -m unittest discover -s pipeline/tests -t pipeline
+      - name: Fetch published object index and slot map
+        # Public objects, plain HTTPS, no credentials - object-index/ and its
+        # slots/ subdirectory are published by publish-osm-object-index.yml
+        # and this workflow's own publish job respectively (see
+        # pipeline/src/nevaio_pipeline/object_slots.py on why the slot map
+        # must be fetched and re-published rather than rebuilt each run).
+        # R2_PUBLIC_BASE_URL is a nonsecret repository variable (see
+        # docs/publishing-security.md), not gated behind the production-r2
+        # environment, so this job needs no environment and no credentials to
+        # read it. Two independent failure modes, both handled without ever
+        # failing the render - the daily snow snapshot is this app's primary
+        # function and has run unattended since 2026-08-28; this feature is
+        # additive and must not put that at risk:
+        #   - the top-level index itself is unreachable: OBJECT_SERIES_ENABLED
+        #     stays false and the render step below omits --object-index-dir
+        #     entirely, exactly as if this feature did not exist yet.
+        #   - one tile's shard fails to fetch: that file is absent locally,
+        #     which render._update_object_series already treats as "skip this
+        #     tile" - harmless, existing behaviour.
+        #   - one tile's slot map fails to fetch: **this is the dangerous one
+        #     and is handled explicitly.** object_slots.load_or_create_slot_map
+        #     builds a FRESH map when the file is absent, so treating any
+        #     fetch failure as "no slot map yet" would rebuild an existing
+        #     tile's ordering from scratch - dropping the holes left by
+        #     departed objects and shifting every slot after them, which
+        #     silently invalidates every byte offset already published for
+        #     that tile. Wrong chart values, no error anywhere. So only a
+        #     literal 404 counts as "first run for this tile"; any other
+        #     outcome (timeout, 5xx, connection failure, 403) means we cannot
+        #     PROVE the slot map is absent, and the tile is skipped entirely
+        #     for this run by removing its shard too. A skipped tile costs one
+        #     day of one tile's samples; a rebuilt slot map costs its whole
+        #     published history.
+        env:
+          R2_PUBLIC_BASE_URL: ${{ vars.R2_PUBLIC_BASE_URL }}
+        run: |
+          index_dir="${RUNNER_TEMP}/gfsc-series/index-fetch"
+          mkdir -p "${index_dir}/objects" "${index_dir}/slots"
+          base="${R2_PUBLIC_BASE_URL%/}/object-index"
+          if curl --fail --silent --show-error --retry 3 --max-time 60 \
+               --output "${index_dir}/object-index.json" "${base}/object-index.json"; then
+            echo "OBJECT_SERIES_ENABLED=true" >> "${GITHUB_ENV}"
+            # A `while read` loop, not `mapfile`/`readarray`, so this does not
+            # depend on a bash version newer than ubuntu-24.04 ships.
+            while IFS= read -r tile; do
+              curl --fail --silent --show-error --retry 3 --max-time 60 \
+                --output "${index_dir}/objects/${tile}.json" "${base}/objects/${tile}.json" \
+                || { echo "shard fetch failed for ${tile}, skipping its series sampling this run" >&2; \
+                     rm -f "${index_dir}/objects/${tile}.json"; }
+              # Note: no --fail here. We need the status code itself, because
+              # only a 404 is safe to read as "this tile has no slot map yet".
+              # `|| true` because this step runs under `bash -e` and a
+              # connection-level failure exits non-zero; --write-out has
+              # already printed the code (000 in that case), so do not echo a
+              # second one or the two concatenate.
+              slot_code="$(curl --silent --show-error --retry 3 --max-time 60 \
+                --write-out '%{http_code}' \
+                --output "${index_dir}/slots/${tile}.json" "${base}/slots/${tile}.json" || true)"
+              case "${slot_code}" in
+                200)
+                  ;;  # existing ordering, extended in place by this run
+                404)
+                  rm -f "${index_dir}/slots/${tile}.json"  # genuinely first run for this tile
+                  ;;
+                *)
+                  # Unproven absence - never rebuild. Drop the shard as well so
+                  # the tile is skipped entirely rather than sampled against a
+                  # slot map we could not read. See this step's comment.
+                  echo "slot map fetch for ${tile} returned ${slot_code}; skipping this tile entirely this run" >&2
+                  rm -f "${index_dir}/slots/${tile}.json" "${index_dir}/objects/${tile}.json"
+                  ;;
+              esac
+            done < <(python3 -c '
+          import json, sys
+          with open(sys.argv[1]) as f:
+              index = json.load(f)
+          for shard in index.get("shards", []):
+              print(shard["tile"])
+          ' "${index_dir}/object-index.json")
+          else
+            echo "Object index unreachable; per-object GFSC sampling is skipped for this run." >&2
+            echo "OBJECT_SERIES_ENABLED=false" >> "${GITHUB_ENV}"
+          fi
       - name: Render snapshot
         env:
           AS_OF_DATE: ${{ inputs.as_of_date }}
@@ -75,6 +158,12 @@ jobs:
           if [[ -n "${MAX_MISSING_TILES}" ]]; then
             args+=(--max-missing-tiles "${MAX_MISSING_TILES}")
           fi
+          if [[ "${OBJECT_SERIES_ENABLED:-false}" == "true" ]]; then
+            args+=(
+              --object-index-dir "${RUNNER_TEMP}/gfsc-series/index-fetch"
+              --series-output-dir "${RUNNER_TEMP}/gfsc-series/series"
+            )
+          fi
           python -m nevaio_pipeline.render "${args[@]}"
       - name: Transfer only rendered runs
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -82,6 +171,23 @@ jobs:
           name: gfsc-render-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/gfsc-output/runs/
           if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+          include-hidden-files: false
+      - name: Transfer per-object series data
+        # Optional and best-effort: no files at all is the normal shape of a
+        # run where the fetch above failed or found nothing new to sample
+        # (see that step's own comment) - not an error, so unlike the run
+        # transfer above this uses if-no-files-found: ignore rather than
+        # error, and the publish job below tolerates the artifact not
+        # existing at all.
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: gfsc-object-series-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/gfsc-series/series/
+            ${{ runner.temp }}/gfsc-series/index-fetch/slots/
+          if-no-files-found: ignore
           retention-days: 1
           compression-level: 0
           include-hidden-files: false
@@ -111,6 +217,18 @@ jobs:
         with:
           name: gfsc-render-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/rendered-runs
+      - name: Download this run's object series data
+        # May not exist at all - the render job's own upload step uses
+        # if-no-files-found: ignore for exactly this artifact when the daily
+        # per-object sampling increment did not run (see its comment). That
+        # is not a failure of this workflow, so this step must not fail the
+        # job when the artifact is simply absent; publish_object_series
+        # below treats an absent directory as zero files to publish.
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: gfsc-object-series-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/object-series
       - name: Validate untrusted artifact without secrets
         env:
           AS_OF_DATE: ${{ inputs.as_of_date }}
@@ -127,6 +245,14 @@ jobs:
             args+=(--max-missing-tiles "${MAX_MISSING_TILES}")
           fi
           python -m nevaio_pipeline.publish "${args[@]}"
+          # Same "revalidate before any secret is in scope" discipline as the
+          # run above, over whatever the object series download step found -
+          # possibly nothing at all, which validate_object_series_dirs
+          # accepts as zero files rather than an error.
+          python -m nevaio_pipeline.publish_object_series \
+            --series-dir "${RUNNER_TEMP}/object-series/series" \
+            --slots-dir "${RUNNER_TEMP}/object-series/index-fetch/slots" \
+            --check-only
       - name: Publish validated run
         env:
           R2_ACCOUNT_ID: ${{ vars.R2_ACCOUNT_ID }}
@@ -152,6 +278,17 @@ jobs:
             args+=(--max-missing-tiles "${MAX_MISSING_TILES}")
           fi
           python -m nevaio_pipeline.publish "${args[@]}"
+          # Series month files and slot maps are validated and published here
+          # too, not in a second credentialed step - see
+          # pipeline/tests/test_workflow_security.py, which asserts secrets
+          # stay confined to exactly this one step. publish_object_series
+          # tolerates either input directory being absent (the download step
+          # above may have found nothing) by publishing zero files rather
+          # than failing, so this call is unconditional.
+          python -m nevaio_pipeline.publish_object_series \
+            --series-dir "${RUNNER_TEMP}/object-series/series" \
+            --slots-dir "${RUNNER_TEMP}/object-series/index-fetch/slots" \
+            --receipt "${RUNNER_TEMP}/object-series-receipt.json"
       # Reads only public URLs and the receipt this job already wrote; no
       # credentials, no new dependency. It also fetches the date catalogue,
       # because that object is what decides which historical dates the app
@@ -187,6 +324,32 @@ jobs:
           print(f"Verified run {expected['runId']}: "
                 f"{len(catalogue['dates'])} AS-OF dates available")
           PY
+      # Reads only public URLs and this job's own receipt; no credentials, no
+      # new dependency. A no-op, by design, on a run where the sampling
+      # increment did not fire - see publish_object_series's own receipt
+      # shape.
+      - name: Verify per-object series publication
+        env:
+          R2_PUBLIC_BASE_URL: ${{ vars.R2_PUBLIC_BASE_URL }}
+        run: |
+          python - <<'PY'
+          import json, os, urllib.request
+          from pathlib import Path
+          temp = Path(os.environ["RUNNER_TEMP"])
+          base = os.environ["R2_PUBLIC_BASE_URL"].rstrip("/")
+          receipt = json.loads((temp / "object-series-receipt.json").read_text())
+          if receipt["seriesFilesPublished"] == 0 and receipt["slotFilesPublished"] == 0:
+              print("Nothing to verify: the per-object sampling increment did not run this time.")
+              raise SystemExit(0)
+          for tile in receipt["tiles"]:
+              url = f"{base}/object-index/slots/{tile}.json"
+              with urllib.request.urlopen(url, timeout=30) as response:
+                  if response.status != 200:
+                      raise SystemExit(f"Slot map for {tile} did not publish: HTTP {response.status}")
+                  json.loads(response.read())
+          print(f"Verified {len(receipt['tiles'])} tile slot map(s) published "
+                f"alongside {receipt['seriesFilesPublished']} series file(s)")
+          PY
       - name: Preserve publication metadata
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
@@ -195,5 +358,6 @@ jobs:
             ${{ runner.temp }}/published-latest.json
             ${{ runner.temp }}/published-dates.json
             ${{ runner.temp }}/publication-receipt.json
+            ${{ runner.temp }}/object-series-receipt.json
           if-no-files-found: error
           retention-days: 7

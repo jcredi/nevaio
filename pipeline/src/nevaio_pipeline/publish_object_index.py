@@ -246,9 +246,24 @@ def publish_object_index_to_r2(
 
     Shard files upload first, the entry point (``object-index.json``) last, so
     a client can never fetch an index naming a shard that is not yet there.
-    Only after that pointer is live are stale keys under ``prefix`` - shards a
-    footprint shrink left behind - deleted, and only the ones the new index no
-    longer names.
+    Only after that pointer is live are stale keys under ``prefix``'s own
+    :data:`nevaio_pipeline.object_index.SHARD_DIRECTORY` subdirectory - shards
+    a footprint shrink left behind - deleted, and only the ones the new index
+    no longer names.
+
+    **Deliberately scoped to shards only, not the whole ``prefix``.**
+    :mod:`nevaio_pipeline.publish_object_series` publishes permanent per-tile
+    slot maps to ``<prefix>/{SLOT_DIRECTORY}/<TILE>.json`` - beside this
+    artifact, in the same bucket prefix, but on its own lifecycle (see that
+    module's docstring on why the slot map has to live somewhere the render
+    job can fetch over plain HTTPS). A slot map is never named by anything
+    this function uploads, so listing and diffing the *entire* ``prefix`` for
+    staleness - as this once did - would see every slot map as an orphan and
+    delete the whole permanent ordering the moment the OSM extracts refresh,
+    silently invalidating every previously published series byte offset. That
+    is exactly the class of bug that never surfaces as an error, so this is
+    tested (``test_never_touches_slot_maps_when_footprint_shrinks``): only
+    ``objects/`` is ever listed as a deletion candidate.
     """
     files = validate_object_index_dir(source_dir)
 
@@ -263,7 +278,7 @@ def publish_object_index_to_r2(
         region_name="auto",
     )
 
-    existing_keys = _existing_keys(client, bucket, prefix)
+    existing_keys = _existing_keys(client, bucket, f"{prefix}/{SHARD_DIRECTORY}")
 
     def upload(relative_path: str) -> None:
         client.put_object(

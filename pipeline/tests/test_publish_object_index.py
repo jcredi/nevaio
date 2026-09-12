@@ -264,6 +264,35 @@ class PublishObjectIndexTests(unittest.TestCase):
             client.order("delete", "object-index/objects/99ZZZ.json"),
         )
 
+    def test_never_touches_slot_maps_when_footprint_shrinks(self) -> None:
+        """Regression guard: stale-shard cleanup must never sweep slots/.
+
+        `nevaio_pipeline.publish_object_series` publishes permanent per-tile
+        slot maps to `object-index/slots/<TILE>.json` - beside this
+        publisher's own artifact, in the same bucket prefix. A slot map is
+        never named by anything this publisher uploads, so if stale-key
+        cleanup ever went back to diffing the *whole* `object-index/` prefix
+        instead of just its `objects/` subdirectory, every slot map would
+        look exactly like an orphaned shard and get deleted the next time the
+        OSM extracts refresh - silently invalidating every previously
+        published series byte offset. That is exactly the kind of bug that
+        never surfaces as an error, so it is pinned here.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write_artifact(root, {"32TLR": [make_object("node/1", 7.1, 45.9), make_object("node/9", 7.15, 45.95)]})
+            client = FakeS3Client(existing_keys=[
+                "object-index/object-index.json",
+                "object-index/objects/32TLR.json",
+                "object-index/slots/32TLR.json",
+                "object-index/slots/31TGL.json",
+            ])
+            result, _ = publish(root, client)
+
+        self.assertEqual(result["deletedStaleKeys"], [])
+        self.assertIn("object-index/slots/32TLR.json", client.objects)
+        self.assertIn("object-index/slots/31TGL.json", client.objects)
+
     def test_never_touches_snow_snapshot_keys(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
