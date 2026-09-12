@@ -3,7 +3,7 @@
  * DOM/SVG layer. All the honesty-critical decisions (which days connect,
  * which are gaps, what a gap is labelled) live in `seriesChartLayout.ts` and
  * are asserted by `npm test`; this module only turns that computed geometry
- * into `<svg>` elements and wires up the preset picker.
+ * into `<svg>` elements.
  *
  * Hand-rolled inline SVG, no charting library (spec section 15 item 8, and
  * the CSP allowlist does not permit an arbitrary chart CDN). Built with
@@ -28,15 +28,7 @@ import {
   type DayCell,
 } from "./seriesChartLayout.ts";
 import { SeriesClient, SeriesLoadError } from "./seriesClient.ts";
-import {
-  FIXED_PRESETS,
-  customRange,
-  fixedPresetRange,
-  previousYearRange,
-  type DateRange,
-  type FixedPresetId,
-  type PresetId,
-} from "./seriesPresets.ts";
+import { trailingRange, type DateRange } from "./seriesWindow.ts";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 
@@ -117,8 +109,9 @@ export type HistorySectionOptions = {
 };
 
 /**
- * One selected object's snow history: preset picker, chart, legend, and the
- * tap/hover detail line. Built fresh per `panel.ts` render (the panel already
+ * One selected object's snow history: the chart, legend, and the tap/hover
+ * detail line, over the single trailing window (spec 7.1 as amended by
+ * v1.13 - no picker, no custom range, no previous-year comparison). Built fresh per `panel.ts` render (the panel already
  * rebuilds its whole body per selection), so this class owns no state beyond
  * one object's own view.
  */
@@ -129,15 +122,7 @@ export class ObjectHistorySection {
   private readonly statusEl: HTMLElement;
   private readonly chartHost: HTMLElement;
   private readonly detailEl: HTMLElement;
-  private readonly controlsEl: HTMLElement;
-  private readonly customFields: HTMLElement;
-  private readonly compareLabel: HTMLLabelElement;
-  private readonly compareCheckbox: HTMLInputElement;
-  private readonly startInput: HTMLInputElement;
-  private readonly endInput: HTMLInputElement;
 
-  private preset: PresetId = "last30";
-  private compare = false;
   private loadToken = 0;
 
   constructor(private readonly options: HistorySectionOptions) {
@@ -152,12 +137,6 @@ export class ObjectHistorySection {
         "Not available yet. The per-object GFSC time series is not published, " +
           "so this panel shows no snow values rather than an empty chart.",
       );
-      this.controlsEl = el("div", "object-history__controls");
-      this.customFields = el("div", "object-history__custom");
-      this.compareLabel = document.createElement("label");
-      this.compareCheckbox = document.createElement("input");
-      this.startInput = document.createElement("input");
-      this.endInput = document.createElement("input");
       this.chartHost = el("div", "object-history__chart");
       this.detailEl = el("p", "object-history__detail");
       this.element.append(this.statusEl);
@@ -165,50 +144,6 @@ export class ObjectHistorySection {
     }
 
     this.client = new SeriesClient(options.seriesBaseUrl, window.location.href);
-
-    this.controlsEl = el("div", "object-history__controls");
-    this.customFields = el("div", "object-history__custom");
-    this.customFields.hidden = true;
-
-    for (const spec of FIXED_PRESETS) {
-      const button = el("button", "object-history__preset", spec.label);
-      button.type = "button";
-      button.dataset.preset = spec.id;
-      button.addEventListener("click", () => this.selectPreset(spec.id));
-      this.controlsEl.append(button);
-    }
-    const customButton = el("button", "object-history__preset", "Custom period");
-    customButton.type = "button";
-    customButton.dataset.preset = "custom";
-    customButton.addEventListener("click", () => this.selectPreset("custom"));
-    this.controlsEl.append(customButton);
-
-    this.startInput = document.createElement("input");
-    this.startInput.type = "date";
-    this.startInput.className = "object-history__date";
-    this.startInput.setAttribute("aria-label", "Custom period start");
-    this.endInput = document.createElement("input");
-    this.endInput.type = "date";
-    this.endInput.className = "object-history__date";
-    this.endInput.setAttribute("aria-label", "Custom period end");
-    const applyCustom = el("button", "object-history__apply", "Show");
-    applyCustom.type = "button";
-    applyCustom.addEventListener("click", () => this.applyCustomRange());
-    this.customFields.append(this.startInput, el("span", "object-history__to", "to"), this.endInput, applyCustom);
-
-    this.compareCheckbox = document.createElement("input");
-    this.compareCheckbox.type = "checkbox";
-    this.compareCheckbox.className = "object-history__compare-input";
-    this.compareCheckbox.addEventListener("change", () => {
-      this.compare = this.compareCheckbox.checked;
-      void this.load();
-    });
-    this.compareLabel = document.createElement("label");
-    this.compareLabel.className = "object-history__compare";
-    this.compareLabel.append(
-      this.compareCheckbox,
-      document.createTextNode(" Compare to previous year"),
-    );
 
     this.chartHost = el("div", "object-history__chart");
     this.statusEl = el("p", "object-history__status", "Loading history…");
@@ -219,58 +154,26 @@ export class ObjectHistorySection {
     );
 
     this.element.append(
-      this.controlsEl,
-      this.customFields,
-      this.compareLabel,
       this.chartHost,
       this.statusEl,
       buildLegend(),
       this.detailEl,
     );
 
-    this.setActivePresetButton();
     void this.load();
-  }
-
-  private setActivePresetButton(): void {
-    for (const button of this.controlsEl.querySelectorAll<HTMLButtonElement>(".object-history__preset")) {
-      button.classList.toggle("object-history__preset--active", button.dataset.preset === this.preset);
-    }
-    this.customFields.hidden = this.preset !== "custom";
-  }
-
-  private selectPreset(preset: PresetId): void {
-    this.preset = preset;
-    this.setActivePresetButton();
-    if (preset !== "custom") void this.load();
-  }
-
-  private applyCustomRange(): void {
-    if (this.startInput.value && this.endInput.value) void this.load();
   }
 
   private currentRange(): DateRange | null {
     const { asOfIso } = this.options;
-    if (this.preset === "custom") {
-      if (!this.startInput.value || !this.endInput.value) return null;
-      try {
-        return customRange(this.startInput.value, this.endInput.value);
-      } catch {
-        return null;
-      }
-    }
     if (asOfIso === null) return null;
-    return fixedPresetRange(this.preset as FixedPresetId, asOfIso);
+    return trailingRange(asOfIso);
   }
 
   private async load(): Promise<void> {
     const token = ++this.loadToken;
     const range = this.currentRange();
     if (!this.client || !range) {
-      this.statusEl.textContent =
-        this.options.asOfIso === null
-          ? "No AS-OF date is available yet to anchor the history."
-          : "Choose a valid custom period.";
+      this.statusEl.textContent = "No AS-OF date is available yet to anchor the history.";
       this.statusEl.hidden = false;
       this.chartHost.replaceChildren();
       return;
@@ -287,24 +190,14 @@ export class ObjectHistorySection {
         range.start,
         range.end,
       );
-      let compareDays: DayCell[] | null = null;
-      if (this.compare) {
-        const previous = previousYearRange(range);
-        compareDays = await this.client.loadRange(
-          this.options.record.tile,
-          this.options.record.id,
-          previous.start,
-          previous.end,
-        );
-      }
-      if (token !== this.loadToken) return; // superseded by a later preset/range change
+      if (token !== this.loadToken) return; // superseded by a later load
 
       const hasAnyMark = days.some((d) => d.cell.state === "valid");
-      this.statusEl.hidden = hasAnyMark || Boolean(compareDays?.some((d) => d.cell.state === "valid"));
+      this.statusEl.hidden = hasAnyMark;
       if (!this.statusEl.hidden) {
         this.statusEl.textContent = "No usable observations in this period.";
       }
-      this.renderChart(days, compareDays);
+      this.renderChart(days);
     } catch (error) {
       if (token !== this.loadToken) return;
       const message = error instanceof SeriesLoadError ? error.message : String(error);
@@ -315,9 +208,8 @@ export class ObjectHistorySection {
     }
   }
 
-  private renderChart(days: DayCell[], compareDays: DayCell[] | null): void {
+  private renderChart(days: DayCell[]): void {
     const layout = buildChartLayout(days, DEFAULT_CHART_CONFIG);
-    const compareLayout = compareDays ? buildChartLayout(compareDays, DEFAULT_CHART_CONFIG) : null;
 
     const svg = svgEl("svg", {
       viewBox: `0 0 ${layout.width} ${layout.height}`,
@@ -359,9 +251,6 @@ export class ObjectHistorySection {
       svg.append(label);
     }
 
-    if (compareLayout && compareDays) {
-      this.renderSeries(svg, compareLayout, compareDays, "object-history__prior-year");
-    }
     this.renderSeries(svg, layout, days, "object-history__current-year");
 
     this.chartHost.replaceChildren(svg);

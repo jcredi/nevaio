@@ -1,5 +1,58 @@
 # Working session log
 
+## 2026-09-12 - Spec v1.13: one 30-day window, and what that unbuilds
+
+The owner dropped section 7.1's period options down to a single trailing
+30-day window: no 90-day preset, no last-year preset, no custom range, no
+previous-year comparison, no picker at all. Recorded as **spec amendment
+v1.13** rather than only here, because 7.1's old list is exactly the kind of
+frozen text a later session would otherwise implement back in.
+
+Everything 7.1 is actually *for* survives untouched - the honest treatment of
+cloud/no-data/stale gaps and the per-mark eligibility rule. Only the period
+menu went.
+
+**The consequence worth more than the deletion.** The plan's backfill depth was
+"two years first", and its stated justification was that two years satisfies
+every 7.1 preset *including the previous-year comparison*. With that comparison
+gone, the requirement behind two years is gone too. Two calendar months is now
+enough - it makes a full 30-day window available on day one whatever the date,
+and the daily increment keeps it filled after that. **2 backfill chunks rather
+than 24, and roughly 26 MB of series in R2 rather than ~310 MB.** Going deeper
+is now a product choice with nothing requiring it. This is the second time
+today a requirement turned out to be carrying a large amount of downstream
+cost that nobody had priced.
+
+*Removed, not left dangling:* `seriesPresets.ts` became `seriesWindow.ts`
+(`trailingRange` and the window length, nothing else); the picker, custom date
+inputs and compare toggle came out of `historyChart.ts`; `shiftYearsIso`,
+`compareIso` and `diffDaysIso` went from `isoDate.ts` as their only caller was
+the presets; and 13 now-unreachable rule blocks came out of `style.css`. 135
+frontend tests pass, down from 140 because the deleted presets took their own
+tests with them. Build, mobile layout at 320/390 px and CSP all clean.
+
+*Chose 30 rather than 31 days*, since "the last 30/31 days" reads as a
+month-ish window and a fixed 30 keeps it the same length whatever month it
+ends in. A month `.bin` still holds up to 31 columns - that is the storage
+layout, unaffected.
+
+**R2 measured: 40.79 MB across 7.07k objects.** Well under the 10 GB
+allowance, and deliberately *not* recorded as "plenty of room". This is a
+September reading of an archive that is mostly snow-free tiles; the number
+that decides anything is mid-winter, projected at ~4.0 GB for a 31-date
+archive. Against that the object index (28.6 MB) and the series (~26 MB now)
+are rounding errors, and the DEM extract is the only claimant worth sizing
+before it is built - its size is still an estimate. The plan now says to
+re-measure in midwinter rather than treating today's figure as the steady
+state.
+
+**Done and closed:** the bucket's CORS policy now exposes `Content-Range` and
+`Accept-Ranges`. **Deferred to the backlog at the owner's request:** creating
+the URL-restricted Mapbox token, which waits until routing is actually built.
+
+The object index workflow was running throughout; still unpublished at the end
+of this entry.
+
 ## 2026-09-12 - The snow history chart, and a 200 that would have lied
 
 Spec 7.1's chart replaces the object panel's placeholder: hand-rolled inline

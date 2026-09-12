@@ -1,8 +1,19 @@
 # Nevaio MVP Product Specification
 
-**Status:** Draft v1.12 - 30-day AS-OF date selection planned
-**Date:** 2026-09-10
+**Status:** Draft v1.13 - object history chart reduced to one 30-day window
+**Date:** 2026-09-12
 **Product stage:** Planning only
+
+**Amendment (v1.13):** Section 7.1's chart period options are reduced to a
+single trailing 30-day window ending on the map's AS-OF date. The last-90-days
+and last-year presets, the custom period, and the comparable-period-in-a-
+previous-year comparison are all dropped (owner decision, 2026-09-12); the
+chart shows one window and offers no picker. Everything else in 7.1 stands
+unchanged - in particular the honest treatment of cloud/no-data/stale gaps and
+the per-mark eligibility rule, which is what the section is really for. This
+also shortens what the per-object backfill must reach: enough history to fill
+a 30-day window, not the two years the previous-year comparison implied. See
+`docs/worklog.md` (2026-09-12) and `docs/plan.md`.
 
 **Amendment (v1.12):** The map will gain an AS-OF date selector for the latest
 available date and up to the preceding 30 calendar dates. It must select
@@ -330,15 +341,9 @@ history lookup; no new running server is introduced for this feature.
 
 The panel should include an interactive snow-cover history chart for the selected object.
 
-The user should be able to choose periods such as:
-
-- last 30 days;
-- last 90 days;
-- last year;
-- custom period;
-- comparable period in a previous year, where data availability permits.
-
-Exact presets can be refined later.
+The chart covers a single period: the trailing 30 days ending on the map's
+AS-OF date. There is no period picker, no custom range, and no previous-year
+comparison - see amendment v1.13, which replaced the earlier list of presets.
 
 The chart must handle missing/cloudy observations honestly rather than silently converting them to snow-free conditions.
 

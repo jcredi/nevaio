@@ -664,94 +664,6 @@ body {
   color: var(--text-warning);
 }
 
-.object-history__controls {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.375rem;
-  margin-top: 0.5rem;
-}
-
-.object-history__preset {
-  /* Comfortable touch target - docs/spec.md section 10 - even though the
-     label itself is short. */
-  min-height: 2rem;
-  padding: 0.3125rem 0.625rem;
-  border: 1px solid rgba(15, 23, 42, 0.14);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.6);
-  font: inherit;
-  font-size: 0.6875rem;
-  font-weight: 600;
-  color: var(--text-secondary);
-  cursor: pointer;
-}
-
-.object-history__preset--active {
-  border-color: var(--accent-strong);
-  background: rgba(56, 189, 248, 0.18);
-  color: var(--text-primary);
-}
-
-.object-history__preset:focus-visible {
-  outline: 2px solid var(--accent-strong);
-  outline-offset: 2px;
-}
-
-.object-history__custom {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.375rem;
-  margin-top: 0.5rem;
-}
-
-/* `.object-history__custom`'s own `display: flex` has the same specificity as
-   the UA default `[hidden] { display: none }` and loads later, so it would
-   otherwise win and show the custom-period fields while `hidden` is set -
-   the same fix `.object-panel[hidden]` already needed above. */
-.object-history__custom[hidden] {
-  display: none;
-}
-
-.object-history__date {
-  min-height: 2rem;
-  padding: 0.25rem 0.375rem;
-  border: 1px solid rgba(15, 23, 42, 0.14);
-  border-radius: 0.5rem;
-  font: inherit;
-  font-size: 0.6875rem;
-  color: var(--text-primary);
-  background: rgba(255, 255, 255, 0.6);
-}
-
-.object-history__to {
-  font-size: 0.6875rem;
-  color: var(--text-secondary);
-}
-
-.object-history__apply {
-  min-height: 2rem;
-  padding: 0.3125rem 0.625rem;
-  border: 1px solid var(--accent-strong);
-  border-radius: 999px;
-  background: rgba(56, 189, 248, 0.18);
-  font: inherit;
-  font-size: 0.6875rem;
-  font-weight: 600;
-  color: var(--text-primary);
-  cursor: pointer;
-}
-
-.object-history__compare {
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
-  margin-top: 0.5rem;
-  font-size: 0.6875rem;
-  font-weight: 500;
-  color: var(--text-secondary);
-}
-
 .object-history__chart {
   margin-top: 0.625rem;
 }
@@ -811,23 +723,7 @@ body {
 
 /* The previous-year comparison line/points: same shape, visibly muted rather
    than a second saturated color, so the current period always reads first. */
-.object-history__line.object-history__prior-year {
-  fill: none;
-  stroke: var(--text-secondary);
-  stroke-width: 1.5;
-  stroke-dasharray: 3 2;
-  stroke-linejoin: round;
-  stroke-linecap: round;
-}
-
-.object-history__point.object-history__prior-year {
-  fill: var(--text-secondary);
-  stroke: white;
-  stroke-width: 0.75;
-  cursor: pointer;
-}
-
-/* Gap ticks: a small mark below the plot area, never inside it - a gap must
+.object-history__line.object-history__point/* Gap ticks: a small mark below the plot area, never inside it - a gap must
    never be visually confusable with a zero-value reading. Each state gets its
    own color so "why is there a hole here" never depends on remembering one
    color for "not a measurement". */
@@ -847,11 +743,7 @@ body {
   fill: var(--text-warning);
 }
 
-.object-history__gap.object-history__prior-year {
-  opacity: 0.55;
-}
-
-.object-history__legend {
+.object-history__gap.object-history__legend {
   list-style: none;
   display: flex;
   flex-wrap: wrap;

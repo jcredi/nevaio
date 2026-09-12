@@ -48,24 +48,3 @@ export function daysInMonth(year: number, month: number): number {
 export function addDaysIso(iso: string, deltaDays: number): string {
   return epochDayToIso(isoToEpochDay(iso) + deltaDays);
 }
-
-/** `end - start`, in whole days. Negative if `end` is before `start`. */
-export function diffDaysIso(startIso: string, endIso: string): number {
-  return isoToEpochDay(endIso) - isoToEpochDay(startIso);
-}
-
-/**
- * Shift a date by whole calendar years, clamping the day when the source is a
- * Feb 29 and the target year has no such day (e.g. 2028-02-29 - 1 -> 2027-02-28,
- * never an overflow into March).
- */
-export function shiftYearsIso(iso: string, deltaYears: number): string {
-  const [y, m, d] = parts(iso);
-  const targetYear = y + deltaYears;
-  const clampedDay = Math.min(d, daysInMonth(targetYear, m));
-  return `${targetYear}-${pad2(m)}-${pad2(clampedDay)}`;
-}
-
-export function compareIso(a: string, b: string): number {
-  return a < b ? -1 : a > b ? 1 : 0;
-}

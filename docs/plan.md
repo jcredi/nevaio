@@ -95,10 +95,16 @@ the deployed site still selects objects only inside the four fixture tiles.
        extract yet. Old month files are therefore never rewritten when the
        slot map grows, and the frontend must read a 416 as a gap. This is the
        one thing the decided format had left open.
-     - **Depth: two years first** - that satisfies every spec 7.1 preset
-       including the previous-year comparison - then extend backwards a month
-       at a time. HR-WSI reaches back to September 2016 (~1.3 MB per
-       tile-date, 27 GB per year of downloads).
+     - **Depth: two calendar months.** Spec amendment v1.13 (2026-09-12) cut
+       the chart to a single trailing 30-day window, so the two-years figure
+       this line used to carry - which existed only to satisfy the
+       previous-year comparison - goes with it. Two months is what makes a
+       full 30-day window available on the first day whatever the date; after
+       that the daily increment keeps it filled by itself. That is **2
+       backfill chunks rather than 24**, and roughly **26 MB of series in R2
+       rather than ~310 MB**. Going deeper is now a product choice with no
+       requirement behind it; HR-WSI still reaches back to September 2016
+       (~1.3 MB per tile-date) if that changes.
      - **Both assumptions this design rested on were checked on 2026-09-12
        and hold** - see `worklog.md`. Runner throughput: the daily job already
        does this workload (a 31-day window over 58 tiles is ~1,798 tile-dates
@@ -117,10 +123,9 @@ the deployed site still selects objects only inside the four fixture tiles.
    - The chart itself (spec section 7.1) **shipped 2026-09-12**, including the
      honest gap treatment, and renders "Not available yet" until
      `VITE_OBJECT_SERIES_URL` is set - which waits on the backfill publishing
-     `series/` and `slots/`. One question for product: spec 7.1 does not
-     clearly separate "last year" as a preset from "the comparable period in a
-     previous year" as a comparison; both were implemented, as a trailing
-     365-day preset and a toggle applying to any preset.
+     `series/` and `slots/`. It shows **one trailing 30-day window and no
+     picker**, per spec amendment v1.13 the same day; the presets, custom
+     range and previous-year comparison it briefly had are gone.
    - One open contract question from the first consumer: whether
      `bytes`/`sha256` stay in the shard index (the frontend does verify them).
      The hut/shelter duplicate question is closed - the pipeline drops a
@@ -180,13 +185,16 @@ the deployed site still selects objects only inside the four fixture tiles.
   Routing was OpenRouteService for part of that day; it is not, because ORS
   forbids client-side keys and this app has no backend - see the correction in
   that document before reopening the question.
-- **Expose `Content-Range` and `Accept-Ranges` in the bucket's CORS policy.**
-  Owner console work, additive and zero-risk; `r2-setup.md` step 5 already
-  carries the updated policy, the live bucket does not. Not a blocker - ranged
-  reads work today (measured 2026-09-12) - but without it a client cannot
-  assert which bytes were served, so a cache answering `200` with the whole
-  object is indistinguishable from a correct partial read. Batch it with the
-  F10 console visit below.
+- **Create the URL-restricted Mapbox token** (owner console work, deferred
+  2026-09-12 until routing is actually built). It must be a **new** token, not
+  the account's default: Mapbox's URL restrictions do not apply to default
+  tokens, so the default would ship unrestricted in a public bundle - the very
+  problem that disqualified OpenRouteService. Restrict it to the Netlify
+  origin, set it as a Netlify env var across all contexts, and deliberately do
+  **not** mark it secret, for the same reason `VITE_MAPTILER_API_KEY` is not:
+  Vite inlines `VITE_*` into the client bundle by design, so secret-scanning
+  would fail the build on a value meant to reach the browser. `api.mapbox.com`
+  joins `connect-src` in `app/public/_headers` in the same change.
 - **Custom domain in front of the `r2.dev` endpoint** (security F10, optional
   pre-launch). Owner console work; needs an Admin-scoped Cloudflare token.
   `app/public/_headers` pins the bucket host in its CSP and must change in the
@@ -199,16 +207,19 @@ the deployed site still selects objects only inside the four fixture tiles.
   publish a 1x1 transparent PNG for empty cells (simple, more objects in R2),
   or narrow the published `bounds`/per-zoom coverage so the grid matches what
   actually exists (cheaper at runtime, more pipeline work). Not urgent.
-- **R2 free-tier headroom is now the binding constraint on what else ships
-  there.** A 31-date archive is roughly 4.0 GB and ~109,000 objects against
-  the 10 GB allowance (it was ~0.9 GB at seven runs). The static OSM object
-  index, the precomputed per-object series **and a Copernicus GLO-30 extract**
+- **R2 free-tier headroom.** **Measured 2026-09-12: 40.79 MB across 7.07k
+  objects** - far under the 10 GB allowance, but that is a *September* figure
+  and must not be read as the steady state: the archive is mostly snow-free
+  tiles right now. The projection that matters is mid-winter, where a 31-date
+  archive is roughly 4.0 GB and ~109,000 objects. Against that, the object
+  index (28.6 MB), the per-object series (~26 MB at the two-month depth
+  amendment v1.13 leaves) and a Copernicus GLO-30 extract are the other
+  claimants. The first two are rounding errors; **the DEM extract is the one
+  worth sizing before it is built**, and its size is still an estimate. They
   have to fit in the remaining
   ~6 GB, or the date window shortens - `config.ASOF_CATALOGUE_DATES` is the
-  one dial. Worth an actual `du` against the bucket once a full window exists,
-  since 130 MB/run is a mid-winter figure and summer runs are smaller. With
-  three claimants rather than two (2026-09-12), that `du` is no longer
-  housekeeping - it gates the elevation/DEM decision.
+  one dial. Re-measure in midwinter, when the number means something - the
+  September reading above cannot tell us whether the DEM fits.
 - **The recovery path is unrehearsed** - revoke the publication key, restore
   trusted code, rebuild dependencies, republish known-good data.
 
