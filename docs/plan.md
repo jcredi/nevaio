@@ -85,9 +85,12 @@ key, then a smoke test of that provider's elevation data.**
      200 MB on a 10 GB free tier. The visual pyramid is unaffected - a test
      asserts those tiles stay byte-identical with the flag on and off.
 
-     **Still to confirm on the first real run**: that the publish job's upload
-     of roughly four times as many objects stays inside its 45-minute timeout,
-     and that a route on production reports snow rather than "unavailable". See
+     **Still to confirm on the first real run**: that a route on production
+     reports snow rather than "unavailable". The publish job's timeout was
+     checked and is not a concern - it uploads with 16 workers, and the run
+     grows from ~1,066 objects to ~4,200 (about ~6,600 at midwinter coverage),
+     against a 45-minute budget the existing comment sizes at ten minutes for
+     3,500 objects *sequentially*. See
      [`research/snow-along-route.md`](research/snow-along-route.md) for why the
      flag's failure mode is silent and which test guards it.
    - **Spec section 15 items 1 and 2 are still open** and should be decided
