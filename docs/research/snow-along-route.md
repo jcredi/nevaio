@@ -78,20 +78,29 @@ frontend fetches only the tiles a route crosses, typically one to four.
   pyramid publishes only tiles that contain snow, while a data raster must cover
   every tile that carries any observation at all.
 - Mean published z11 visual tile, sampled across nine real locations on
-  2026-09-13: **9.2 KB**. A data tile carries more entropy (continuous GF, age
-  and QA rather than five quantised colours) but also large uniform regions, so
-  10-30 KB is the honest bracket until one is actually built.
+  2026-09-13: **9.2 KB**.
+- **Mean modelled data tile: 8.7 KB.** Built by taking five real published z11
+  tiles, recovering their snow field by inverting the published alpha ramp, and
+  re-encoding it in the format above with spatially smooth age and QA fields -
+  smooth because a whole acquisition swath shares a date, and modelling them as
+  noise would badly overstate the compressed size.
+
+  The first version of this model was wrong in an instructive way: it treated a
+  transparent visual pixel as *uncovered*, when transparency on the visual tile
+  means **no snow**, not no observation. Corrected to near-full observation
+  coverage, the tiles got *smaller*, not larger, because a large uniform region
+  of "valid, 0%" compresses about as well as a large uniform region of
+  "absent".
 
 | scope | per date | 31-date archive |
 |---|---|---|
-| at 10 KB/tile | 30.5 MB | 0.92 GB |
-| at 20 KB/tile | 60.9 MB | 1.84 GB |
-| at 30 KB/tile | 91.4 MB | 2.77 GB |
+| measured September mix (8.7 KB/tile) | 26.6 MB | 0.80 GB |
+| the snowiest sampled tile as the mean (14.8 KB/tile), i.e. a midwinter proxy | 45.1 MB | 1.37 GB |
 
-Against the R2 free tier's 10 GB, with a midwinter visual archive projected at
-roughly 4 GB, **a 31-date data archive is the single largest new claim anyone
-has proposed** - up to 2.8 GB, taking the projected total to around 7 GB. A
-single date is a rounding error by comparison.
+Against the R2 free tier's 10 GB and a midwinter visual archive projected at
+roughly 4 GB, even the whole 31-date archive is affordable at around 1.4 GB -
+materially cheaper than the 2.8 GB the pre-measurement bracket feared. A single
+date, at under 50 MB, is a rounding error.
 
 ## RECOMMENDATION: publish the data raster for the latest date only
 
@@ -102,9 +111,11 @@ not for all 31 archived dates.
   which is a question about current conditions. The historical AS-OF picker
   exists so the *map* can be looked at over time; nobody has asked to plan a
   route against three weeks ago.
-- **It costs 30-90 MB instead of up to 2.8 GB**, leaving the free tier's
-  headroom for the winter visual archive, which is the thing that actually has
-  to grow.
+- **It costs under 50 MB instead of ~1.4 GB**, leaving the free tier's headroom
+  for the winter visual archive, which is the thing that actually has to grow.
+  The measurement weakens this argument from "prohibitive" to merely
+  "unnecessary" - 1.4 GB would fit - so if per-date profiles are ever wanted,
+  storage is not the reason to refuse them.
 - **It is extendable without a format change.** If per-date profiles are ever
   wanted, the same stage runs over the archived dates and the frontend path is
   unchanged.
