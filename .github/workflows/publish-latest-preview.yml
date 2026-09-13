@@ -164,8 +164,12 @@ jobs:
           # the question.
           #
           # Cost, measured rather than estimated (2026-09-13): ~3,100 z11
-          # tiles at ~8.7 KB, about 27 MB per date, so under 200 MB live
-          # against --keep-runs 7 on a 10 GB free tier. Data tiles are more
+          # tiles at ~8.7 KB, about 27 MB per date. NOT bounded by
+          # --keep-runs 7: that flag is only the rollback buffer for
+          # superseded same-date runs, and catalogue.plan_retention keeps
+          # every run that backs a catalogue entry, so the real bound is
+          # ASOF_CATALOGUE_DATES = 31 -> about 0.8 GB, up to ~1.4 GB at
+          # midwinter cover, on a 10 GB free tier. Data tiles are more
           # numerous than visual ones (1,066 on the run this was sized
           # against) because the visual pyramid draws only where there is snow
           # while this one must record everywhere there was an *observation*,

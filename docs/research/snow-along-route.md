@@ -138,9 +138,22 @@ every scheduled run renders the current date, so the newest date always has a
 pyramid, and the historical dates already in the catalogue were deliberately
 **not** backfilled.
 
-Live cost is therefore smaller than the figure this document sized against. The
-catalogue keeps `--keep-runs 7`, so about **7 dates x 27 MB, under 200 MB** on
-a 10 GB free tier - not the 0.8-1.4 GB a full 31-date archive would have cost.
+Live cost is the figure this document already sized: **about 0.8 GB, up to
+~1.4 GB at midwinter cover**, on a 10 GB free tier.
+
+A correction worth recording, because it was briefly written down the other way
+on 2026-09-13: `--keep-runs 7` does **not** cap this. That flag is only the
+rollback buffer for superseded same-date runs. `catalogue.plan_retention` keeps
+every run that backs a catalogue entry, so the real bound is
+`ASOF_CATALOGUE_DATES = 31`.
+
+That has a second consequence. Each daily run's own date manifest announces its
+data pyramid, so within 31 days every date in the catalogue will answer
+snow-along-route - not only the latest. "Latest date only" therefore describes
+what is published *going forward* (nothing is backfilled, and the historical
+dates that predate the flag never gain one); it is not a limit the app
+enforces, and no pruning stage exists to impose one. If the storage is ever
+wanted back, pruning `data/` from non-latest runs is the place to add it.
 
 Two consequences worth knowing before changing any of this:
 

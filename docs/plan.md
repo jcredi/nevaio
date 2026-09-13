@@ -81,8 +81,16 @@ key, then a smoke test of that provider's elevation data.**
      unconditionally, which is what makes "latest date only" true by
      construction: every scheduled run renders the current date, and the
      historical dates already published were deliberately not backfilled.
-     Live cost is about 27 MB per date and, against `--keep-runs 7`, under
-     200 MB on a 10 GB free tier. The visual pyramid is unaffected - a test
+     Live cost is about 27 MB per date. It is **not** bounded by
+     `--keep-runs 7` - that is only the rollback buffer for superseded
+     same-date runs, and `plan_retention` keeps every run backing a catalogue
+     entry - so the bound is `ASOF_CATALOGUE_DATES = 31`: about 0.8 GB, up to
+     ~1.4 GB at midwinter, on a 10 GB free tier. A consequence worth stating:
+     because each daily run's own date manifest announces its data pyramid,
+     within 31 days *every* catalogue date will answer snow-along-route, not
+     just the latest. Nothing is backfilled, so this costs no extra work - but
+     "latest date only" describes what is *published going forward*, not a
+     limit the app enforces. The visual pyramid is unaffected - a test
      asserts those tiles stay byte-identical with the flag on and off.
 
      **Still to confirm on the first real run**: that a route on production

@@ -13,9 +13,17 @@ construction rather than by a condition, since every scheduled run renders the
 current date. The historical dates already in the catalogue were deliberately
 not backfilled.
 
-**The live cost is smaller than the figure the decision was taken against.**
-`--keep-runs 7` means about 7 dates x 27 MB, under 200 MB on a 10 GB free tier,
-rather than the 0.8-1.4 GB a full 31-date archive would have cost. Worth noting
+**The live cost is the originally measured figure, ~0.8 GB.** I first wrote
+this entry claiming `--keep-runs 7` capped it at under 200 MB. That was wrong,
+and worth recording as a misreading rather than quietly fixing: `--keep-runs`
+is only the rollback buffer for superseded same-date runs, and
+`catalogue.plan_retention` keeps every run backing a catalogue entry, so the
+bound is `ASOF_CATALOGUE_DATES = 31`. It also means "latest date only" is not a
+limit the app enforces - within 31 days every catalogue date will answer
+snow-along-route, because each daily run's date manifest announces its own
+pyramid. Nothing is backfilled, so this costs no extra work; it is capability
+arriving for free, and the storage was always the 0.8-1.4 GB the owner decided
+against. Worth noting
 the shape of it: the run this was sized against has 1,066 visual tiles but ~3,100
 data tiles, because the visual pyramid draws only where there *is* snow while
 this one must record everywhere there was an *observation*, including a confirmed

@@ -261,6 +261,30 @@ class RunSafetyTests(unittest.TestCase):
         advertised_keys = {date_manifest_key(d, r) for d, r in plan.entries}
         self.assertFalse(advertised_keys & set(plan.doomed_manifest_keys))
 
+    def test_keep_runs_does_not_cap_how_many_runs_survive(self) -> None:
+        """`--keep-runs` is the rollback buffer, not a bound on stored runs.
+
+        Recorded as a test because it was misread on 2026-09-13 in exactly the
+        direction that matters for the free tier: `--keep-runs 7` was taken to
+        mean only seven runs are ever stored, which made the snow data pyramid
+        look four times cheaper than it is. Every run backing a catalogue entry
+        survives, so the real bound on storage is `keep_dates`.
+        """
+        dates = daily(31)
+        runs, manifests = bucket_state(dates)
+        plan = plan_retention(
+            run_ids=runs,
+            manifest_keys=manifests,
+            current_run_id=run_id_for(dates[0]),
+            current_as_of_date=dates[0],
+            keep_dates=31,
+            keep_runs=7,
+        )
+        # Far more than seven: one per advertised date.
+        self.assertEqual(len(plan.entries), 31)
+        self.assertEqual(len(plan.advertised_run_ids), 31)
+        self.assertFalse(plan.advertised_run_ids & set(plan.doomed_run_ids))
+
     def test_retention_counts_below_one_are_refused(self) -> None:
         for kwargs in ({"keep_dates": 0}, {"keep_runs": 0}):
             with self.subTest(**kwargs):
