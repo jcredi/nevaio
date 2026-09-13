@@ -169,6 +169,12 @@ map.on("load", async () => {
         highlight?.clear();
       },
       setRouteLabels: (labels) => objectPanel.setRouteLabels(labels),
+      // Read fresh on every route: the AS-OF date can change, and a run that
+      // predates the data pyramid genuinely publishes none.
+      snowDataSource: () =>
+        snowOverlay?.dataTileUrl && snowOverlay.dataTileZoom !== null
+          ? { url: snowOverlay.dataTileUrl, zoom: snowOverlay.dataTileZoom }
+          : null,
     });
     // Registered after the controller exists, which is also what puts the
     // route buttons in the object panel for the first time; the controller's

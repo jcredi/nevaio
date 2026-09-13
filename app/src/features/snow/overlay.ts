@@ -31,6 +31,15 @@ export type SnowOverlay = {
   bounds: [number, number, number, number];
   setVisible: (visible: boolean) => void;
   isVisible: () => boolean;
+  /**
+   * The snow *data* pyramid this AS-OF date publishes, or null when it does
+   * not (spec section 8.4). Carried on the overlay rather than read from
+   * config because it belongs to a specific published run - a historical date
+   * that predates the data pyramid genuinely has none, and the route profile
+   * must say so rather than sampling another date's snow.
+   */
+  dataTileUrl: string | null;
+  dataTileZoom: number | null;
 };
 
 /**
@@ -49,7 +58,7 @@ function setFadeTransition(map: Map, layerId: string): void {
 
 function finishOverlay(
   map: Map,
-  info: Pick<SnowOverlay, "date" | "summary" | "title" | "bounds">,
+  info: Pick<SnowOverlay, "date" | "summary" | "title" | "bounds" | "dataTileUrl" | "dataTileZoom">,
 ): SnowOverlay {
   const beforeId = INSERT_BEFORE.find((id) => map.getLayer(id));
   map.addLayer(
@@ -96,6 +105,8 @@ function addTilePreview(
   map: Map,
   manifest: SnowTileManifest,
   tileUrls: string[],
+  dataTileUrl: string | null,
+  dataTileZoom: number | null,
 ): SnowOverlay {
   map.addSource(SOURCE_ID, {
     type: "raster",
@@ -118,6 +129,8 @@ function addTilePreview(
     summary: coverage,
     title: manifest.notice,
     bounds: manifest.bounds,
+    dataTileUrl,
+    dataTileZoom,
   });
 }
 
@@ -249,9 +262,9 @@ export async function addSnowOverlay(
   try {
     // Fetched before anything is torn down, so a slow network no longer shows
     // an empty map for the length of the request.
-    const { manifest, tileUrls } = await loadTileManifest(manifestUrl);
+    const { manifest, tileUrls, dataTileUrl, dataTileZoom } = await loadTileManifest(manifestUrl);
     const hadPrevious = demoteCurrentOverlay(map);
-    const overlay = addTilePreview(map, manifest, tileUrls);
+    const overlay = addTilePreview(map, manifest, tileUrls, dataTileUrl, dataTileZoom);
     void crossFadeIn(map, hadPrevious);
     return overlay;
   } catch (error) {

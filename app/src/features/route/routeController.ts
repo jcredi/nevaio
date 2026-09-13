@@ -31,7 +31,9 @@ import { DirectionsError, NoRouteError, fetchWalkingRoute } from "./directions.t
 import { RouteLayer } from "./routeLayer.ts";
 import { RoutePanel } from "./routePanel.ts";
 import { RoutePrompt } from "./routePrompt.ts";
-import { pointAtDistance } from "./routeProfile.ts";
+import { DEFAULT_SPACING_METERS, pointAtDistance, resampleAlongRoute } from "./routeProfile.ts";
+import { SnowDataClient } from "./snowDataClient.ts";
+import { summariseSnow } from "./snowSummary.ts";
 
 export type { RouteRole };
 
@@ -42,6 +44,16 @@ export type RouteControllerHooks = {
   closeObjectPanel: () => void;
   /** Re-word the object panel's route buttons as the plan fills in. */
   setRouteLabels: (labels: { start: string; destination: string }) => void;
+  /**
+   * The snow data pyramid for the AS-OF date currently on the map, or null.
+   *
+   * A getter, not a value: the AS-OF date can change after this controller is
+   * built, and a historical run that predates the data pyramid genuinely has
+   * none. Sampling another date's snow against this date's map would be the
+   * exact confusion spec section 5.4 exists to prevent, so the answer is read
+   * fresh each time a route is calculated.
+   */
+  snowDataSource: () => { url: string; zoom: number } | null;
 };
 
 export class RouteController {
@@ -134,6 +146,7 @@ export class RouteController {
       this.coordinates = route.coordinates;
       this.layer.setRoute(route.coordinates);
       this.panel.showRoute(names, route);
+      void this.sampleSnow(route.coordinates, token);
     } catch (error) {
       if (token !== this.token) return;
       // An abort means this request was superseded or cleared; the state that
@@ -152,6 +165,41 @@ export class RouteController {
       }
     } finally {
       if (this.inFlight === controller) this.inFlight = null;
+    }
+  }
+
+  /**
+   * Sample snow along the route and hand the summary to the panel.
+   *
+   * Deliberately *after* the route is already on screen and not awaited by it:
+   * the distance, profile and disclaimer are useful immediately, and snow
+   * sampling pulls one or more tiles over the network. A slow or missing snow
+   * layer must never hold back the rest of the answer.
+   */
+  private async sampleSnow(coordinates: readonly [number, number][], token: number): Promise<void> {
+    const source = this.hooks.snowDataSource();
+    if (source === null) {
+      this.panel.showSnowUnavailable(
+        "Snow along the route is not available for this date.",
+      );
+      return;
+    }
+
+    this.panel.showSnowPending();
+    // The same even ground spacing everything else in this feature uses, so a
+    // count of samples converts to a distance (spec section 8.3's rule that
+    // analysis must not depend on zoom).
+    const { samples, spacingMeters } = resampleAlongRoute(coordinates, DEFAULT_SPACING_METERS);
+    try {
+      const client = new SnowDataClient(source.url, source.zoom);
+      const cells = await client.sample(samples);
+      if (token !== this.token) return;
+      this.panel.showSnow(summariseSnow(cells), spacingMeters);
+    } catch (error) {
+      if (token !== this.token) return;
+      console.error("Snow sampling failed", error);
+      // Unknown, never "no snow".
+      this.panel.showSnowUnavailable("Snow along the route could not be read.");
     }
   }
 

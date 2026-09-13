@@ -68,14 +68,25 @@ key, then a smoke test of that provider's elevation data.**
      2026-09-13 on measurement): no pipeline job, no R2 storage claim, no
      sizing exercise. It stays documented as the fallback if Geoapify is ever
      dropped, and the 2026-09-12 analysis behind it is unchanged.
-   - **Snow along the route**, and this needs a data source the frontend does
-     not have. The published PNG tiles encode freshness as five discrete
-     colours and coverage as alpha, so reading FSC back out of them loses the
-     QA tier entirely - and spec section 15 item 11 makes freshness *and*
-     quality a firm requirement on the profile, stronger than section 8.4-8.5
-     currently read. The honest options are a separate lossless per-date data
-     raster (GF/QA/age packed per pixel) published beside the visual tiles, or
-     narrowing what the profile claims. Size the first before choosing.
+   - **Snow along the route is built but not published - this is the one open
+     decision.** The whole path exists and is tested end to end: a lossless
+     data pyramid encoder in the pipeline (`data_tiles.py`), the render flag
+     `--data-tiles`, artifact validation, manifest announcement, the frontend
+     decoder, sampler and summary, and the panel section. Verified in a browser
+     on 2026-09-13 against a pipeline-generated tile: canvas decode, sampling,
+     and a summary reporting 71% observed / 29% cloud exactly as encoded.
+
+     **What is needed is the owner's go-ahead to publish it**, because that is a
+     storage commitment on the R2 free tier and a change to the daily workflow.
+     Measured: about 27 MB per date, or 0.8 GB for all 31 archived dates (up to
+     ~1.4 GB with midwinter cover). The recommendation in
+     [`research/snow-along-route.md`](research/snow-along-route.md) is the
+     latest date only - a route planner answers "should I go", and nobody has
+     asked to plan against three weeks ago - with the panel saying plainly that
+     snow is unavailable on a historical date rather than quietly showing
+     today's. Enabling it means adding `--data-tiles` to the daily workflow's
+     render step; nothing else changes, and the flag is asserted to leave the
+     visual tiles byte-identical.
    - **Spec section 15 items 1 and 2 are still open** and should be decided
      against real numbers rather than in advance: the sampling *mechanism* is
      now concrete (even spacing in ground metres, endpoints preserved exactly,

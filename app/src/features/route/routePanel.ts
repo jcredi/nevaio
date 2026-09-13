@@ -37,6 +37,8 @@ import { BottomSheetHeight } from "../../map/bottomSheet.ts";
 import { DESTINATION_COLOR, START_COLOR } from "./routeLayer.ts";
 import { ElevationChart, type ScrubHandler } from "./elevationChart.ts";
 import { elevationStats, formatAscent } from "./elevationProfile.ts";
+import { QUALITY_LABELS, SnowDataState } from "./snowDataTile.ts";
+import { snowHeadline, type SnowSummary } from "./snowSummary.ts";
 import type { ValidatedRoute } from "./directionsSchema.ts";
 
 export type RouteEndpointNames = { start: string; destination: string };
@@ -70,6 +72,8 @@ export class RoutePanel {
   private readonly subtitle: HTMLElement;
   private readonly body: HTMLElement;
   private readonly sheetHeight: BottomSheetHeight;
+  /** Where the snow section is rendered, once sampling finishes. */
+  private snowHost: HTMLElement | null = null;
   private onClosed: (() => void) | null = null;
   private onScrub: ScrubHandler | null = null;
 
@@ -208,13 +212,8 @@ export class RoutePanel {
       );
     }
 
-    children.push(
-      element(
-        "p",
-        "route-panel__pending",
-        "Snow coverage along this route is not shown yet.",
-      ),
-    );
+    this.snowHost = element("div", "route-panel__snow");
+    children.push(this.snowHost);
 
     children.push(
       element(
@@ -232,7 +231,104 @@ export class RoutePanel {
 
   close(): void {
     this.element.hidden = true;
+    this.snowHost = null;
     this.sheetHeight.release();
+  }
+
+  /** Snow sampling is in flight; say so rather than leaving a blank strip. */
+  showSnowPending(): void {
+    if (!this.snowHost) return;
+    this.snowHost.replaceChildren(
+      element("p", "route-panel__pending", "Checking snow along this route\u2026"),
+    );
+  }
+
+  /**
+   * Why there is no snow along this route - never silence, and never zeroes.
+   * The commonest reason by far is an AS-OF date whose run predates the data
+   * pyramid, which is a real answer about *our data*, not about the mountain.
+   */
+  showSnowUnavailable(reason: string): void {
+    if (!this.snowHost) return;
+    this.snowHost.replaceChildren(element("p", "route-panel__pending", reason));
+  }
+
+  /**
+   * Snow along the route (spec section 8.4), with freshness and quality beside
+   * it rather than tucked away - spec section 15 item 11 makes that a firm
+   * requirement, strengthened from "where practical" on 2026-09-11.
+   *
+   * Every figure here comes from `summariseSnow`, which divides by observed
+   * samples rather than total ones; this method's job is to make the coverage
+   * behind them visible too, so a confident-looking percentage can always be
+   * weighed against how much of the route it rests on.
+   */
+  showSnow(summary: SnowSummary, spacingMeters: number): void {
+    if (!this.snowHost) return;
+
+    const section = element("div", "route-elevation");
+    const header = element("div", "route-elevation__header");
+    header.append(element("h3", "route-elevation__title", "Snow"));
+    section.append(header);
+
+    const headline = snowHeadline(summary);
+    if (headline) {
+      section.append(element("p", "route-panel__snow-headline", headline));
+    } else {
+      section.append(
+        element(
+          "p",
+          "route-panel__pending",
+          summary.observedSamples === 0
+            ? "No usable snow observation anywhere along this route."
+            : "Too little of this route was observed to summarise snow cover.",
+        ),
+      );
+    }
+
+    const stats = element("dl", "route-panel__stats");
+    if (summary.meanCoverPercent !== null) {
+      stats.append(...statEntry("Mean cover", `${Math.round(summary.meanCoverPercent)}%`));
+    }
+    if (summary.longestSnowRun > 0) {
+      // Samples are evenly spaced in ground metres (`routeProfile.ts`), which
+      // is what lets a count of samples become a distance at all.
+      const meters = summary.longestSnowRun * spacingMeters;
+      stats.append(...statEntry("Longest snow stretch", formatDistance(meters)));
+    }
+    stats.append(
+      ...statEntry("Route observed", `${Math.round(summary.coverage * 100)}%`),
+    );
+    if (summary.maxAgeDays !== null) {
+      stats.append(
+        ...statEntry(
+          "Oldest observation",
+          summary.maxAgeDays === 0 ? "Today" : `${summary.maxAgeDays} days old`,
+        ),
+      );
+    }
+    if (summary.worstQuality !== null) {
+      stats.append(...statEntry("Lowest quality", QUALITY_LABELS[summary.worstQuality] ?? "Unknown"));
+    }
+    section.append(stats);
+
+    // What the unobserved part of the route actually was, so "70% observed"
+    // is never left as a bare number.
+    const gaps: string[] = [];
+    for (const [state, label] of [
+      [SnowDataState.Cloud, "cloud"],
+      [SnowDataState.Water, "water"],
+      [SnowDataState.Stale, "stale"],
+      [SnowDataState.NoData, "no data"],
+    ] as const) {
+      const count = summary.stateCounts[state];
+      if (count > 0) gaps.push(`${label} ${Math.round((count / summary.totalSamples) * 100)}%`);
+    }
+    if (gaps.length > 0) {
+      section.append(element("p", "route-panel__pending", `Unobserved: ${gaps.join(", ")}.`));
+    }
+
+    this.snowHost.replaceChildren(section);
   }
 
   /**

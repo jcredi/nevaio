@@ -1,5 +1,64 @@
 # Working session log
 
+## 2026-09-13 (evening) - snow along the route, built end to end but not published
+
+Spec section 8's last missing piece is now built and verified. It is **not
+enabled**: publishing the data it needs is a storage commitment on the R2 free
+tier and a change to the daily workflow, which is the owner's call. Everything
+up to that switch is done, tested and additive.
+
+**Reading the visual snow tiles back was rejected on the spec's own terms, not
+on effort.** Section 5.4 states that a valid 0% pixel is indistinguishable from
+cloud, water and no-data on the map raster, because all four are fully
+transparent. For a route profile that is not a detail - it *is* the question -
+and the QA tier section 15 item 11 requires is not in the visual encoding at
+all. So a second, lossless pyramid: GF in R, observation age in G, QA tier and
+state packed into B, alpha pinned opaque.
+
+**Two traps in that format are designed out rather than commented around.**
+Alpha must stay 255 because canvas `getImageData` un-premultiplies by it, so any
+lower value silently rounds the other three channels - a format using alpha as a
+fourth field would return snow percentages that are quietly wrong. And the
+pipeline warps through a raster of source-pixel *indices* rather than warping
+the encoded bands: `tiles.py` can use 0 as its nodata sentinel because an
+all-zero pixel is impossible in the visual encoding, but here GF=0 means zero
+percent snow, which is real, common and the entire point. Warping that with
+nodata=0 would drop it or bump it to 1%. Both have tests.
+
+**The sizing was measured, and the first model was wrong in a way worth
+recording.** It treated a transparent visual pixel as *uncovered*, when
+transparency means no snow rather than no observation. Corrected to near-full
+coverage the tiles got *smaller*, not larger - a uniform "valid, 0%" region
+compresses about as well as a uniform absent one. 3,119 z11 tiles cover the
+footprint at a modelled 8.7 KB each: 27 MB per date, 0.8 GB for all 31, against
+a pre-measurement fear of 2.8 GB. Storage is no longer the reason to limit this
+to one date; "nobody plans a route against three weeks ago" is.
+
+**The summary statistics are where spec 5.4 is easiest to break, so that is
+where the tests are.** Dividing by total samples rather than *observed* ones
+turns cloud into bare ground and makes a route look safer the worse the data is.
+Every figure divides by the observed count, coverage is always shown beside
+them, a snow run never spans an unobserved gap (two snowy stretches either side
+of a cloud bank are not one snowfield), and a headline percentage is refused
+outright below 50% coverage rather than sounding confident about a tenth of a
+route. Freshness and quality are reported at their worst, not averaged - an
+average hides the one stale stretch behind a lot of fresh data.
+
+Verified in a real browser against a pipeline-generated tile with a deliberately
+mixed structure: the panel reported 71% observed / 29% cloud, mean cover 5%,
+oldest observation today, lowest quality Low - each matching what was encoded.
+That exercises the whole chain across the language boundary: Python encoder,
+PNG, canvas decode, sampler, summary, DOM.
+
+Also this session: the artifact validator gained the `data/` directory under a
+symmetry rule (files and metadata present together or not at all - anything else
+means the artifact disagrees with itself, which is what that validator exists to
+catch before a publication credential is near it), and the render flag is
+asserted to leave the visual tiles byte-identical, so turning it on cannot move
+the map by a pixel.
+
+`npm test` 240 passing, pipeline 323 passing, build and mobile layout clean.
+
 ## 2026-09-13 (later still again) - the elevation profile, and spec 8.5 linked
 
 Spec section 8 is now complete apart from its snow half: the route panel draws
