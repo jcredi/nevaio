@@ -1,5 +1,53 @@
 # Working session log
 
+## 2026-09-13 (later) - Mapbox wanted a credit card, so the routing provider is Geoapify
+
+The owner went to create the Mapbox token and was asked for payment details.
+That is a reasonable place to stop for a feature budgeted at zero (spec section
+15 item 9), so **"no payment details at signup" became a hard filter** alongside
+"the key must be safe in a browser" - and, as the 2026-09-12 correction in
+`docs/research/routing-and-dem-options.md` already said to do, both were applied
+*before* any ranking on routing quality this time.
+
+**The pick is Geoapify, `hike` mode.** No card, 3,000 credits/day, keys the
+vendor documents as restrictable by allowed origin / HTTP referrer / CORS - the
+same mechanism that makes MapTiler's key safe in a public bundle - and a free
+plan that permits commercial use in writing, where Stadia's forbids it without
+defining the term and GraphHopper's forbids it outright. Stadia has the better
+auth story (domain authentication needs no key in the page at all) and lost on
+that licensing ambiguity alone; GraphHopper has the best hiking profile and was
+rejected on the client-side-key filter, which is the ORS failure mode exactly.
+FOSSGIS's keyless public Valhalla is recorded as the escape hatch, not the pick:
+it is a fair-use *demo* server, the category that disqualified Nominatim.
+
+**The finding that matters most is not about routing.** Geoapify's
+`details=elevation` returns per-point heights and ascent/descent *with the
+route*, which is spec section 8.3's elevation gain/loss and most of section
+8.4's profile from the same call - and would take the Copernicus GLO-30 extract
+off section 8's critical path entirely: no pipeline job, no R2 storage claim, no
+sizing exercise. It is deliberately **not requested yet**. Geoapify does not name
+its global DEM source, and 30 m global data is at its worst in exactly the steep
+terrain this app exists for, so it gets smoke-tested against known summit and
+hut heights before anything is built on it. GLO-30 is deferred, not cancelled.
+
+**Two ways to be confidently wrong, both now guarded by tests.** Geoapify's
+`waypoints` parameter is `lat,lon` - the reverse of the GeoJSON `[lon, lat]`
+order the same API returns in its own geometry and that the rest of this feature
+speaks. Swapping them does not error; both readings are valid points on Earth,
+so the app would draw a confident route through the Indian Ocean. `formatWaypoint`
+is therefore a named function in the pure module with a test on a real summit's
+coordinates. Separately, `distance_units` is a response *field*, not an
+assumption: a `"Miles"` distance read as metres is entirely plausible on a panel,
+so it is refused rather than converted - converting would hide a request we did
+not mean to make.
+
+The provider boundary held: only `directionsSchema.ts`, `directions.ts`, the
+config variable and one CSP line changed. The controller, panel, prompt, map
+layer and pure geometry are untouched, which is what that boundary was for.
+
+Not yet verified against a live key - the account is the owner's to create.
+`npm test` 170 passing, build clean.
+
 ## 2026-09-13 - The route planner's core, without the profile it still needs
 
 Spec section 8's A-to-B walking route now works end to end on the parts that do

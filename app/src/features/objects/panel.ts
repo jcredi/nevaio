@@ -133,7 +133,7 @@ export class ObjectPanel {
    * preferred interaction is selection of OSM objects or searched places").
    *
    * Never called means no buttons are rendered at all, which is how an
-   * unconfigured routing provider surfaces: no `VITE_MAPBOX_TOKEN`, no route
+   * unconfigured routing provider surfaces: no `VITE_GEOAPIFY_API_KEY`, no route
    * actions, rather than a control that fails when pressed. `labels` lets the
    * route controller re-word the buttons as the plan fills in - "Start here"
    * becomes "Change start" once a start exists - so the panel never has to

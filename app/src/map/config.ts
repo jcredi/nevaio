@@ -70,25 +70,30 @@ export const objectSeriesUrl: string | null =
 // doesn't matter.
 export const searchBiasBounds: [number, number, number, number] = [5, 40, 16, 48];
 
-// The hiking routing provider (spec section 8, decided 2026-09-12 - see
-// docs/research/routing-and-dem-options.md and the correction in it that
-// reversed OpenRouteService). Mapbox Directions' `mapbox/walking` profile is
-// called straight from the browser, which is only safe because a Mapbox
-// *public* token can carry URL restrictions; OpenRouteService was disqualified
-// precisely because it cannot.
+// The hiking routing provider (spec section 8). **Geoapify**, decided
+// 2026-09-13 - see docs/research/routing-and-dem-options.md, whose 2026-09-13
+// amendment supersedes the Mapbox decision of the day before: Mapbox began
+// asking for payment details at signup, against a feature budgeted at zero
+// (spec section 15 item 9). OpenRouteService was rejected earlier and for a
+// different reason - its staff forbid delivering a key to a browser, and it
+// offers no domain restriction.
 //
-// Two rules ride on this value and neither is optional:
-//   - It must be a **new, URL-restricted** token, never the account's default
-//     one. Mapbox does not apply URL restrictions to default tokens, so the
-//     default would ship unrestricted inside a public bundle.
+// Geoapify's Routing API is called straight from the browser, which is safe for
+// the same reason MapTiler's key is: the vendor documents keys as restrictable
+// by allowed origin, HTTP referrer and CORS. Two rules ride on this value:
+//   - **Restrict the key to the deployed origin in the Geoapify console.** An
+//     unrestricted key in a public bundle is a key anyone can spend.
 //   - Like VITE_MAPTILER_API_KEY, it is deliberately **not** marked secret in
 //     Netlify: Vite inlines `VITE_*` into the client bundle by design, so
-//     secret-scanning would fail the build on a value that is meant to reach
-//     the browser. The real access control is Mapbox's own URL restriction.
+//     secret-scanning would fail the build on a value meant to reach the
+//     browser. The real access control is the origin restriction.
+//
+// Free-plan use requires a visible "Powered by Geoapify" credit, which
+// `main.ts` adds to the map's attribution control. Don't drop it.
 //
 // Null when unset, and that is a supported state rather than a broken one: the
 // route planner reports itself unavailable instead of offering a control that
 // cannot work. There is no fallback provider and no canned route - the same
 // posture the snow overlay and the object series take about missing data.
-export const mapboxAccessToken: string | null =
-  import.meta.env.VITE_MAPBOX_TOKEN || null;
+export const geoapifyApiKey: string | null =
+  import.meta.env.VITE_GEOAPIFY_API_KEY || null;

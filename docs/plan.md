@@ -22,11 +22,13 @@ draws real snow history over a trailing 30-day window; item 1 is now watching
 rather than building.
 
 **A-to-B routing (item 2) is half done as of 2026-09-13.** The route itself
-works - endpoints picked from the object panel, a real Mapbox Directions
-walking route on the map, distance, and the section 8.6 disclaimer - and is
-committed behind `VITE_MAPBOX_TOKEN`, which is not set anywhere, so the feature
-is invisible on production. **Next work is the two things that block the rest
-of section 8: the owner's Mapbox token, and an elevation source.**
+works - endpoints picked from the object panel, a real hiking route on the map,
+distance, and the section 8.6 disclaimer - and is committed behind
+`VITE_GEOAPIFY_API_KEY`, which is not set anywhere, so the feature is invisible
+on production. **The provider is Geoapify**, switched the same day the routing
+code landed: Mapbox began asking for payment details at signup, which a feature
+budgeted at zero should not require. **Next work is the owner's free Geoapify
+key, then a smoke test of that provider's elevation data.**
 
 ## Next, in order
 
@@ -53,21 +55,27 @@ of section 8: the owner's Mapbox token, and an elevation source.**
 
 2. **A-to-B routing + snow/elevation profile (spec section 8) - the route
    ships, the profile does not.** Shipped 2026-09-13 in
-   `app/src/features/route/`: Mapbox Directions `mapbox/walking`, endpoints
-   nominated from the object panel, route geometry and endpoints on the map,
-   distance, and the section 8.6 disclaimer with every route. Sampling geometry
-   (`routeProfile.ts`) is built and tested but nothing consumes it yet. What is
-   left, in the order it unblocks:
-   - **Create the URL-restricted Mapbox token** (owner console work - see
-     "Open" below). Until it exists and is set as a Netlify env var, the whole
-     feature is invisible on production by design. Nothing else here can be
-     verified against a real route without it.
-   - **An elevation source**, decided 2026-09-12 as a precomputed Copernicus
-     GLO-30 extract in R2 (fallback: MapTiler Terrain-RGB). Mapbox Directions
-     returns no elevation, so this is what section 8.3's elevation gain/loss
-     and section 8.4's elevation profile both wait on. `du` the bucket before
-     building it - see the R2 headroom item below, where the DEM is the one
-     claimant worth sizing.
+   `app/src/features/route/`: the Geoapify Routing API in `hike` mode,
+   endpoints nominated from the object panel, route geometry and endpoints on
+   the map, distance, and the section 8.6 disclaimer with every route. Sampling
+   geometry (`routeProfile.ts`) is built and tested but nothing consumes it
+   yet. What is left, in the order it unblocks:
+   - **Create the free Geoapify API key** (owner console work - see "Open"
+     below). No card required. Until it exists and is set as a Netlify env var,
+     the whole feature is invisible on production by design, and nothing else
+     here can be verified against a real route.
+   - **Smoke-test Geoapify's elevation before building anything on it.** Its
+     `details=elevation` returns per-point heights plus ascent/descent with the
+     route, which is why it was chosen - but Geoapify does not name its global
+     DEM source, and 30 m global data is at its worst in exactly the steep
+     terrain this app is about. Check a handful of summits and huts against the
+     object index's own elevations first. The request deliberately does not ask
+     for elevation until that passes.
+   - **The Copernicus GLO-30 extract is deferred, not cancelled.** If the smoke
+     test passes, the elevation profile comes from the routing response and the
+     DEM extract is not needed for section 8 at all - no pipeline job, no R2
+     storage claim, no sizing exercise. If it fails, GLO-30 is the fallback and
+     the decision of 2026-09-12 stands unchanged.
    - **Snow along the route**, and this needs a data source the frontend does
      not have. The published PNG tiles encode freshness as five discrete
      colours and coverage as alpha, so reading FSC back out of them loses the
@@ -101,25 +109,30 @@ of section 8: the owner's Mapbox token, and an elevation source.**
 - **Spec section 15** is the canonical list of undecided product questions.
   Live ones: route sampling method and "snow-covered percentage" definition
   (1, 2), basemap/terrain provider (4), optional 20 m FSCOG layer (10).
-  **Items 6 and 7 were decided 2026-09-12** from
-  [`research/routing-and-dem-options.md`](research/routing-and-dem-options.md):
-  routing is **Mapbox Directions** (`mapbox/walking`), elevation is a
-  **precomputed Copernicus GLO-30 extract into the existing R2 bucket**.
-  Routing was OpenRouteService for part of that day; it is not, because ORS
-  forbids client-side keys and this app has no backend - see the correction in
-  that document before reopening the question.
-- **Create the URL-restricted Mapbox token** (owner console work; routing is
-  now built and waiting on it, 2026-09-13). It must be a **new** token, not
-  the account's default: Mapbox's URL restrictions do not apply to default
-  tokens, so the default would ship unrestricted in a public bundle - the very
-  problem that disqualified OpenRouteService. Restrict it to the Netlify
-  origin, set it as a Netlify env var (`VITE_MAPBOX_TOKEN`) across all
+  **Item 6 (routing provider) was decided 2026-09-13: Geoapify, `hike` mode.**
+  It replaced Mapbox Directions, decided the day before and abandoned when
+  Mapbox asked for payment details at signup; Mapbox in turn had replaced
+  OpenRouteService, which forbids client-side keys. The full comparison, both
+  reversals and the reasoning are in
+  [`research/routing-and-dem-options.md`](research/routing-and-dem-options.md)
+  - read the 2026-09-13 amendment before reopening this.
+  **Item 7 (elevation/DEM source) is open again**, and deliberately: a
+  precomputed Copernicus GLO-30 extract into R2 remains the decided fallback,
+  but Geoapify returns a per-point elevation profile with the route, which
+  would make the extract unnecessary. Which one is used depends on a smoke test
+  that has not run (item 2 above).
+- **Create the free Geoapify API key** (owner console work, 2026-09-13; routing
+  is built and waiting on it). No credit card. Restrict it to the Netlify
+  origin in the Geoapify console - the key ships inside a public bundle, and
+  the origin restriction is the only thing standing between it and anyone who
+  lifts it. Set it as a Netlify env var (`VITE_GEOAPIFY_API_KEY`) across all
   contexts, and deliberately do **not** mark it secret, for the same reason
   `VITE_MAPTILER_API_KEY` is not: Vite inlines `VITE_*` into the client bundle
   by design, so secret-scanning would fail the build on a value meant to reach
-  the browser. `api.mapbox.com` is already in `connect-src` in
-  `app/public/_headers` (added 2026-09-13 with the routing code), so the token
-  is the only remaining step.
+  the browser. `api.geoapify.com` is already in `connect-src` in
+  `app/public/_headers` (added 2026-09-13 with the switch), and the mandatory
+  "Powered by Geoapify" free-plan credit is already in the map's attribution
+  control, so the key is the only remaining step.
 - **Custom domain in front of the `r2.dev` endpoint** (security F10, optional
   pre-launch). Owner console work; needs an Admin-scoped Cloudflare token.
   `app/public/_headers` pins the bucket host in its CSP and must change in the
@@ -139,8 +152,10 @@ of section 8: the owner's Mapbox token, and an elevation source.**
   archive is roughly 4.0 GB and ~109,000 objects. Against that, the object
   index (28.6 MB), the per-object series (~26 MB at the two-month depth
   amendment v1.13 leaves) and a Copernicus GLO-30 extract are the other
-  claimants. The first two are rounding errors; **the DEM extract is the one
-  worth sizing before it is built**, and its size is still an estimate. They
+  claimants. The first two are rounding errors; **the DEM extract was the one
+  worth sizing before it is built** - and since 2026-09-13 it may never be
+  built at all, if Geoapify's own elevation proves good enough (item 2), which
+  would take the largest single unknown out of this projection. They
   have to fit in the remaining
   ~6 GB, or the date window shortens - `config.ASOF_CATALOGUE_DATES` is the
   one dial. Re-measure in midwinter, when the number means something - the

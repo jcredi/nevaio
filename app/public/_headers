@@ -10,14 +10,16 @@
 # this file must be updated in the same change or the overlay will be blocked.
 # Verify with app/scripts/check-csp.mjs after any change.
 #
-# api.mapbox.com is in connect-src for the A-to-B route planner (spec section
-# 8): Mapbox Directions is called directly from the browser. It is connect-src
-# only - no Mapbox script, style, font or tile is loaded, and it must stay that
-# way, because the basemap is MapTiler's and adding Mapbox to script-src or
-# img-src would widen this allowlist for a dependency the app does not have.
+# api.geoapify.com is in connect-src for the A-to-B route planner (spec section
+# 8): the Geoapify Routing API is called directly from the browser. It is
+# connect-src only - no Geoapify script, style, font or tile is loaded, and it
+# must stay that way, because the basemap is MapTiler's and adding Geoapify to
+# script-src or img-src would widen this allowlist for a dependency the app does
+# not have. (This replaced api.mapbox.com on 2026-09-13 with the provider
+# switch; Mapbox is no longer contacted at all.)
 
 /*
-  Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://api.maptiler.com https://pub-1b43c7d267ad44228b11f94fc251b9ac.r2.dev; connect-src 'self' https://api.maptiler.com https://api.mapbox.com https://pub-1b43c7d267ad44228b11f94fc251b9ac.r2.dev; worker-src 'self' blob:; child-src 'self' blob:; font-src 'self'; manifest-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'none'; upgrade-insecure-requests
+  Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://api.maptiler.com https://pub-1b43c7d267ad44228b11f94fc251b9ac.r2.dev; connect-src 'self' https://api.maptiler.com https://api.geoapify.com https://pub-1b43c7d267ad44228b11f94fc251b9ac.r2.dev; worker-src 'self' blob:; child-src 'self' blob:; font-src 'self'; manifest-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'none'; upgrade-insecure-requests
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
   Referrer-Policy: strict-origin-when-cross-origin

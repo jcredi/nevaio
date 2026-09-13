@@ -12,20 +12,23 @@
  *
  * **Two deliberate omissions, both about not overstating what we have:**
  *
- *  - **No walking time.** Mapbox Directions returns a `duration`, and it is
- *    not shown. It is an urban-walking estimate computed on flat-ground pace
- *    with no elevation input at all, and this app's whole subject is alpine
- *    terrain where ascent, not distance, sets the time. A number that says
- *    "2 h 10" for a route with 1,400 m of climbing is not a rough estimate,
- *    it is wrong in the direction that gets people caught out after dark -
- *    precisely the kind of harm spec section 8.6's disclaimer exists for.
- *    When a DEM lands (`docs/plan.md` item 2), an ascent-aware estimate could
- *    be offered honestly; until then there is nothing to show.
- *  - **No elevation gain/loss.** Spec section 8.3 asks for it "where
- *    available or derivable", and from Mapbox Directions alone it is neither:
- *    the provider returns no elevation for the walking profile. The panel
- *    says so rather than leaving a silent gap a reader would fill in with an
- *    assumption.
+ *  - **No walking time.** The provider returns a `time`, and it is not shown.
+ *    It is a pedestrian estimate computed on flat-ground pace, and this app's
+ *    whole subject is alpine terrain where ascent, not distance, sets the
+ *    time. A number that says "2 h 10" for a route with 1,400 m of climbing is
+ *    not a rough estimate, it is wrong in the direction that gets people
+ *    caught out after dark - precisely the kind of harm spec section 8.6's
+ *    disclaimer exists for. Once elevation is trusted here, an ascent-aware
+ *    estimate could be offered honestly; until then there is nothing to show.
+ *  - **No elevation gain/loss yet.** Spec section 8.3 asks for it "where
+ *    available or derivable". Geoapify *can* return a per-point elevation
+ *    profile with the route (`details=elevation`) - that is a large part of
+ *    why it was chosen on 2026-09-13 - but it does not name its global DEM
+ *    source, and 30 m global data is at its worst in exactly the steep terrain
+ *    this app is about. So the request does not ask for it until it has been
+ *    smoke-tested against known summit and hut heights (`docs/plan.md` item
+ *    2), and the panel says "not available yet" rather than leaving a silent
+ *    gap a reader would fill in with an assumption.
  *
  * The disclaimer (spec section 8.6) is not a footnote here: it is rendered
  * with every calculated route, and it is not dismissible.

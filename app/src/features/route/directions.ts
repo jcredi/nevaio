@@ -1,94 +1,94 @@
 /**
- * The network boundary for A-to-B hiking routes (spec section 8.1): one
- * request to Mapbox Directions' `mapbox/walking` profile, validated by
- * `directionsSchema.ts` before any value reaches the map.
+ * The network boundary for A-to-B hiking routes (spec section 8.1): one request
+ * to the Geoapify Routing API in `hike` mode, validated by `directionsSchema.ts`
+ * before any value reaches the map.
  *
- * Why Mapbox and not OpenRouteService, which was the pick for part of
- * 2026-09-12: ORS's own staff forbid delivering an API key to a browser and
- * ORS offers no domain restriction, so a keyless-frontend app like this one
- * cannot use it without the backend spec section 11 says the MVP does not
- * have. Mapbox public tokens *can* be URL-restricted, which is what makes a
- * token in a public bundle defensible. The full comparison is in
- * `docs/research/routing-and-dem-options.md`, including the correction that
- * reversed the original recommendation - read it before reopening this.
+ * **Why Geoapify**, decided 2026-09-13 - the full comparison and the two
+ * rejected predecessors are in `docs/research/routing-and-dem-options.md`:
  *
- * `mapbox/walking` is the profile, not `mapbox/driving`; Mapbox has no
- * hiking-specific profile, which is a real limitation to state rather than
- * paper over: it is an urban-walking profile applied to alpine paths, and it
- * knows nothing about trail difficulty, exposure, or seasonal closure. Spec
- * section 8.6 requires the app to say so, and `routePanel.ts` does.
+ *  - *Not OpenRouteService*: its staff state a key must not be delivered to a
+ *    browser, and it offers no domain restriction. An app with no backend
+ *    (spec section 11) cannot use it.
+ *  - *Not Mapbox*: it began asking for payment details at signup, against a
+ *    feature budgeted at zero (spec section 15 item 9).
+ *  - Geoapify needs no card, documents its keys as restrictable by allowed
+ *    origin / HTTP referrer / CORS - the mechanism that makes MapTiler's key
+ *    safe in a public bundle - and permits free-plan commercial use in writing.
  *
- * This module holds the token and the `fetch`, exactly as
- * `../search/geocode.ts` does for place search, so everything below it stays
- * pure and Node-testable.
+ * `hike` is the mode, not `walk`: Geoapify describes it as using "hiking trails
+ * and higher difficulty trails", where `walk` is a pavement-oriented pedestrian
+ * profile. That difference is the whole reason this app routes at all. It is
+ * still a general router over OSM ways, though, and knows nothing about
+ * seasonal closure, snow, or whether a marked path is currently passable -
+ * spec section 8.6 requires the app to say so, and `routePanel.ts` does.
+ *
+ * **Attribution is mandatory on the free plan**: a "Powered by Geoapify" credit,
+ * alongside the OpenStreetMap attribution the app already carries. It is added
+ * to the map's attribution control in `main.ts`. Do not remove it while this
+ * provider is in use.
+ *
+ * This module holds the key and the `fetch`, exactly as `../search/geocode.ts`
+ * does for place search, so everything below it stays pure and Node-testable.
  */
-import { mapboxAccessToken } from "../../map/config";
+import { geoapifyApiKey } from "../../map/config";
 import {
   DirectionsError,
   NoRouteError,
+  formatWaypoint,
   validateDirectionsResponse,
   type ValidatedRoute,
 } from "./directionsSchema.ts";
 
 export { DirectionsError, NoRouteError, type ValidatedRoute };
 
-const ENDPOINT = "https://api.mapbox.com/directions/v5/mapbox/walking";
+const ENDPOINT = "https://api.geoapify.com/v1/routing";
 
 /**
- * Bound the response before it is parsed. `overview=full` on a long alpine
- * route is tens of kilobytes of JSON; a megabyte means something is wrong
- * with the response, not with the route. `directionsSchema.ts` bounds the
- * decoded geometry too - this bounds the bytes, which is the cheaper check.
+ * Bound the response before it is parsed. A long alpine route's geometry is
+ * tens of kilobytes of JSON; a megabyte means something is wrong with the
+ * response, not with the route. `directionsSchema.ts` bounds the decoded
+ * geometry too - this bounds the bytes, which is the cheaper check.
  */
 const MAX_RESPONSE_BYTES = 4 * 1024 * 1024;
 
 export type RoutePoint = { longitude: number; latitude: number };
 
-/** Whether routing can be offered at all - see `mapboxAccessToken` in `map/config.ts`. */
+/** Whether routing can be offered at all - see `geoapifyApiKey` in `map/config.ts`. */
 export function routingIsConfigured(): boolean {
-  return mapboxAccessToken !== null;
-}
-
-/** Six decimals is ~0.1 m: far finer than any path geometry, and it keeps the URL short. */
-function formatPoint(point: RoutePoint): string {
-  return `${point.longitude.toFixed(6)},${point.latitude.toFixed(6)}`;
+  return geoapifyApiKey !== null;
 }
 
 /**
- * Fetch one walking route from `start` to `destination`.
+ * Fetch one hiking route from `start` to `destination`.
  *
- * Throws `NoRouteError` when Mapbox answers, in-band, that no walking route
- * connects the two points - a real answer to show the user, not a failure -
- * and `DirectionsError` for everything else, including a missing token, a
- * transport failure, and an HTTP error. See `directionsSchema.ts` for why
- * those two are deliberately different classes.
+ * Throws `NoRouteError` when the provider cannot connect the two points on foot
+ * - a real answer to show the user - and `DirectionsError` for everything else,
+ * including a missing key, a transport failure, and an HTTP error.
  */
 export async function fetchWalkingRoute(
   start: RoutePoint,
   destination: RoutePoint,
   options: { signal?: AbortSignal } = {},
 ): Promise<ValidatedRoute> {
-  if (mapboxAccessToken === null) {
-    // Callers are expected to check `routingIsConfigured()` and never offer
-    // the control at all; this is the backstop, and it says which variable is
-    // missing rather than surfacing an opaque 401 from Mapbox.
-    throw new DirectionsError("VITE_MAPBOX_TOKEN is not set, so routing is unavailable");
+  if (geoapifyApiKey === null) {
+    // Callers are expected to check `routingIsConfigured()` and never offer the
+    // control at all; this is the backstop, and it names the missing variable
+    // rather than surfacing an opaque 401 from the provider.
+    throw new DirectionsError("VITE_GEOAPIFY_API_KEY is not set, so routing is unavailable");
   }
 
-  const url = new URL(`${ENDPOINT}/${formatPoint(start)};${formatPoint(destination)}`);
-  // GeoJSON rather than an encoded polyline: the decoder would be one more
-  // hand-written parser on the trust boundary, for a payload this app is not
-  // large enough to care about the size of.
-  url.searchParams.set("geometries", "geojson");
-  // The full geometry, not the zoom-dependent simplification Mapbox defaults
-  // to. Spec section 8.3: "Analytical results must not change simply because
-  // the user changes map zoom level" - a simplified overview would make the
-  // route's own length depend on how it was asked for.
-  url.searchParams.set("overview", "full");
-  // No turn-by-turn instructions: this is a planning aid, not a navigator
-  // (spec section 8.6), and the steps array is most of the response size.
-  url.searchParams.set("steps", "false");
-  url.searchParams.set("access_token", mapboxAccessToken);
+  const url = new URL(ENDPOINT);
+  url.searchParams.set("waypoints", `${formatWaypoint(start)}|${formatWaypoint(destination)}`);
+  url.searchParams.set("mode", "hike");
+  // Metres, explicitly. `directionsSchema.ts` then *verifies* that the reply
+  // says metres rather than assuming it: asking and checking are two different
+  // things, and a miles figure read as metres is plausible on screen.
+  url.searchParams.set("units", "metric");
+  // No `details=elevation` yet. Geoapify can return a per-point elevation
+  // profile, which is why it was chosen over Stadia - but it does not name its
+  // global DEM source, so the elevation is to be smoke-tested against known
+  // summit heights before anything is built on it (docs/plan.md item 2).
+  url.searchParams.set("apiKey", geoapifyApiKey);
 
   let response: Response;
   try {
@@ -101,21 +101,23 @@ export async function fetchWalkingRoute(
   }
 
   if (response.status === 401 || response.status === 403) {
-    // The overwhelmingly likely cause is the token: expired, revoked, or
-    // URL-restricted to an origin this build is not served from.
+    // The overwhelmingly likely cause is the key: revoked, or restricted to an
+    // origin this build is not served from.
     throw new DirectionsError(
-      `the routing provider rejected this app's token (HTTP ${response.status})`,
+      `the routing provider rejected this app's API key (HTTP ${response.status})`,
     );
-  }
-  if (response.status === 422) {
-    // Mapbox uses 422 for a request it understood but cannot answer - most
-    // often a coordinate it cannot snap to any walkable segment. That is the
-    // same class of answer as an in-band "NoSegment", so it is reported the
-    // same way rather than as a broken app.
-    throw new NoRouteError("NoSegment");
   }
   if (response.status === 429) {
     throw new DirectionsError("the routing provider's rate limit was reached - try again shortly");
+  }
+  if (response.status === 400) {
+    // Geoapify answers a request it understood but cannot route with a 400 and
+    // a message. The two causes are a waypoint it cannot snap to any walkable
+    // way, and a malformed request - and this app builds the request itself, so
+    // the first is overwhelmingly the likely one. Reported as "no route" rather
+    // than as a broken app, with the provider's own message kept for the log.
+    console.warn("Routing provider returned HTTP 400", await safeText(response));
+    throw new NoRouteError("the provider could not match these points to a path network");
   }
   if (!response.ok) {
     throw new DirectionsError(`routing request failed: HTTP ${response.status}`);
@@ -137,4 +139,13 @@ export async function fetchWalkingRoute(
     throw new DirectionsError(`routing response is not valid JSON: ${String(error)}`);
   }
   return validateDirectionsResponse(document);
+}
+
+/** Read an error body for the console without letting that read throw. */
+async function safeText(response: Response): Promise<string> {
+  try {
+    return (await response.text()).slice(0, 500);
+  } catch {
+    return "<unreadable body>";
+  }
 }

@@ -29,6 +29,22 @@ import { RoutePanel } from "./features/route/routePanel";
 import { RoutePrompt } from "./features/route/routePrompt";
 import "./style.css";
 
+/**
+ * Legal credits this app owes, beyond the MapTiler/OSM credit the basemap style
+ * supplies itself. Copernicus is unconditional - we always render its data.
+ * Geoapify's is conditional on routing being configured, because it is owed for
+ * *use* of their API, and an unconfigured build never calls them.
+ */
+function attributions(): string[] {
+  const credits = [
+    '<a href="https://land.copernicus.eu/en/products/snow/high-resolution-gap-filled-fractional-snow-cover" target="_blank" rel="noopener">Snow: Copernicus HR-WSI GFSC</a> (© European Union, Copernicus Land Monitoring Service / EEA)',
+  ];
+  if (routingIsConfigured()) {
+    credits.push('Routing <a href="https://www.geoapify.com/" target="_blank" rel="noopener">Powered by Geoapify</a>');
+  }
+  return credits;
+}
+
 const map = new maplibregl.Map({
   container: "map",
   style: styleUrl,
@@ -39,9 +55,11 @@ const map = new maplibregl.Map({
     // it into a separate ⓘ disclosure, which is not the intended footer.
     compact: false,
     // The MapTiler style supplies its own MapTiler/OSM credit; this adds the
-    // Copernicus one, now that we render Copernicus-derived data.
-    customAttribution:
-      '<a href="https://land.copernicus.eu/en/products/snow/high-resolution-gap-filled-fractional-snow-cover" target="_blank" rel="noopener">Snow: Copernicus HR-WSI GFSC</a> (© European Union, Copernicus Land Monitoring Service / EEA)',
+    // Copernicus one, now that we render Copernicus-derived data, and the
+    // Geoapify one when routing is configured - a "Powered by Geoapify" credit
+    // is mandatory on their free plan, so it appears exactly when the app is
+    // actually able to call them. See `features/route/directions.ts`.
+    customAttribution: attributions(),
   },
 });
 

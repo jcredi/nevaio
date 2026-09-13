@@ -183,7 +183,7 @@ try {
     // top, and everything at the top of this app has collided with something
     // else at least once. It only exists when a routing provider is
     // configured, so its absence is a state to skip - the same treatment the
-    // AS-OF date pill gets above. Run this leg with a VITE_MAPBOX_TOKEN set
+    // AS-OF date pill gets above. Run this leg with a VITE_GEOAPIFY_API_KEY set
     // (any non-empty value: the strip appears on selection, before any
     // request is made) to exercise it.
     const startButton = page.locator(".object-panel__action--start");
