@@ -1179,3 +1179,85 @@ body {
   line-height: 1.35;
   color: var(--text-warning);
 }
+
+/* Route elevation profile (spec sections 8.4-8.5). Hand-rolled inline SVG, no
+   charting library - the geometry comes from elevationChartLayout.ts and these
+   rules are purely presentational, so the decisions that could mislead (where
+   the y-axis starts, what the gridlines say) stay in tested code rather than
+   in CSS. */
+.route-elevation {
+  margin-top: 0.625rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid rgba(15, 23, 42, 0.1);
+}
+
+.route-elevation__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.route-elevation__title {
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+/* Shows the route's own elevation span at rest and the scrubbed point while a
+   finger is down, so the strip is never empty waiting to be touched. */
+.route-elevation__readout {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+.route-elevation__svg {
+  display: block;
+  width: 100%;
+  height: 6.875rem;
+  margin-top: 0.25rem;
+  /* Load-bearing: without it a drag along the profile scrolls the panel
+     instead of scrubbing, which makes spec section 8.5's core interaction
+     unusable on a phone rather than merely awkward. */
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.route-elevation__grid {
+  stroke: rgba(15, 23, 42, 0.12);
+  stroke-width: 1;
+}
+
+.route-elevation__axis-label {
+  font-size: 7px;
+  font-weight: 600;
+  fill: var(--text-secondary);
+}
+
+.route-elevation__area {
+  fill: rgba(14, 165, 233, 0.16);
+}
+
+.route-elevation__line {
+  fill: none;
+  stroke: var(--accent-strong);
+  stroke-width: 1.75;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.route-elevation__cursor-line {
+  stroke: rgba(15, 23, 42, 0.55);
+  stroke-width: 1;
+  stroke-dasharray: 2 2;
+}
+
+.route-elevation__cursor-dot {
+  fill: #ffffff;
+  stroke: #1f2937;
+  stroke-width: 2;
+}

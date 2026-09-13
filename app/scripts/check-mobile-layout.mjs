@@ -1,8 +1,9 @@
 /**
  * Guard the narrow-screen layout against the search bar returning underneath
- * MapLibre's top-right navigation controls, against the object panel covering
- * the bottom-left snow control, and against the route planner's half-planned
- * strip landing on the AS-OF date pill. This is an emulator baseline, not
+ * MapLibre's top-right navigation controls, against either bottom sheet - the
+ * object panel or the taller route panel - covering the bottom-left snow
+ * control, and against the route planner's half-planned strip landing on the
+ * AS-OF date pill. This is an emulator baseline, not
  * a replacement for real-handset checks of safe areas, the virtual keyboard,
  * and touch interaction.
  *
@@ -10,6 +11,28 @@
  *        NEVAIO_URL=https://nevaio.netlify.app npm run check-mobile-layout
  */
 import { chromium } from "playwright";
+import { readFileSync } from "node:fs";
+
+/**
+ * A real Geoapify reply, captured from the live API on 2026-09-13 and trimmed.
+ * It exists so this check can measure the *route panel*, which is now the
+ * tallest of the two bottom sheets and therefore the one that decides whether
+ * the snow control is covered. The production API key is correctly restricted
+ * to the deployed origin and will not answer a dev server, so a recorded real
+ * body is the only way to render that panel here.
+ *
+ * It lives under `scripts/`, deliberately outside `src/` and `public/`, so it
+ * cannot be imported by the app or served to a browser. This is NOT a licence
+ * to check in sample *snow* data - see docs/agent-guide.md: a stale raster read
+ * as current conditions is a hazard, and a route fixture used by a dev script
+ * is not.
+ */
+// `globalThis.URL` because this module shadows `URL` with the page address
+// below - a plain `new URL(...)` here hits the temporal dead zone.
+const ROUTE_FIXTURE = readFileSync(
+  new globalThis.URL("./fixtures/route-with-elevation.json", import.meta.url),
+  "utf8",
+);
 
 const URL = process.env.NEVAIO_URL ?? "http://127.0.0.1:5173";
 // Not the 44px ideal: this is a secondary control in a deliberately compact
@@ -224,8 +247,64 @@ try {
           `${Math.round(withPrompt.prompt.bottom)}px, clears the ${withPrompt.blocker} ` +
           `at ${Math.round(withPrompt.blockerBottom)}px`,
       );
+      // Finish the route and measure the panel it opens. The route panel
+      // carries an elevation chart and so is taller than the object panel -
+      // it is the sheet that now decides whether the snow control is covered,
+      // which is the exact collision `src/map/bottomSheet.ts` exists to
+      // prevent.
+      await page.route(/api\.geoapify\.com/, (route) =>
+        route.fulfill({ status: 200, contentType: "application/json", body: ROUTE_FIXTURE }),
+      );
+      await page.mouse.click(viewport.width / 2, viewport.height / 2);
+      await page.waitForSelector(".object-panel:not([hidden])", { timeout: 5_000 });
+      await page.locator(".object-panel__action--destination").first().click();
+      await page.waitForSelector(".route-panel:not([hidden])", { timeout: 10_000 });
+      await page.waitForSelector(".route-elevation__svg", { timeout: 10_000 });
+      // The sheet eases into place and the control eases up to meet it.
+      await page.waitForTimeout(800);
+
+      const withRoute = await page.evaluate(() => {
+        const panel = document.querySelector(".route-panel")?.getBoundingClientRect();
+        const snow = document.querySelector(".maplibregl-ctrl-bottom-left")?.getBoundingClientRect();
+        const chart = document.querySelector(".route-elevation__svg")?.getBoundingClientRect();
+        if (!panel || !snow || !chart) throw new Error("Expected the route panel and its chart");
+        return {
+          panel: { top: panel.top, bottom: panel.bottom, left: panel.left, right: panel.right },
+          chartWidth: chart.width,
+          snowBottom: snow.bottom,
+          objectPanelOpen: !document.querySelector(".object-panel")?.hidden,
+          viewportWidth: window.innerWidth,
+          documentWidth: document.documentElement.scrollWidth,
+        };
+      });
+
+      if (withRoute.documentWidth > withRoute.viewportWidth) {
+        throw new Error(`${name}: horizontal overflow with the route panel open`);
+      }
+      if (withRoute.panel.left < 0 || withRoute.panel.right > withRoute.viewportWidth) {
+        throw new Error(
+          `${name}: route panel (${withRoute.panel.left}-${withRoute.panel.right}px) leaves the viewport`,
+        );
+      }
+      if (withRoute.snowBottom > withRoute.panel.top + 0.5) {
+        throw new Error(
+          `${name}: snow control (bottom ${withRoute.snowBottom}px) is behind the ` +
+            `route panel (top ${withRoute.panel.top}px)`,
+        );
+      }
+      if (withRoute.objectPanelOpen) {
+        throw new Error(`${name}: the object panel is still open behind the route panel`);
+      }
+      if (withRoute.chartWidth < 120) {
+        throw new Error(`${name}: the elevation chart collapsed to ${withRoute.chartWidth}px`);
+      }
+      console.log(
+        `${name}: route panel ${Math.round(withRoute.panel.top)}-${Math.round(withRoute.panel.bottom)}px, ` +
+          `chart ${Math.round(withRoute.chartWidth)}px wide, snow control clears it at ` +
+          `${Math.round(withRoute.snowBottom)}px`,
+      );
     } else {
-      console.log(`${name}: route prompt skipped (no routing provider configured)`);
+      console.log(`${name}: route legs skipped (no routing provider configured)`);
     }
 
     await page.close();

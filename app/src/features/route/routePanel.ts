@@ -20,21 +20,23 @@
  *    caught out after dark - precisely the kind of harm spec section 8.6's
  *    disclaimer exists for. Once elevation is trusted here, an ascent-aware
  *    estimate could be offered honestly; until then there is nothing to show.
- *  - **No elevation gain/loss yet.** Spec section 8.3 asks for it "where
- *    available or derivable". Geoapify *can* return a per-point elevation
- *    profile with the route (`details=elevation`) - that is a large part of
- *    why it was chosen on 2026-09-13 - but it does not name its global DEM
- *    source, and 30 m global data is at its worst in exactly the steep terrain
- *    this app is about. So the request does not ask for it until it has been
- *    smoke-tested against known summit and hut heights (`docs/plan.md` item
- *    2), and the panel says "not available yet" rather than leaving a silent
- *    gap a reader would fill in with an assumption.
+ *  - **Ascent and descent are rounded to 10 m**, and a route that barely
+ *    climbs reads "flat" rather than "7 m". The underlying measurement varies
+ *    by about 3% across sampling choices (measured 2026-09-13), so a figure
+ *    like "437 m" would claim a precision it does not have. `formatAscent`
+ *    owns that rule.
+ *
+ * The elevation profile itself arrives with the route and is drawn by
+ * `elevationChart.ts`; when the provider returns none, the panel says so rather
+ * than drawing an empty box that would read as flat ground.
  *
  * The disclaimer (spec section 8.6) is not a footnote here: it is rendered
  * with every calculated route, and it is not dismissible.
  */
 import { BottomSheetHeight } from "../../map/bottomSheet.ts";
 import { DESTINATION_COLOR, START_COLOR } from "./routeLayer.ts";
+import { ElevationChart, type ScrubHandler } from "./elevationChart.ts";
+import { elevationStats, formatAscent } from "./elevationProfile.ts";
 import type { ValidatedRoute } from "./directionsSchema.ts";
 
 export type RouteEndpointNames = { start: string; destination: string };
@@ -69,6 +71,7 @@ export class RoutePanel {
   private readonly body: HTMLElement;
   private readonly sheetHeight: BottomSheetHeight;
   private onClosed: (() => void) | null = null;
+  private onScrub: ScrubHandler | null = null;
 
   constructor() {
     this.element = element("section", "route-panel");
@@ -96,6 +99,16 @@ export class RoutePanel {
   /** Called when the user clears the route. */
   setCloseHandler(handler: () => void): void {
     this.onClosed = handler;
+  }
+
+  /**
+   * Called as the user scrubs the elevation profile, with a distance along the
+   * route and the elevation there, or null when they let go (spec section 8.5).
+   * The panel passes it straight to whichever chart is currently rendered, so
+   * the caller registers once rather than on every route.
+   */
+  setScrubHandler(handler: ScrubHandler): void {
+    this.onScrub = handler;
   }
 
   showCalculating(names: RouteEndpointNames): void {
@@ -142,29 +155,59 @@ export class RoutePanel {
   showRoute(names: RouteEndpointNames, route: ValidatedRoute): void {
     this.renderHeader(names);
 
+    const profile = route.elevationProfile;
+    const summary = profile ? elevationStats(profile) : null;
+
     const stats = element("dl", "route-panel__stats");
-    stats.append(
-      ...statEntry("Distance", formatDistance(route.distanceMeters)),
-      // Stated, not omitted - see the module docstring.
-      ...statEntry("Ascent / descent", "Not available yet"),
+    stats.append(...statEntry("Distance", formatDistance(route.distanceMeters)));
+    if (summary) {
+      stats.append(
+        ...statEntry(
+          "Ascent / descent",
+          `${formatAscent(summary.ascentMeters)} / ${formatAscent(summary.descentMeters)}`,
+        ),
+      );
+    } else {
+      // Absent, and said so - never a silent gap a reader fills in with an
+      // assumption, and never a zero.
+      stats.append(...statEntry("Ascent / descent", "Not available"));
+    }
+
+    const children: HTMLElement[] = [stats];
+
+    const chart = profile ? ElevationChart.create(profile) : null;
+    if (chart) {
+      if (this.onScrub) chart.setScrubHandler(this.onScrub);
+      children.push(chart.element);
+    } else {
+      children.push(
+        element(
+          "p",
+          "route-panel__pending",
+          "No elevation profile was returned for this route.",
+        ),
+      );
+    }
+
+    children.push(
+      element(
+        "p",
+        "route-panel__pending",
+        "Snow coverage along this route is not shown yet.",
+      ),
     );
 
-    const pending = element(
-      "p",
-      "route-panel__pending",
-      "Snow coverage and elevation along this route are not shown yet: they need an " +
-        "elevation dataset the app does not publish yet.",
+    children.push(
+      element(
+        "p",
+        "route-panel__disclaimer",
+        "This route is generated from OpenStreetMap paths by a general walking router. " +
+          "It is a planning aid, not a guarantee of safety, accessibility or suitability - " +
+          "verify it independently before setting out.",
+      ),
     );
 
-    const disclaimer = element(
-      "p",
-      "route-panel__disclaimer",
-      "This route is generated from OpenStreetMap paths by a general walking router. " +
-        "It is a planning aid, not a guarantee of safety, accessibility or suitability - " +
-        "verify it independently before setting out.",
-    );
-
-    this.body.replaceChildren(stats, pending, disclaimer);
+    this.body.replaceChildren(...children);
     this.reveal();
   }
 

@@ -31,6 +31,7 @@ import { DirectionsError, NoRouteError, fetchWalkingRoute } from "./directions.t
 import { RouteLayer } from "./routeLayer.ts";
 import { RoutePanel } from "./routePanel.ts";
 import { RoutePrompt } from "./routePrompt.ts";
+import { pointAtDistance } from "./routeProfile.ts";
 
 export type { RouteRole };
 
@@ -45,6 +46,8 @@ export type RouteControllerHooks = {
 
 export class RouteController {
   private endpoints: Endpoints = { start: null, destination: null };
+  /** The geometry the profile's distances refer to, for spec section 8.5. */
+  private coordinates: readonly [number, number][] = [];
   /** Guards against a superseded request settling over a newer one. */
   private token = 0;
   private inFlight: AbortController | null = null;
@@ -57,6 +60,17 @@ export class RouteController {
   ) {
     this.panel.setCloseHandler(() => this.clear());
     this.prompt.setCancelHandler(() => this.clear());
+    // Spec section 8.5, a core MVP requirement: a finger moved along the
+    // profile identifies the corresponding place on the route and moves a
+    // marker there. Registered once - the panel hands it to whichever chart it
+    // renders - and the chart itself never learns that a map exists.
+    this.panel.setScrubHandler((position) => {
+      if (position === null || this.coordinates.length < 2) {
+        this.layer.setCursor(null);
+        return;
+      }
+      this.layer.setCursor(pointAtDistance(this.coordinates, position.distanceMeters));
+    });
     this.refreshLabels();
   }
 
@@ -76,6 +90,7 @@ export class RouteController {
     // Half-planned: the object panel stays open as the picking surface, and
     // the strip carries the state instead of a sheet. Any route drawn from an
     // earlier plan goes now - the line no longer matches the endpoints.
+    this.coordinates = [];
     this.layer.clearRoute();
     this.panel.close();
     const chosen = start ?? destination;
@@ -88,6 +103,7 @@ export class RouteController {
     this.inFlight?.abort();
     this.inFlight = null;
     this.endpoints = { start: null, destination: null };
+    this.coordinates = [];
     this.layer.clear();
     this.panel.close();
     this.prompt.hide();
@@ -106,6 +122,7 @@ export class RouteController {
     try {
       const route = await fetchWalkingRoute(start, destination, { signal: controller.signal });
       if (token !== this.token) return;
+      this.coordinates = route.coordinates;
       this.layer.setRoute(route.coordinates);
       this.panel.showRoute(names, route);
     } catch (error) {
@@ -113,6 +130,7 @@ export class RouteController {
       // An abort means this request was superseded or cleared; the state that
       // replaced it already owns the panel.
       if (error instanceof DOMException && error.name === "AbortError") return;
+      this.coordinates = [];
       this.layer.clearRoute();
       if (error instanceof NoRouteError) {
         this.panel.showNoRoute(names);
