@@ -92,6 +92,12 @@ key, then a smoke test of that provider's elevation data.**
      not closed by that.
    - The linked map/profile interaction (section 8.5) has its map side ready -
      `RouteLayer.setCursor` - and no profile to drive it yet.
+   - Two small known gaps, neither urgent: choosing the same object as both
+     start and destination spends a request and renders a valid 0 m route
+     instead of being refused up front; and `npm run check-csp` has no routing
+     leg, because driving one needs object selection in a production bundle
+     that deliberately exposes no map handle. The deployed route was verified
+     by hand on 2026-09-13 instead.
 
 3. **Repository structure refactor, stage 4**
    ([`../REFACTOR.md`](../REFACTOR.md)). Stages 1 (dissolve `recon/`) and 2

@@ -80,6 +80,24 @@ spoofed third-party origin all get 401. That is the restriction working
 correctly, and it means the deployed site - not a dev server - is where this
 feature gets verified.
 
+**Verified end to end on the deployed site**, which is the only place the key
+answers: a tap-selected start and destination produced an HTTP 200 from
+`api.geoapify.com`, the route panel rendered, there were **no CSP violations**,
+and the mandatory "Powered by Geoapify" credit is in the attribution footer.
+
+The rendering of a *long* route was verified separately, by replaying the real
+487-point Zermatt-Riffelberg response captured from the live API against a local
+build - the production key correctly refuses localhost, so a recorded real body
+is the honest substitute for a hand-written fixture. The `MultiLineString`
+flattened to a 487-point line, the panel read 7.8 km for the API's 7,784 m, both
+line layers and both endpoint markers were present, and the line follows actual
+trails up the valley. Screenshot checked, no console errors.
+
+Two small things left deliberately undone and noted in the plan: routing an
+object to itself returns a valid 0 m route rather than being refused up front,
+and `npm run check-csp` still has no routing leg (driving one needs object
+selection in a production bundle that exposes no map handle).
+
 `npm test` 175 passing, build clean.
 
 ## 2026-09-13 - The route planner's core, without the profile it still needs
