@@ -68,25 +68,28 @@ key, then a smoke test of that provider's elevation data.**
      2026-09-13 on measurement): no pipeline job, no R2 storage claim, no
      sizing exercise. It stays documented as the fallback if Geoapify is ever
      dropped, and the 2026-09-12 analysis behind it is unchanged.
-   - **Snow along the route is built but not published - this is the one open
-     decision.** The whole path exists and is tested end to end: a lossless
-     data pyramid encoder in the pipeline (`data_tiles.py`), the render flag
-     `--data-tiles`, artifact validation, manifest announcement, the frontend
-     decoder, sampler and summary, and the panel section. Verified in a browser
-     on 2026-09-13 against a pipeline-generated tile: canvas decode, sampling,
-     and a summary reporting 71% observed / 29% cloud exactly as encoded.
+   - **Snow along the route is built and now enabled** (owner's decision,
+     2026-09-13: latest date only). The whole path exists and is tested end to
+     end: a lossless data pyramid encoder in the pipeline (`data_tiles.py`), the
+     render flag `--data-tiles`, artifact validation, manifest announcement, the
+     frontend decoder, sampler and summary, and the panel section. Verified in a
+     browser on 2026-09-13 against a pipeline-generated tile: canvas decode,
+     sampling, and a summary reporting 71% observed / 29% cloud exactly as
+     encoded.
 
-     **What is needed is the owner's go-ahead to publish it**, because that is a
-     storage commitment on the R2 free tier and a change to the daily workflow.
-     Measured: about 27 MB per date, or 0.8 GB for all 31 archived dates (up to
-     ~1.4 GB with midwinter cover). The recommendation in
-     [`research/snow-along-route.md`](research/snow-along-route.md) is the
-     latest date only - a route planner answers "should I go", and nobody has
-     asked to plan against three weeks ago - with the panel saying plainly that
-     snow is unavailable on a historical date rather than quietly showing
-     today's. Enabling it means adding `--data-tiles` to the daily workflow's
-     render step; nothing else changes, and the flag is asserted to leave the
-     visual tiles byte-identical.
+     The daily workflow's render step now passes `--data-tiles`
+     unconditionally, which is what makes "latest date only" true by
+     construction: every scheduled run renders the current date, and the
+     historical dates already published were deliberately not backfilled.
+     Live cost is about 27 MB per date and, against `--keep-runs 7`, under
+     200 MB on a 10 GB free tier. The visual pyramid is unaffected - a test
+     asserts those tiles stay byte-identical with the flag on and off.
+
+     **Still to confirm on the first real run**: that the publish job's upload
+     of roughly four times as many objects stays inside its 45-minute timeout,
+     and that a route on production reports snow rather than "unavailable". See
+     [`research/snow-along-route.md`](research/snow-along-route.md) for why the
+     flag's failure mode is silent and which test guards it.
    - **Spec section 15 items 1 and 2 are still open** and should be decided
      against real numbers rather than in advance: the sampling *mechanism* is
      now concrete (even spacing in ground metres, endpoints preserved exactly,

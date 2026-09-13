@@ -128,8 +128,31 @@ Silently showing the latest snow against a historical date would be the worst
 option available, and is precisely the class of error spec section 5.4 exists to
 rule out.
 
-## Open for the owner
+## Settled by the owner, 2026-09-13
 
-The recommendation above is a storage/capability trade, so it is the owner's to
-confirm before the publishing stage is wired into the daily workflow. The format
-and the pipeline encoder do not depend on the answer and can be built either way.
+**Confirmed: latest date only, and publishing is now enabled.** The reasoning
+given was the one this document recommends - "nobody plans a route for last
+week". The daily workflow's render step passes `--data-tiles` unconditionally,
+which satisfies "latest date only" by construction rather than by a condition:
+every scheduled run renders the current date, so the newest date always has a
+pyramid, and the historical dates already in the catalogue were deliberately
+**not** backfilled.
+
+Live cost is therefore smaller than the figure this document sized against. The
+catalogue keeps `--keep-runs 7`, so about **7 dates x 27 MB, under 200 MB** on
+a 10 GB free tier - not the 0.8-1.4 GB a full 31-date archive would have cost.
+
+Two consequences worth knowing before changing any of this:
+
+- **The flag's failure mode is silent.** Drop `--data-tiles` and nothing breaks:
+  the run publishes, the map is correct, and the route panel simply says snow is
+  unavailable - which is also the honest message for a date genuinely rendered
+  without it. `DailySnowDataPyramidTests` in
+  `pipeline/tests/test_workflow_security.py` asserts the flag is present *and*
+  that it sits in the unconditional `args=(...)` literal rather than in one of
+  the dispatch-input blocks below it, since the scheduled run is the one that
+  must always have it.
+- **Data tiles outnumber visual tiles**, and that is the feature. On the run
+  this was sized against there were 1,066 visual tiles and ~3,100 data tiles:
+  the visual pyramid draws only where there is snow, while this one must record
+  everywhere there was an *observation*, including a confirmed zero.

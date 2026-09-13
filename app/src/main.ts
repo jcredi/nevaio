@@ -71,6 +71,8 @@ map.addControl(new maplibregl.NavigationControl(), "top-right");
 // the object panel because the panel's history chart (spec section 7.1)
 // anchors its presets on whatever this date is *at render time*.
 let snowOverlay: SnowOverlay | null = null;
+/** The newest AS-OF date the catalogue offers, once it has loaded. */
+let latestAsOfDate: string | null = null;
 const snowControl = new SnowControl(null);
 const snowDate = new SnowDateControl((entry) => void selectDate(entry));
 document.body.append(snowDate.element);
@@ -154,7 +156,14 @@ map.on("load", async () => {
     // A missing or rejected catalogue simply means no historical dates are on
     // offer: the display stays the non-interactive label it has always been.
     const catalogue = await loadDateCatalogue(snowManifestUrl, window.location.href);
-    if (catalogue) snowDate.setCatalogue(catalogue.dates);
+    if (catalogue) {
+      snowDate.setCatalogue(catalogue.dates);
+      // Validated as newest-first by `dateCatalogueSchema`, so the head is the
+      // latest date. Held so the route panel can tell "this date is historical"
+      // apart from "the latest date is missing its data pyramid" - see
+      // `snowDataSource` below.
+      latestAsOfDate = catalogue.dates[0]?.asOfDate ?? null;
+    }
   } catch (error) {
     // A missing overlay shouldn't take the basemap down with it.
     console.error("Snow overlay failed to load", error);
@@ -171,10 +180,24 @@ map.on("load", async () => {
       setRouteLabels: (labels) => objectPanel.setRouteLabels(labels),
       // Read fresh on every route: the AS-OF date can change, and a run that
       // predates the data pyramid genuinely publishes none.
-      snowDataSource: () =>
-        snowOverlay?.dataTileUrl && snowOverlay.dataTileZoom !== null
-          ? { url: snowOverlay.dataTileUrl, zoom: snowOverlay.dataTileZoom }
-          : null,
+      snowDataSource: () => {
+        if (snowOverlay?.dataTileUrl && snowOverlay.dataTileZoom !== null) {
+          return { available: true, url: snowOverlay.dataTileUrl, zoom: snowOverlay.dataTileZoom };
+        }
+        // Only the latest date carries a snow data pyramid (owner's decision,
+        // 2026-09-13): a route planner answers "should I go", so the daily run
+        // publishes one and the historical dates already in the catalogue were
+        // never backfilled. That is a designed limit the user can act on, so
+        // say which date does have it rather than leaving them to guess.
+        const historical =
+          latestAsOfDate !== null && snowOverlay?.date != null && snowOverlay.date !== latestAsOfDate;
+        return {
+          available: false,
+          reason: historical
+            ? "Snow along the route is available for the latest date only."
+            : "Snow along the route is unavailable right now.",
+        };
+      },
     });
     // Registered after the controller exists, which is also what puts the
     // route buttons in the object panel for the first time; the controller's

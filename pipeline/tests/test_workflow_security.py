@@ -93,6 +93,55 @@ class WorkflowSecurityTests(unittest.TestCase):
         self.assertEqual(packages, {"boto3", "botocore", "jmespath", "python-dateutil", "s3transfer", "six", "urllib3"})
 
 
+class DailySnowDataPyramidTests(unittest.TestCase):
+    """The daily run must keep rendering the snow *data* pyramid.
+
+    Not a security property - a correctness one with no alarm attached. If
+    ``--data-tiles`` is ever dropped from the render step, nothing fails: the
+    run publishes, the map looks right, and the route profile quietly says
+    "Snow along the route is not available for this date" forever, because
+    that is also the honest answer for a date genuinely rendered without it.
+    A silent feature outage with a plausible-looking message is exactly the
+    kind of regression no other test in this repo would catch, so it is
+    asserted here against the workflow file itself.
+    """
+
+    def setUp(self):
+        self.workflow = yaml.load(
+            (Path(__file__).resolve().parents[2] / ".github/workflows/publish-latest-preview.yml").read_text(),
+            Loader=yaml.BaseLoader,
+        )
+
+    def test_the_daily_render_publishes_data_tiles(self):
+        render = next(s for s in self.workflow["jobs"]["render"]["steps"]
+                      if s["name"] == "Render snapshot")
+        self.assertIn("--data-tiles", render["run"])
+
+    def test_data_tiles_are_not_gated_behind_a_dispatch_input(self):
+        """Every scheduled run is a "latest date" run, so the flag is unconditional.
+
+        The owner's decision (2026-09-13) was latest-date-only, which this
+        workflow satisfies by construction: it always renders the current
+        date, and the historical dates already published are simply not
+        backfilled. Making the flag conditional on an input would instead mean
+        the *scheduled* run could silently render without it - the one run
+        that must always have it.
+        """
+        render = next(s for s in self.workflow["jobs"]["render"]["steps"]
+                      if s["name"] == "Render snapshot")
+        # Comment lines mention the flag by name, so compare against code only.
+        script = "\n".join(l for l in render["run"].splitlines() if not l.lstrip().startswith("#"))
+        self.assertEqual(script.count("--data-tiles"), 1)
+        # It must sit in the initial `args=( ... )` literal, which runs on
+        # every invocation - not in one of the `if [[ -n "${...}" ]]` blocks
+        # below it, each of which appends only when its dispatch input was
+        # given and so would leave the scheduled run without the flag.
+        opening = script.index("args=(")
+        closing = script.index("\n)", opening)
+        self.assertLess(script.index("--data-tiles"), closing)
+        self.assertGreater(script.index("--data-tiles"), opening)
+
+
 class ObjectIndexWorkflowSecurityTests(unittest.TestCase):
     """The same trust boundary, over the OSM object index publisher.
 

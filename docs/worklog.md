@@ -1,5 +1,53 @@
 # Working session log
 
+## 2026-09-13 (late evening) - snow along the route, enabled
+
+The owner confirmed the open decision from the entry below: **latest date only,
+publish it.** The reasoning given was the one the research document recommended
+- "nobody plans a route for last week".
+
+**The change is one flag**, because everything else was already wired and
+tested: the daily workflow's render step now passes `--data-tiles`. It is
+unconditional, and that is the point - "latest date only" is satisfied by
+construction rather than by a condition, since every scheduled run renders the
+current date. The historical dates already in the catalogue were deliberately
+not backfilled.
+
+**The live cost is smaller than the figure the decision was taken against.**
+`--keep-runs 7` means about 7 dates x 27 MB, under 200 MB on a 10 GB free tier,
+rather than the 0.8-1.4 GB a full 31-date archive would have cost. Worth noting
+the shape of it: the run this was sized against has 1,066 visual tiles but ~3,100
+data tiles, because the visual pyramid draws only where there *is* snow while
+this one must record everywhere there was an *observation*, including a confirmed
+zero. That asymmetry is the whole reason the format exists.
+
+**This flag's failure mode is silent, so it is asserted rather than trusted.**
+Drop `--data-tiles` and nothing fails: the run publishes, the map is correct, and
+the route panel says snow is unavailable - which is *also* the honest message for
+a date genuinely rendered without it. A feature outage wearing a plausible
+message is exactly what no other test here would catch, so
+`DailySnowDataPyramidTests` checks the flag is present and that it sits in the
+unconditional `args=(...)` literal, not in one of the dispatch-input blocks that
+only fire when an input was given. I mutated the workflow both ways to confirm
+the guard actually bites - and the first run of that check was itself wrong, a
+false red from running unittest in the wrong directory, which is a good reminder
+that a failing mutation test proves nothing until you have seen it pass.
+
+**The panel now says *which* date has snow.** `snowDataSource` returned a bare
+null before, so both causes produced "not available for this date". Those need
+different words: a historical date is a designed limit the user can act on by
+moving to the latest date, while the latest date lacking a pyramid is a fault on
+our side and must not be worded as though it were normal. The hook returns one
+union value rather than gaining a second hook, so the reason cannot disagree
+with the availability.
+
+Left for the first real run: the publish job uploads roughly four times as many
+objects and has a 45-minute timeout, and a production route should report snow
+rather than "unavailable". Neither can be checked from here.
+
+Tests: 325 pipeline, 240 frontend, build, CSP and mobile layout at 320/390 px
+all clean.
+
 ## 2026-09-13 (evening) - snow along the route, built end to end but not published
 
 Spec section 8's last missing piece is now built and verified. It is **not

@@ -45,16 +45,27 @@ export type RouteControllerHooks = {
   /** Re-word the object panel's route buttons as the plan fills in. */
   setRouteLabels: (labels: { start: string; destination: string }) => void;
   /**
-   * The snow data pyramid for the AS-OF date currently on the map, or null.
+   * The snow data pyramid for the AS-OF date currently on the map.
    *
    * A getter, not a value: the AS-OF date can change after this controller is
    * built, and a historical run that predates the data pyramid genuinely has
    * none. Sampling another date's snow against this date's map would be the
    * exact confusion spec section 5.4 exists to prevent, so the answer is read
    * fresh each time a route is calculated.
+   *
+   * Unavailability carries its own reason rather than being a bare null,
+   * because the two causes need different words: a *historical* date is the
+   * designed behaviour and the user can act on it by moving to the latest
+   * date, whereas the latest date having no pyramid is a fault on our side
+   * and must not be described as if it were normal. One value rather than two
+   * hooks, so the reason cannot disagree with the availability.
    */
-  snowDataSource: () => { url: string; zoom: number } | null;
+  snowDataSource: () => SnowDataAvailability;
 };
+
+export type SnowDataAvailability =
+  | { available: true; url: string; zoom: number }
+  | { available: false; reason: string };
 
 export class RouteController {
   private endpoints: Endpoints = { start: null, destination: null };
@@ -178,10 +189,8 @@ export class RouteController {
    */
   private async sampleSnow(coordinates: readonly [number, number][], token: number): Promise<void> {
     const source = this.hooks.snowDataSource();
-    if (source === null) {
-      this.panel.showSnowUnavailable(
-        "Snow along the route is not available for this date.",
-      );
+    if (!source.available) {
+      this.panel.showSnowUnavailable(source.reason);
       return;
     }
 

@@ -145,10 +145,38 @@ jobs:
           REQUESTED_TILES: ${{ inputs.tiles }}
           MAX_MISSING_TILES: ${{ inputs.max_missing_tiles }}
         run: |
+          # --data-tiles publishes the lossless snow *data* pyramid beside the
+          # visual one, which is what lets the route profile answer "is there
+          # snow along this route" at all: on the visual raster a confirmed 0%
+          # pixel is byte-identical to cloud, water and no-data (spec section
+          # 5.4), and the QA tier spec section 15 item 11 requires is not
+          # encoded there in any form. See docs/research/snow-along-route.md.
+          #
+          # Unconditional here, and deliberately not backfilled over the
+          # historical dates already published: a route planner answers
+          # "should I go", so only the newest date needs it (owner's decision,
+          # 2026-09-13). Every scheduled run renders the current date, so
+          # "latest" is simply what this workflow always produces; older runs
+          # keep whatever they were published with and expire with --keep-runs.
+          # A date whose run predates this flag announces no dataTiles in its
+          # manifest, and the route panel says snow is unavailable for it
+          # rather than falling back to the visual tiles, which cannot answer
+          # the question.
+          #
+          # Cost, measured rather than estimated (2026-09-13): ~3,100 z11
+          # tiles at ~8.7 KB, about 27 MB per date, so under 200 MB live
+          # against --keep-runs 7 on a 10 GB free tier. Data tiles are more
+          # numerous than visual ones (1,066 on the run this was sized
+          # against) because the visual pyramid draws only where there is snow
+          # while this one must record everywhere there was an *observation*,
+          # including a confirmed zero - that asymmetry is the feature, not a
+          # bug. The visual pyramid is unaffected: a test asserts those tiles
+          # stay byte-identical with the flag on and off.
           args=(
             --raw-dir "${RUNNER_TEMP}/gfsc-raw"
             --work-dir "${RUNNER_TEMP}/gfsc-work"
             --output-dir "${RUNNER_TEMP}/gfsc-output"
+            --data-tiles
           )
           if [[ -n "${AS_OF_DATE}" ]]; then args+=(--as-of "${AS_OF_DATE}"); fi
           if [[ -n "${REQUESTED_TILES}" ]]; then
