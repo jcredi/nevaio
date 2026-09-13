@@ -33,12 +33,24 @@ export type SnowTileManifest = {
   sourceProductTotal?: number;
   tileCount: number;
   notice: string;
+  /**
+   * The lossless snow *data* pyramid, present only on runs that carry one
+   * (spec section 8.4, `pipeline/.../data_tiles.py`). Announced here rather
+   * than configured separately so this manifest URL stays the single trust
+   * anchor for everything about the snow layer, exactly as the date catalogue
+   * is derived from it.
+   */
+  dataTiles?: string[];
+  dataTileZoom?: number;
 };
 
 /** A validated manifest, with its tile templates already resolved to URLs. */
 export type ValidatedManifest = {
   manifest: SnowTileManifest;
   tileUrls: string[];
+  /** Resolved data tile template, or null when this run publishes none. */
+  dataTileUrl: string | null;
+  dataTileZoom: number | null;
 };
 
 export const SCHEMA_VERSION = 1;
@@ -75,6 +87,7 @@ function unpark(value: string): string {
 const RUN_ID = /^\d{8}T\d{6}Z$/;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const TILE_PATH_SUFFIX = "/tiles/{z}/{x}/{y}.png";
+const DATA_TILE_PATH_SUFFIX = "/data/{z}/{x}/{y}.png";
 
 export class ManifestError extends Error {}
 
@@ -238,6 +251,26 @@ export function validateTileManifest(
     unpark(resolveTrustedUrl(template, `tiles[${index}]`, base, { expectedPath }).href),
   );
 
+  // The data pyramid is optional and is held to exactly the same URL trust
+  // rules as the visual one: same origin, same run directory, no query, no
+  // redirect to somewhere else. A second tile source is a second thing that
+  // gets fetched and decoded, so it gets no weaker a check for being newer.
+  let dataTileUrl: string | null = null;
+  let dataTileZoom: number | null = null;
+  if (source.dataTiles !== undefined || source.dataTileZoom !== undefined) {
+    if (!Array.isArray(source.dataTiles) || source.dataTiles.length !== 1) {
+      fail("dataTiles must be an array of exactly one template");
+    }
+    // One zoom only, and it must be inside the pyramid this manifest declares.
+    dataTileZoom = requireInteger(source.dataTileZoom, "dataTileZoom", minzoom, maxzoom);
+    const expectedDataPath = `${directoryOf(base)}runs/${runId}${DATA_TILE_PATH_SUFFIX}`;
+    dataTileUrl = unpark(
+      resolveTrustedUrl(source.dataTiles[0], "dataTiles[0]", base, {
+        expectedPath: expectedDataPath,
+      }).href,
+    );
+  }
+
   const manifest: SnowTileManifest = {
     schemaVersion: SCHEMA_VERSION,
     runId,
@@ -252,6 +285,7 @@ export function validateTileManifest(
     requestedSourceTileCount,
     tileCount,
     notice,
+    ...(dataTileUrl !== null ? { dataTiles: source.dataTiles as string[], dataTileZoom: dataTileZoom as number } : {}),
   };
-  return { manifest, tileUrls };
+  return { manifest, tileUrls, dataTileUrl, dataTileZoom };
 }

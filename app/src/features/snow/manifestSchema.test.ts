@@ -174,3 +174,71 @@ describe("validateTileManifest", () => {
     rejects(null, /must be a JSON object/);
   });
 });
+
+/**
+ * The optional snow data pyramid (spec section 8.4). It is announced in this
+ * manifest rather than configured separately so that this URL stays the single
+ * trust anchor for the whole snow layer - which means it must be held to
+ * exactly the same URL rules as the visual tiles, not weaker ones for being
+ * newer.
+ */
+describe("validateTileManifest - the snow data pyramid", () => {
+  const dataTemplate = `https://pub-example.r2.dev/runs/${RUN_ID}/data/{z}/{x}/{y}.png`;
+
+  it("resolves the data template when a run carries one", () => {
+    const result = validateTileManifest(
+      manifest({ dataTiles: [dataTemplate], dataTileZoom: 11 }),
+      MANIFEST_URL,
+      PAGE,
+    );
+    assert.equal(result.dataTileUrl, dataTemplate);
+    assert.equal(result.dataTileZoom, 11);
+    assert.deepEqual(result.manifest.dataTiles, [dataTemplate]);
+  });
+
+  it("reports no data pyramid for a run without one, rather than guessing a URL", () => {
+    const result = validateTileManifest(manifest(), MANIFEST_URL, PAGE);
+    assert.equal(result.dataTileUrl, null);
+    assert.equal(result.dataTileZoom, null);
+    assert.equal(result.manifest.dataTiles, undefined);
+  });
+
+  it("refuses a data template on another origin", () => {
+    rejects(
+      manifest({
+        dataTiles: [`https://evil.example.com/runs/${RUN_ID}/data/{z}/{x}/{y}.png`],
+        dataTileZoom: 11,
+      }),
+      /dataTiles\[0\]/,
+    );
+  });
+
+  it("refuses a data template outside this run's own directory", () => {
+    rejects(
+      manifest({
+        dataTiles: ["https://pub-example.r2.dev/runs/20240101T000000Z/data/{z}/{x}/{y}.png"],
+        dataTileZoom: 11,
+      }),
+      /dataTiles\[0\]/,
+    );
+    rejects(
+      manifest({ dataTiles: [`https://pub-example.r2.dev/runs/${RUN_ID}/tiles/{z}/{x}/{y}.png`], dataTileZoom: 11 }),
+      /dataTiles\[0\]/,
+    );
+  });
+
+  it("refuses a zoom outside the declared pyramid", () => {
+    rejects(manifest({ dataTiles: [dataTemplate], dataTileZoom: 20 }), /dataTileZoom/);
+    rejects(manifest({ dataTiles: [dataTemplate], dataTileZoom: 2 }), /dataTileZoom/);
+  });
+
+  it("refuses a half-declared pyramid in either direction", () => {
+    rejects(manifest({ dataTiles: [dataTemplate] }), /dataTileZoom/);
+    rejects(manifest({ dataTileZoom: 11 }), /dataTiles/);
+  });
+
+  it("refuses more than one data template", () => {
+    rejects(manifest({ dataTiles: [dataTemplate, dataTemplate], dataTileZoom: 11 }), /dataTiles/);
+    rejects(manifest({ dataTiles: [], dataTileZoom: 11 }), /dataTiles/);
+  });
+});
