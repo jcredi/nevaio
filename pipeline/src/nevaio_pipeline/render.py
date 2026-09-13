@@ -185,8 +185,16 @@ def build_preview(
     keep_runs: int | None = None,
     object_index_dir: Path | None = None,
     series_output_dir: Path | None = None,
+    data_tiles: bool = False,
 ) -> dict[str, object]:
     """Run AS-OF window discovery through render and optional R2 publish.
+
+    ``data_tiles`` additionally writes the lossless snow *data* pyramid under
+    ``runs/<runId>/data/`` and announces it in the manifest, for the route
+    profile's snow sampling (spec section 8.4,
+    ``docs/research/snow-along-route.md``). It is off by default because it is a
+    real storage commitment - about 27 MB per date, measured - and because the
+    visual pyramid must keep working exactly as before either way.
 
     ``object_index_dir``, when given, turns on the per-object GFSC time series
     "daily increment" (docs/plan.md): each active tile's already-published
@@ -252,11 +260,12 @@ def build_preview(
         window_sizes[tile] = len(window)
 
     run_dir = output_dir / "runs" / run_id
-    tile_paths = render_snapshots(
+    tile_paths, data_tile_paths = render_snapshots(
         snapshot_paths,
         run_dir / "tiles",
         PREVIEW_MIN_ZOOM,
         PREVIEW_MAX_ZOOM,
+        data_out_dir=(run_dir / "data") if data_tiles else None,
     )
     metadata: dict[str, object] = {
         "schemaVersion": 1,
@@ -278,11 +287,21 @@ def build_preview(
         "sourceProductTotal": sum(window_sizes.values()),
         "notice": snapshot_notice(as_of_date.isoformat()),
     }
+    if data_tiles:
+        # Announced in the manifest rather than configured separately in the
+        # frontend: `VITE_SNOW_MANIFEST_URL` stays the single trust anchor for
+        # everything about the snow layer, the same rule the date catalogue
+        # follows. A second environment variable would be a second thing to get
+        # wrong and a second origin to have to trust.
+        metadata["dataTileCount"] = len(data_tile_paths)
+        metadata["dataTileZoom"] = PREVIEW_MAX_ZOOM
     run_dir.mkdir(parents=True, exist_ok=True)
     (run_dir / "run.json").write_text(json.dumps(metadata, indent=2) + "\n")
 
     local_latest = dict(metadata)
     local_latest["tiles"] = [f"runs/{run_id}/tiles/{{z}}/{{x}}/{{y}}.png"]
+    if data_tiles:
+        local_latest["dataTiles"] = [f"runs/{run_id}/data/{{z}}/{{x}}/{{y}}.png"]
     output_dir.mkdir(parents=True, exist_ok=True)
     (output_dir / "latest.json").write_text(json.dumps(local_latest, indent=2) + "\n")
     if publish:
@@ -358,6 +377,16 @@ def main() -> None:
         default=None,
         help="Where to write series/<TILE>/<YYYY-MM>.bin (default: <output-dir>/series).",
     )
+    parser.add_argument(
+        "--data-tiles",
+        action="store_true",
+        help=(
+            "Also write the lossless snow data pyramid under runs/<runId>/data/ "
+            "at the max zoom, and announce it in the manifest. Feeds the route "
+            "profile's snow sampling (spec section 8.4). Off by default: it is a "
+            "real storage commitment, about 27 MB per date."
+        ),
+    )
     args = parser.parse_args()
     metadata = build_preview(
         as_of_date=args.as_of,
@@ -372,6 +401,7 @@ def main() -> None:
         keep_runs=args.keep_runs,
         object_index_dir=args.object_index_dir,
         series_output_dir=args.series_output_dir,
+        data_tiles=args.data_tiles,
     )
     print(json.dumps(metadata, indent=2))
 

@@ -28,12 +28,17 @@ CATALOGUE_FIELDS = frozenset(("schemaVersion", "kind", "generatedAt", "maxDates"
 CATALOGUE_ENTRY_FIELDS = frozenset(("asOfDate", "runId", "manifest"))
 RUN_PATTERN = re.compile(r"\d{8}T\d{6}Z")
 TILE_PATTERN = re.compile(r"tiles/(\d{1,2})/(\d{1,5})/(\d{1,5})\.png")
+# The lossless snow data pyramid (spec section 8.4, render --data-tiles). One
+# zoom level only, and optional: a run without it is the normal case.
+DATA_TILE_PATTERN = re.compile(r"data/(\d{1,2})/(\d{1,5})/(\d{1,5})\.png")
 FIELDS = frozenset((
     "schemaVersion", "runId", "mode", "asOfDate", "asOfWindowDays", "generatedAt",
     "minzoom", "maxzoom", "bounds", "tileCount", "requestedSourceTileCount",
     "sourceTileCount", "sourceTiles", "missingSourceTiles", "productDates",
     "sourceProductCounts", "sourceProductTotal", "notice",
 ))
+# Present together or not at all - see the symmetry check in `validate_run`.
+DATA_FIELDS = frozenset(("dataTileCount", "dataTileZoom"))
 
 
 def snapshot_notice(as_of: str) -> str:
@@ -128,6 +133,7 @@ def validate_run(run_dir: Path) -> tuple[dict, list[Path]]:
     run_dir = Path(run_dir)
     _directory(run_dir)
     files: list[Path] = []
+    data_files: list[Path] = []
     total = 0
     entries_seen = 0
     for base, dirs, names in os.walk(run_dir, followlinks=False):
@@ -137,24 +143,45 @@ def validate_run(run_dir: Path) -> tuple[dict, list[Path]]:
             path = Path(base) / name
             _directory(path)
             relative = path.relative_to(run_dir).as_posix()
-            _require(re.fullmatch(r"tiles(?:/\d{1,2}(?:/\d{1,5})?)?", relative) is not None,
+            _require(re.fullmatch(r"(?:tiles|data)(?:/\d{1,2}(?:/\d{1,5})?)?", relative) is not None,
                      "unexpected artifact directory")
         for name in names:
             path = Path(base) / name
             relative = path.relative_to(run_dir).as_posix()
             match = TILE_PATTERN.fullmatch(relative)
-            _require(relative == "run.json" or match is not None, "unexpected artifact file")
+            data_match = DATA_TILE_PATTERN.fullmatch(relative)
+            _require(relative == "run.json" or match is not None or data_match is not None,
+                     "unexpected artifact file")
             total += _regular_file(path, MAX_METADATA_BYTES if relative == "run.json" else MAX_PNG_BYTES)
             files.append(path)
+            if data_match is not None:
+                data_files.append(path)
             _require(len(files) <= MAX_FILES and total <= MAX_TOTAL_BYTES, "artifact exceeds limits")
             if match:
                 z, x, y = map(int, match.groups())
                 _require(PREVIEW_MIN_ZOOM <= z <= PREVIEW_MAX_ZOOM and x < 2**z and y < 2**z,
                          "tile coordinates outside pyramid")
                 _require(relative == f"tiles/{z}/{x}/{y}.png", "noncanonical tile path")
+            if data_match:
+                z, x, y = map(int, data_match.groups())
+                # One zoom only, and it is the pyramid's max: the data raster is
+                # native GFSC resolution, so a coarser level would throw values
+                # away and a finer one would invent them.
+                _require(z == PREVIEW_MAX_ZOOM and x < 2**z and y < 2**z,
+                         "data tile coordinates outside pyramid")
+                _require(relative == f"data/{z}/{x}/{y}.png", "noncanonical data tile path")
     _require(run_dir / "run.json" in files, "missing run metadata")
     metadata = json.loads((run_dir / "run.json").read_text(), object_pairs_hook=_unique_object)
-    _require(type(metadata) is dict and metadata.keys() == FIELDS, "unexpected metadata fields")
+    # The data pyramid's two fields are all-or-nothing, and their presence must
+    # match the presence of the `data/` directory. Anything else - files with no
+    # declaration, or a declaration with no files - means the artifact and its
+    # metadata disagree, which is exactly what this validator exists to catch
+    # before a publication credential is anywhere near it.
+    has_data_fields = metadata.keys() == FIELDS | DATA_FIELDS
+    _require(type(metadata) is dict and (metadata.keys() == FIELDS or has_data_fields),
+             "unexpected metadata fields")
+    _require(has_data_fields == bool(data_files),
+             "data tiles and their metadata must be present together")
     d = metadata
     _require(isinstance(d["runId"], str) and RUN_PATTERN.fullmatch(d["runId"]) is not None,
              "invalid run ID")
@@ -181,8 +208,15 @@ def validate_run(run_dir: Path) -> tuple[dict, list[Path]]:
     _require(bool(active) and not active & missing, "invalid source coverage")
     for key, expected in (("sourceTileCount", len(active)),
                           ("requestedSourceTileCount", len(active | missing)),
-                          ("tileCount", len(files) - 1)):
+                          # Visual tiles only: every file, less run.json and the
+                          # data pyramid, which has its own count below.
+                          ("tileCount", len(files) - 1 - len(data_files))):
         _require(_integer(d[key], 0, MAX_FILES) and d[key] == expected, f"inconsistent {key}")
+    if has_data_fields:
+        _require(_integer(d["dataTileCount"], 1, MAX_FILES) and d["dataTileCount"] == len(data_files),
+                 "inconsistent dataTileCount")
+        _require(type(d["dataTileZoom"]) is int and d["dataTileZoom"] == PREVIEW_MAX_ZOOM,
+                 "invalid dataTileZoom")
     for key in ("productDates", "sourceProductCounts"):
         _require(type(d[key]) is dict and set(d[key]) == active, "invalid source product map")
     for value in d["productDates"].values():

@@ -205,3 +205,69 @@ class WriteDataTilesTests(unittest.TestCase):
 
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()
+
+
+class RenderSnapshotsWiringTests(unittest.TestCase):
+    """The data pyramid must be purely additive to the existing render."""
+
+    def _snapshot(self, tmp: Path) -> Path:
+        from nevaio_pipeline.mosaic import TileComposite
+        from nevaio_pipeline.snapshots import save_snapshot
+
+        resolution = 300.0
+        grid = RasterGrid(
+            "EPSG:3857",
+            Affine(resolution, 0.0, 860_000.0, 0.0, -resolution, 5_800_000.0),
+            128,
+            128,
+        )
+        c = composite(
+            PixelState.VALID, fsc=35, quality=1, age_days=2, shape=(grid.height, grid.width)
+        )
+        path = tmp / "32TLR.npz"
+        save_snapshot(path, TileComposite(tile="32TLR", grid=grid, composite=c))
+        return path
+
+    def test_visual_tiles_are_identical_with_and_without_data_tiles(self) -> None:
+        from nevaio_pipeline.snapshots import render_snapshots
+
+        with tempfile.TemporaryDirectory() as raw:
+            tmp = Path(raw)
+            snapshot = self._snapshot(tmp)
+
+            plain_dir = tmp / "plain"
+            visual_only, none_written = render_snapshots([snapshot], plain_dir, 8, 10)
+            self.assertEqual(none_written, [], "no data tiles without an output dir")
+
+            both_dir = tmp / "both"
+            data_dir = tmp / "both-data"
+            visual_again, data_written = render_snapshots(
+                [snapshot], both_dir, 8, 10, data_out_dir=data_dir
+            )
+
+            self.assertTrue(visual_only, "expected the fixture to produce visual tiles")
+            self.assertTrue(data_written, "expected data tiles when an output dir is given")
+
+            # Same relative paths, and byte-identical content: turning the data
+            # pyramid on must not perturb the map by so much as a pixel.
+            relative_plain = sorted(p.relative_to(plain_dir).as_posix() for p in visual_only)
+            relative_both = sorted(p.relative_to(both_dir).as_posix() for p in visual_again)
+            self.assertEqual(relative_plain, relative_both)
+            for relative in relative_plain:
+                self.assertEqual(
+                    (plain_dir / relative).read_bytes(),
+                    (both_dir / relative).read_bytes(),
+                    f"visual tile {relative} changed when data tiles were enabled",
+                )
+
+    def test_data_tiles_are_written_only_at_the_max_zoom(self) -> None:
+        from nevaio_pipeline.snapshots import render_snapshots
+
+        with tempfile.TemporaryDirectory() as raw:
+            tmp = Path(raw)
+            snapshot = self._snapshot(tmp)
+            data_dir = tmp / "data"
+            _, data_written = render_snapshots([snapshot], tmp / "tiles", 8, 10, data_out_dir=data_dir)
+            self.assertTrue(data_written)
+            zooms = {int(p.relative_to(data_dir).parts[0]) for p in data_written}
+            self.assertEqual(zooms, {10}, "the data pyramid is one zoom level only")

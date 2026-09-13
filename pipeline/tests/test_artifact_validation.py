@@ -141,3 +141,125 @@ nevaio_pipeline.publish.main()
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DataPyramidValidationTests(unittest.TestCase):
+    """The optional snow data pyramid (spec section 8.4, render --data-tiles).
+
+    This validator is what stands between an untrusted build artifact and the
+    publication credentials, so the rule is symmetry: the `data/` directory and
+    its two metadata fields are present together or not at all. Files with no
+    declaration, or a declaration with no files, means the artifact and its
+    metadata disagree.
+    """
+
+    def test_a_run_with_a_data_pyramid_validates(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run, metadata = make_run(Path(tmp), data_tiles=True)
+            validated, files = validate_run(run)
+            self.assertEqual(validated, metadata)
+            self.assertEqual(validated["dataTileCount"], 1)
+            self.assertEqual(validated["dataTileZoom"], 11)
+            # tileCount counts the visual pyramid only.
+            self.assertEqual(validated["tileCount"], 1)
+            self.assertEqual(len(files), 3)
+
+    def test_a_run_without_one_still_validates_unchanged(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run, metadata = make_run(Path(tmp))
+            validated, files = validate_run(run)
+            self.assertEqual(validated, metadata)
+            self.assertNotIn("dataTileCount", validated)
+            self.assertEqual(len(files), 2)
+
+    def test_data_tiles_without_metadata_are_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run, metadata = make_run(Path(tmp), data_tiles=True)
+            for key in ("dataTileCount", "dataTileZoom"):
+                metadata.pop(key)
+            (run / "run.json").write_text(json.dumps(metadata))
+            with self.assertRaises(ValueError):
+                validate_run(run)
+
+    def test_metadata_without_data_tiles_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run, metadata = make_run(Path(tmp))
+            metadata["dataTileCount"] = 1
+            metadata["dataTileZoom"] = 11
+            (run / "run.json").write_text(json.dumps(metadata))
+            with self.assertRaises(ValueError):
+                validate_run(run)
+
+    def test_a_miscounted_data_pyramid_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run, metadata = make_run(Path(tmp), data_tiles=True)
+            metadata["dataTileCount"] = 2
+            (run / "run.json").write_text(json.dumps(metadata))
+            with self.assertRaises(ValueError):
+                validate_run(run)
+
+    def test_a_data_tile_at_the_wrong_zoom_is_rejected(self) -> None:
+        from PIL import Image
+
+        with tempfile.TemporaryDirectory() as tmp:
+            run, metadata = make_run(Path(tmp), data_tiles=True)
+            stray = run / "data/8/1/2.png"
+            stray.parent.mkdir(parents=True, exist_ok=True)
+            Image.new("RGBA", (8, 8), (0, 0, 0, 255)).save(stray)
+            with self.assertRaises(ValueError):
+                validate_run(run)
+
+    def test_an_unexpected_directory_is_still_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run, _ = make_run(Path(tmp))
+            (run / "scripts").mkdir()
+            (run / "scripts" / "x.png").write_bytes(b"")
+            with self.assertRaises(ValueError):
+                validate_run(run)
+
+
+class DataPyramidPublicationTests(unittest.TestCase):
+    def test_the_manifest_advertises_data_tiles_only_when_the_run_has_them(self) -> None:
+        for data_tiles, expected in ((True, True), (False, False)):
+            with self.subTest(data_tiles=data_tiles), tempfile.TemporaryDirectory() as tmp:
+                run, metadata = make_run(Path(tmp), data_tiles=data_tiles)
+                puts: list[tuple[str, dict]] = []
+
+                class FakeClient:
+                    def upload_file(self, *args, **kwargs):
+                        return None
+
+                    def put_object(self, *, Bucket, Key, Body, **kwargs):
+                        puts.append((Key, json.loads(Body.decode())))
+
+                    def get_paginator(self, *args, **kwargs):
+                        class Paginator:
+                            def paginate(self, **kwargs):
+                                return iter(())
+
+                        return Paginator()
+
+                    def delete_objects(self, *args, **kwargs):
+                        return None
+
+                env = {
+                    "R2_ACCOUNT_ID": "acct",
+                    "R2_BUCKET": "bucket",
+                    "R2_PUBLIC_BASE_URL": "https://example.invalid",
+                    "R2_ACCESS_KEY_ID": "id",
+                    "R2_SECRET_ACCESS_KEY": "secret",
+                }
+                with (
+                    patch.dict(os.environ, env, clear=False),
+                    patch("nevaio_pipeline.publish.boto3.client", return_value=FakeClient()),
+                ):
+                    publish_to_r2(run, metadata)
+
+                latest = [body for key, body in puts if key == "latest.json"]
+                self.assertTrue(latest, "expected latest.json to be published")
+                self.assertEqual("dataTiles" in latest[0], expected)
+                if expected:
+                    self.assertEqual(
+                        latest[0]["dataTiles"],
+                        [f"https://example.invalid/runs/{metadata['runId']}/data/{{z}}/{{x}}/{{y}}.png"],
+                    )

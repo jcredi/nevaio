@@ -14,6 +14,7 @@ from rasterio.warp import transform_bounds
 from .asof import AsOfComposite
 from .mosaic import TileComposite, mosaic_to_grid
 from .raster_io import RasterGrid
+from .data_tiles import write_data_tiles
 from .tiles import ORIGIN_SHIFT, TILE_SIZE, write_xyz_tiles
 
 
@@ -114,9 +115,27 @@ def _metatile_grid(base_zoom: int, max_zoom: int, x: int, y: int) -> RasterGrid:
 
 
 def render_snapshots(
-    paths: Sequence[Path], out_dir: Path, min_zoom: int = 8, max_zoom: int = 11
-) -> list[Path]:
-    """Merge source overlaps one z8 metatile at a time and write XYZ tiles."""
+    paths: Sequence[Path],
+    out_dir: Path,
+    min_zoom: int = 8,
+    max_zoom: int = 11,
+    data_out_dir: Path | None = None,
+) -> tuple[list[Path], list[Path]]:
+    """Merge source overlaps one z8 metatile at a time and write XYZ tiles.
+
+    Returns ``(visual_tiles, data_tiles)``. ``data_out_dir``, when given, also
+    writes the lossless data pyramid (``data_tiles.write_data_tiles``) at
+    ``max_zoom`` only - the values a route profile needs, which the visual
+    encoding deliberately cannot carry (spec section 5.4). Omitted, nothing
+    about the existing render changes: this is additive, like the per-object
+    series increment.
+
+    Both pyramids are written from the *same* merged mosaic, inside the same
+    metatile loop. That is deliberate and worth keeping: rendering them in two
+    passes would mean two independent merges of the same overlapping sources,
+    and any divergence between them - a different overlap winner at a UTM seam,
+    say - would put the route profile and the map quietly out of step.
+    """
 
     if max_zoom < min_zoom:
         raise ValueError("max_zoom must be greater than or equal to min_zoom")
@@ -129,6 +148,7 @@ def render_snapshots(
                 metatiles.setdefault((x, y), []).append(info)
 
     written: list[Path] = []
+    data_written: list[Path] = []
     for (x, y), sources in sorted(metatiles.items()):
         target = _metatile_grid(min_zoom, max_zoom, x, y)
         mosaic = mosaic_to_grid(
@@ -142,5 +162,9 @@ def render_snapshots(
                 out_dir,
             )
         )
-    return sorted(set(written))
+        if data_out_dir is not None:
+            data_written.extend(
+                write_data_tiles(mosaic.composite, target, max_zoom, data_out_dir)
+            )
+    return sorted(set(written)), sorted(set(data_written))
 

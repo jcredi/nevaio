@@ -91,7 +91,12 @@ class PreviewHelpersTests(unittest.TestCase):
                 patch("nevaio_pipeline.render.load_tile_products", return_value=SimpleNamespace(grid=grid, products=(object(),))) as load,
                 patch("nevaio_pipeline.render.compose_as_of", return_value=object()),
                 patch("nevaio_pipeline.render.save_snapshot", side_effect=persist),
-                patch("nevaio_pipeline.render.render_snapshots", return_value=[Path("one.png"), Path("two.png")]),
+                # render_snapshots returns (visual_tiles, data_tiles); the second list is
+                # empty unless --data-tiles is on, which this test does not use.
+                patch(
+                    "nevaio_pipeline.render.render_snapshots",
+                    return_value=([Path("one.png"), Path("two.png")], []),
+                ),
                 patch("nevaio_pipeline.render._bounds_wgs84", return_value=[5.0, 40.0, 16.0, 48.0]),
                 patch("nevaio_pipeline.render.publish_to_r2") as publish,
             ):

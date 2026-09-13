@@ -157,6 +157,14 @@ def publish_to_r2(
         body = dict(run_metadata)
         body["manifestUrl"] = f"{public_base_url}/{key}"
         body["tiles"] = [f"{public_base_url}/{prefix}/tiles/{{z}}/{{x}}/{{y}}.png"]
+        # The snow data pyramid is announced here rather than configured in the
+        # frontend, so `VITE_SNOW_MANIFEST_URL` stays the single trust anchor
+        # for everything about the snow layer - the same rule the date
+        # catalogue follows. Present only when the run actually carries one;
+        # `validate_run` has already checked that the files and the metadata
+        # agree, so this cannot advertise tiles that were never uploaded.
+        if "dataTileCount" in run_metadata:
+            body["dataTiles"] = [f"{public_base_url}/{prefix}/data/{{z}}/{{x}}/{{y}}.png"]
         body["publishedAt"] = published_at
         return body
 

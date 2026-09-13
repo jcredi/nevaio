@@ -221,7 +221,7 @@ class BuildPreviewWiringTests(unittest.TestCase):
             ),
             patch("nevaio_pipeline.render.compose_as_of", return_value=object()),
             patch("nevaio_pipeline.render.save_snapshot"),
-            patch("nevaio_pipeline.render.render_snapshots", return_value=[Path("one.png")]),
+            patch("nevaio_pipeline.render.render_snapshots", return_value=([Path("one.png")], [])),
             patch("nevaio_pipeline.render._bounds_wgs84", return_value=[5.0, 40.0, 16.0, 48.0]),
         ):
             return build_preview(
