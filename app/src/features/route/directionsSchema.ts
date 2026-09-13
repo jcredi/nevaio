@@ -47,18 +47,38 @@
  *    `features` array**, which is a real answer ("nothing connects these
  *    points"), not a malformed body - hence `NoRouteError`, thrown separately.
  *
- * Elevation: this validator ignores a third entry in a GeoJSON position rather
- * than rejecting it, and never carries it through. Geoapify *can* return real
- * per-point elevation, but only when the request asks for `details=elevation`,
- * and this app does not ask yet (`docs/plan.md` item 2: the provider swap lands
- * before the profile is built on an unnamed DEM). Until a deliberate decision
- * is made to consume it, a stray third number must not be mistaken for one.
+ * **Elevation** arrives per leg, in `legs[].elevation_range`: an array of
+ * `[distanceAlongLeg, heightMetres]` pairs. Two things about that shape are
+ * easy to get wrong and are handled here:
+ *
+ *  - **Each leg's distances restart at zero.** Concatenating legs without
+ *    offsetting by the preceding legs' lengths would fold a multi-leg profile
+ *    back over itself - a chart that looks plausible and is nonsense. Offsets
+ *    are applied even though this app sends only two waypoints today.
+ *  - **The profile is measured, and measured DEMs have limits.** Verified
+ *    2026-09-13 against 200 indexed objects and 8 real routes (the MEASURED
+ *    section of `docs/research/routing-and-dem-options.md`): accurate to about
+ *    a metre on path-level terrain, but a median 49 m *low* on summits above
+ *    3,000 m. Consumers must never read a summit height off this - the object
+ *    index's OSM `ele` is what the panel shows - and must resample before
+ *    computing ascent, since ~14 m spacing against a ~30 m DEM is oversampled.
+ *
+ * A third entry inside a GeoJSON *position* is a different thing and is still
+ * ignored: the geometry's optional z is not the profile, and conflating them
+ * would mix a checked source with an unchecked one.
  *
  * This module imports nothing but the pure geometry helper it shares with the
  * rest of the feature (no map config, no `import.meta.env`, no `fetch`, no DOM,
  * no MapLibre), so `npm test` runs it directly under Node.
  */
 import { haversineMeters } from "./routeProfile.ts";
+
+/** One point on the route's elevation profile (spec sections 8.3-8.5). */
+export type ElevationPoint = {
+  /** Metres from the route start, along the route. */
+  distanceMeters: number;
+  elevationMeters: number;
+};
 
 /** One validated route, normalised for downstream map/profile use. */
 export type ValidatedRoute = {
@@ -72,6 +92,13 @@ export type ValidatedRoute = {
   durationSeconds: number;
   /** Always two-element [lon, lat] tuples; see the module docstring on elevation. */
   coordinates: [number, number][];
+  /**
+   * The elevation profile, or `null` when the provider did not return one.
+   * Null is a first-class state, not a failure: the route is still perfectly
+   * usable without a profile, and inventing flat ground would be worse than
+   * saying nothing - so this never falls back to zeros.
+   */
+  elevationProfile: ElevationPoint[] | null;
 };
 
 /**
@@ -250,6 +277,58 @@ function requireGeometry(value: unknown, field: string): [number, number][] {
   return combined;
 }
 
+/** Bound the profile the way the geometry is bounded - same reasoning. */
+const MAX_PROFILE_POINTS = MAX_ROUTE_COORDINATES;
+
+/**
+ * The elevation profile across all legs, with each leg's distances offset by
+ * the total length of the legs before it, or `null` when the response carries
+ * no usable profile.
+ *
+ * Returns null rather than throwing when the field is simply absent: a route
+ * without `details=elevation`, or a provider that declined to supply one, is a
+ * valid response. A field that is *present but malformed* does throw - that is
+ * a contract violation, not an absence.
+ */
+function readElevationProfile(legs: unknown, field: string): ElevationPoint[] | null {
+  if (!Array.isArray(legs)) return null;
+
+  const profile: ElevationPoint[] = [];
+  let offset = 0;
+  for (const [index, rawLeg] of legs.entries()) {
+    if (typeof rawLeg !== "object" || rawLeg === null) continue;
+    const leg = rawLeg as Record<string, unknown>;
+    const range = leg.elevation_range;
+    if (range === undefined) continue;
+    if (!Array.isArray(range)) fail(`${field}[${index}].elevation_range must be an array`);
+
+    let lastDistance = 0;
+    for (const entry of range) {
+      if (!Array.isArray(entry) || entry.length < 2) {
+        fail(`${field}[${index}].elevation_range entries must be [distance, height] pairs`);
+      }
+      const along = requireFiniteNumber(entry[0], `${field}[${index}].elevation_range distance`, 0, Infinity);
+      // Earth's land surface, generously bounded: the Dead Sea shore is about
+      // -430 m and Everest 8,849 m. A value outside this is not a height.
+      const height = requireFiniteNumber(entry[1], `${field}[${index}].elevation_range height`, -500, 9000);
+      profile.push({ distanceMeters: offset + along, elevationMeters: height });
+      lastDistance = Math.max(lastDistance, along);
+      if (profile.length > MAX_PROFILE_POINTS) {
+        fail(`${field} elevation profile exceeds the ${MAX_PROFILE_POINTS} point limit`);
+      }
+    }
+    // Prefer the leg's own declared length for the offset; fall back to the
+    // furthest profile distance seen, so a leg missing `distance` still cannot
+    // make the next leg restart at zero.
+    const declared = typeof leg.distance === "number" && Number.isFinite(leg.distance) ? leg.distance : lastDistance;
+    offset += Math.max(declared, lastDistance);
+  }
+
+  // A single point is not a profile - it cannot be drawn and its ascent is
+  // undefined. Report the honest absence instead.
+  return profile.length >= 2 ? profile : null;
+}
+
 /**
  * Validate a Geoapify Routing API response for the `hike` mode.
  *
@@ -292,6 +371,7 @@ export function validateDirectionsResponse(document: unknown): ValidatedRoute {
     Infinity,
   );
   const coordinates = requireGeometry(feature.geometry, "features[0].geometry");
+  const elevationProfile = readElevationProfile(properties.legs, "features[0].properties.legs");
 
-  return { distanceMeters, durationSeconds, coordinates };
+  return { distanceMeters, durationSeconds, coordinates, elevationProfile };
 }

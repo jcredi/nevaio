@@ -96,10 +96,13 @@ export async function fetchWalkingRoute(
   // says metres rather than assuming it: asking and checking are two different
   // things, and a miles figure read as metres is plausible on screen.
   url.searchParams.set("units", "metric");
-  // No `details=elevation` yet. Geoapify can return a per-point elevation
-  // profile, which is why it was chosen over Stadia - but it does not name its
-  // global DEM source, so the elevation is to be smoke-tested against known
-  // summit heights before anything is built on it (docs/plan.md item 2).
+  // The elevation profile (spec sections 8.3-8.5), cleared for use on
+  // 2026-09-13 after being measured against 200 indexed objects and 8 real
+  // routes: accurate to about a metre on path-level terrain. It arrives as
+  // `legs[].elevation_range`, and `directionsSchema.ts` carries the two rules
+  // that measurement imposed - never read a summit height off it, and resample
+  // before summing ascent.
+  url.searchParams.set("details", "elevation");
   url.searchParams.set("apiKey", geoapifyApiKey);
 
   let response: Response;
