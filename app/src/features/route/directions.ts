@@ -33,13 +33,16 @@
 import { geoapifyApiKey } from "../../map/config";
 import {
   DirectionsError,
+  MAX_ROUTE_SPAN_METERS,
   NoRouteError,
+  RouteTooLongError,
   formatWaypoint,
+  routeSpanMeters,
   validateDirectionsResponse,
   type ValidatedRoute,
 } from "./directionsSchema.ts";
 
-export { DirectionsError, NoRouteError, type ValidatedRoute };
+export { DirectionsError, NoRouteError, RouteTooLongError, type ValidatedRoute };
 
 const ENDPOINT = "https://api.geoapify.com/v1/routing";
 
@@ -77,6 +80,15 @@ export async function fetchWalkingRoute(
     throw new DirectionsError("VITE_GEOAPIFY_API_KEY is not set, so routing is unavailable");
   }
 
+  // Refused before the request, not after: the provider caps a regular call at
+  // MAX_ROUTE_SPAN_METERS of straight-line distance and reports the breach as a
+  // plain HTTP 400, which is indistinguishable from any other bad request
+  // without string-matching its prose. Checking here spends no credit and,
+  // more importantly, lets the panel say something true - see
+  // `RouteTooLongError`.
+  const span = routeSpanMeters(start, destination);
+  if (span > MAX_ROUTE_SPAN_METERS) throw new RouteTooLongError(span);
+
   const url = new URL(ENDPOINT);
   url.searchParams.set("waypoints", `${formatWaypoint(start)}|${formatWaypoint(destination)}`);
   url.searchParams.set("mode", "hike");
@@ -111,13 +123,18 @@ export async function fetchWalkingRoute(
     throw new DirectionsError("the routing provider's rate limit was reached - try again shortly");
   }
   if (response.status === 400) {
-    // Geoapify answers a request it understood but cannot route with a 400 and
-    // a message. The two causes are a waypoint it cannot snap to any walkable
-    // way, and a malformed request - and this app builds the request itself, so
-    // the first is overwhelmingly the likely one. Reported as "no route" rather
-    // than as a broken app, with the provider's own message kept for the log.
-    console.warn("Routing provider returned HTTP 400", await safeText(response));
-    throw new NoRouteError("the provider could not match these points to a path network");
+    // Measured 2026-09-13, against the live API: a 400 is the provider
+    // rejecting the *request*, not reporting that no path exists. The one cause
+    // this app can actually trigger is an over-long route, and that is now
+    // caught before the request - so anything reaching here is unexpected, and
+    // the honest thing is to surface what the provider actually said rather
+    // than assert a cause. Genuine "nothing connects these points" arrives as
+    // an empty feature list instead, and `directionsSchema.ts` owns it.
+    //
+    // Not reported as "no route": an earlier version did, which would have told
+    // someone routing across a valley that no path existed when the real answer
+    // was that they had asked for too much.
+    throw new DirectionsError(providerMessage(await safeText(response)));
   }
   if (!response.ok) {
     throw new DirectionsError(`routing request failed: HTTP ${response.status}`);
@@ -141,11 +158,32 @@ export async function fetchWalkingRoute(
   return validateDirectionsResponse(document);
 }
 
-/** Read an error body for the console without letting that read throw. */
+/** Read an error body without letting that read throw. */
 async function safeText(response: Response): Promise<string> {
   try {
-    return (await response.text()).slice(0, 500);
+    return (await response.text()).slice(0, 1000);
   } catch {
-    return "<unreadable body>";
+    return "";
   }
+}
+
+/**
+ * The provider's own explanation, pulled out of its `{statusCode, error,
+ * message}` error body, for cases where this app has nothing better to say
+ * than what the provider said. Falls back to a generic sentence rather than
+ * dumping a raw body into the UI.
+ */
+function providerMessage(body: string): string {
+  try {
+    const parsed: unknown = JSON.parse(body);
+    if (typeof parsed === "object" && parsed !== null) {
+      const message = (parsed as Record<string, unknown>).message;
+      if (typeof message === "string" && message.length > 0 && message.length <= 300) {
+        return `the routing provider rejected the request: ${message}`;
+      }
+    }
+  } catch {
+    // Not JSON; fall through to the generic message.
+  }
+  return "the routing provider rejected the request";
 }

@@ -45,8 +45,42 @@ The provider boundary held: only `directionsSchema.ts`, `directions.ts`, the
 config variable and one CSP line changed. The controller, panel, prompt, map
 layer and pure geometry are untouched, which is what that boundary was for.
 
-Not yet verified against a live key - the account is the owner's to create.
-`npm test` 170 passing, build clean.
+**Then verified against the live API with a real key, which corrected the
+client in three places.** Guessing the contract from documentation got two of
+them wrong:
+
+- **The provider caps a request at 100 km of straight-line distance** and
+  reports the breach as a plain HTTP 400 ("Estimated distance is 575781
+  meter(s)"). The first client mapped *every* 400 to "no walking route connects
+  these points" - which would have told someone planning a long traverse that no
+  path existed, when the truth was that they had asked for more than one request
+  can carry. The span is now checked *before* the request, against the same
+  great-circle measure the provider's own pre-check uses (our haversine agrees
+  with their 575,781 m estimate to within 5 km, asserted by a test), and spends
+  no credit. A 400 that still arrives now surfaces the provider's own message
+  rather than asserting a cause.
+- **`distance_units` comes back lowercase `"meters"`**, where the documentation
+  shows `"Meters"`. The case-insensitive comparison written on a hunch turned
+  out to be load-bearing rather than defensive.
+- **Two identical waypoints return HTTP 200 with distance 0** and a two-point
+  line of identical coordinates - a real answer, not a malformed one, and
+  already handled by the zero-length path in `routeProfile.ts`.
+
+Also measured: an unroutable-looking point is *snapped* to the nearest way
+rather than refused (a point in open water on Lake Geneva routed fine), so a
+genuine "no route" is rare and arrives as an empty feature list, which the
+schema owns. A bad key is a 401, as assumed. `hike` mode routes real alpine
+terrain - a pair of points on the Gorner glacier returned 1.88 km, and took
+4.8 h to do it, which is its pedestrian cost model on steep ground and a fresh
+reminder of why that duration is not shown.
+
+The owner's key is restricted to the Netlify origin, verified from here:
+`https://nevaio.netlify.app` answers 200 while `localhost`, `127.0.0.1` and a
+spoofed third-party origin all get 401. That is the restriction working
+correctly, and it means the deployed site - not a dev server - is where this
+feature gets verified.
+
+`npm test` 175 passing, build clean.
 
 ## 2026-09-13 - The route planner's core, without the profile it still needs
 

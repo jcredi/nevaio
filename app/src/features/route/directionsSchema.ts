@@ -54,9 +54,11 @@
  * before the profile is built on an unnamed DEM). Until a deliberate decision
  * is made to consume it, a stray third number must not be mistaken for one.
  *
- * This module imports nothing (no map config, no `import.meta.env`, no `fetch`,
- * no DOM, no MapLibre), so `npm test` runs it directly under Node.
+ * This module imports nothing but the pure geometry helper it shares with the
+ * rest of the feature (no map config, no `import.meta.env`, no `fetch`, no DOM,
+ * no MapLibre), so `npm test` runs it directly under Node.
  */
+import { haversineMeters } from "./routeProfile.ts";
 
 /** One validated route, normalised for downstream map/profile use. */
 export type ValidatedRoute = {
@@ -105,6 +107,34 @@ export function formatWaypoint(point: RoutePoint): string {
   return `${point.latitude.toFixed(6)},${point.longitude.toFixed(6)}`;
 }
 
+/**
+ * Geoapify refuses a regular routing request whose **estimated** (straight-line)
+ * distance exceeds this, with an HTTP 400 and a message naming the limit. From
+ * their own error body, measured 2026-09-13:
+ *
+ *   "Too long distance between locations. Distance should not exceed 100000
+ *    meters for a regular API call... Estimated distance is 575781 meter(s)."
+ *
+ * Checked here, before the request, for two reasons. It spends no credit on a
+ * call that cannot succeed; and more importantly it lets the app say something
+ * true. An HTTP 400 is indistinguishable from other bad requests without
+ * string-matching the provider's prose, and the first version of this client
+ * mapped every 400 to "no walking route connects these points" - which would
+ * have told a user planning Zermatt to Chamonix that no path exists between
+ * them, when the truth is that the request was too long to ask in one go.
+ */
+export const MAX_ROUTE_SPAN_METERS = 100_000;
+
+/**
+ * How far apart two endpoints are in a straight line, by the same measure the
+ * provider's own pre-check uses (its "estimated distance" tracks great-circle,
+ * not route length - the 575 km figure above is the straight-line distance for
+ * that request). Compare against `MAX_ROUTE_SPAN_METERS`.
+ */
+export function routeSpanMeters(start: RoutePoint, destination: RoutePoint): number {
+  return haversineMeters(start, destination);
+}
+
 /** Malformed response: the body is not shaped like a routing response. */
 export class DirectionsError extends Error {}
 
@@ -115,6 +145,21 @@ export class DirectionsError extends Error {}
  * `catch (e) { if (e instanceof NoRouteError) ... }` never has to also rule out
  * a malformed body.
  */
+/**
+ * The two endpoints are further apart than the provider will route in one
+ * request. A subclass of `DirectionsError` on purpose: the panel already
+ * renders a `DirectionsError`'s message as a sentence to the user, and this
+ * message - unlike a parse failure's - is written to be read by one.
+ */
+export class RouteTooLongError extends DirectionsError {
+  constructor(spanMeters: number) {
+    super(
+      `these points are ${Math.round(spanMeters / 1000)} km apart in a straight line, ` +
+        `and the routing provider handles at most ${MAX_ROUTE_SPAN_METERS / 1000} km per route`,
+    );
+  }
+}
+
 export class NoRouteError extends Error {
   constructor(reason = "the provider returned no route between these points") {
     super(`No walking route: ${reason}`);
