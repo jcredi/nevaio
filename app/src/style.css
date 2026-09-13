@@ -230,26 +230,25 @@ body {
 }
 
 /*
- * With a catalogue to pick from, the pill becomes a real control: a label
- * (the date the slider is currently on) over a native range slider, per the
- * owner's own "slider or calendar" suggestion - see dateControl.ts for why a
- * slider won over a hand-built calendar grid. It needs real vertical room for
- * both rows and a real touch target on the track, so unlike the read-only
- * pill it is allowed to be taller; it still stays horizontally centred in the
- * same spot so the page does not jump when the catalogue arrives after first
- * paint.
+ * With a catalogue to pick from, the pill becomes a real control: `< date >`,
+ * with a calendar popup behind the date itself. It replaced a range slider on
+ * 2026-09-13 - see dateControl.ts for the reasoning. It stays horizontally
+ * centred in the same spot as the read-only pill so the page does not jump
+ * when the catalogue arrives after first paint.
  */
 .snow-date--interactive {
   display: flex;
-  padding: 0.375rem 0.75rem 0.5rem;
+  padding: 0.1875rem 0.25rem;
 }
 
-.snow-date__slider-wrap {
+.snow-date__wrap {
+  position: relative;
+}
+
+.snow-date__stepper {
   display: flex;
-  flex-direction: column;
-  align-items: stretch;
+  align-items: center;
   gap: 0.125rem;
-  width: min(13rem, calc(100vw - env(safe-area-inset-left) - env(safe-area-inset-right) - 4rem));
 }
 
 .snow-date__label {
@@ -259,67 +258,146 @@ body {
 }
 
 /*
- * A native <input type="range">, stepped one stop per catalogue date (never
- * continuous days), restyled just enough to fit the pill. Keyboard behaviour
- * (arrow keys, Home/End, Page Up/Down), dragging, and touch handling all stay
- * the platform's own; only the track/thumb colors are custom.
+ * Both controls are 2rem tall rather than the 2.75rem a 44px touch target
+ * would want. The pill sits between the search bar and the map, and a
+ * full-height row there crowds both; the arrows are a low-stakes, instantly
+ * reversible action (press the other one), so the usual argument for a large
+ * target is weaker here than the argument for not burying the map. The
+ * calendar's day cells, which are not trivially reversible, are full size.
  */
-.snow-date__slider {
-  appearance: none;
-  -webkit-appearance: none;
-  width: 100%;
-  height: 1.5rem;
-  margin: 0;
+.snow-date__step,
+.snow-date__face {
+  min-height: 2rem;
+  border: 0;
   background: transparent;
+  color: inherit;
+  font: inherit;
+  border-radius: 999px;
   cursor: pointer;
 }
 
-.snow-date__slider::-webkit-slider-runnable-track {
-  height: 0.25rem;
-  border-radius: 999px;
-  background: rgba(15, 23, 42, 0.14);
+.snow-date__step {
+  width: 2rem;
+  font-size: 1.125rem;
+  line-height: 1;
+  color: var(--text-secondary);
 }
 
-.snow-date__slider::-moz-range-track {
-  height: 0.25rem;
-  border-radius: 999px;
-  background: rgba(15, 23, 42, 0.14);
+.snow-date__face {
+  padding: 0 0.5rem;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  white-space: nowrap;
 }
 
-.snow-date__slider::-webkit-slider-thumb {
-  appearance: none;
-  -webkit-appearance: none;
-  width: 1.125rem;
-  height: 1.125rem;
-  margin-top: -0.4375rem;
-  border-radius: 50%;
-  background: var(--accent-strong);
-  border: 2px solid #fff;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.35);
+.snow-date__step:hover:not(:disabled),
+.snow-date__face:hover:not(:disabled) {
+  background: rgba(15, 23, 42, 0.06);
 }
 
-.snow-date__slider::-moz-range-thumb {
-  width: 1.125rem;
-  height: 1.125rem;
-  border-radius: 50%;
-  background: var(--accent-strong);
-  border: 2px solid #fff;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.35);
+.snow-date__step:disabled,
+.snow-date__face:disabled {
+  opacity: 0.35;
+  cursor: default;
 }
 
-.snow-date__slider:focus-visible::-webkit-slider-thumb {
+.snow-date__step:focus-visible,
+.snow-date__face:focus-visible,
+.snow-date__day:focus-visible {
   outline: 2px solid var(--focus-ring, var(--accent-strong));
-  outline-offset: 2px;
+  outline-offset: 1px;
 }
 
-.snow-date__slider:focus-visible::-moz-range-thumb {
-  outline: 2px solid var(--focus-ring, var(--accent-strong));
-  outline-offset: 2px;
-}
-
-.snow-date--loading .snow-date__slider {
+.snow-date--loading .snow-date__face {
   cursor: progress;
-  opacity: 0.6;
+}
+
+/*
+ * Anchored to the pill and centred under it. `max-width` with the viewport
+ * inset keeps it on screen at 320px, where the pill itself is near the edges.
+ */
+.snow-date__calendar {
+  position: absolute;
+  top: calc(100% + 0.375rem);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  padding: 0.5rem;
+  background: var(--panel-bg);
+  backdrop-filter: blur(var(--panel-blur)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--panel-blur)) saturate(180%);
+  border: 1px solid var(--panel-border);
+  border-radius: 0.75rem;
+  box-shadow: var(--panel-shadow);
+  max-width: calc(100vw - env(safe-area-inset-left) - env(safe-area-inset-right) - 1.5rem);
+}
+
+.snow-date__calendar-title {
+  text-align: center;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  padding-bottom: 0.375rem;
+}
+
+.snow-date__grid {
+  display: grid;
+  grid-template-columns: repeat(7, 2rem);
+  gap: 0.125rem;
+}
+
+.snow-date__weekday {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 1.25rem;
+  font-size: 0.5625rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.snow-date__day {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 2rem;
+  border: 0;
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.snow-date__day--blank {
+  cursor: default;
+}
+
+.snow-date__day:hover:not(:disabled) {
+  background: rgba(15, 23, 42, 0.08);
+}
+
+/*
+ * A day inside the window whose run never published. Dimmed rather than
+ * removed: the gap is information (see calendarGrid.ts), and a calendar that
+ * silently renumbers around missing days would hide it.
+ */
+.snow-date__day:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.snow-date__day--current {
+  background: var(--accent-strong);
+  color: #fff;
+  font-weight: 600;
+}
+
+/* A quiet rule marking where one month becomes the next, so a span like
+   "30 Aug - 13 Sep" reads as two months rather than one long run of numbers. */
+.snow-date__day--month-start {
+  box-shadow: inset 2px 0 0 var(--panel-border);
 }
 
 .snow-date--failed {
@@ -957,75 +1035,261 @@ body {
   background: #b91c1c;
 }
 
-/* Half-planned route strip: below the search bar AND the AS-OF date pill,
-   clear of both the object panel and the bottom-left snow control, so it can
-   coexist with the picking surface. It is not a bottom sheet and does not
-   register a height.
-
-   7.5rem is measured, not guessed: at 320 and 390 CSS px the search bar ends
-   at 52px and the date pill - in its tallest form, the slider - ends at 113px,
-   so 120px clears it. The pill is shorter when the catalogue offers fewer than
-   two dates and absent entirely when no snapshot loaded; the resulting gap is
-   cosmetic, and the alternative (a fourth element publishing its height) buys
-   less than it costs. `npm run check-mobile-layout` asserts the clearance so
-   this cannot regress silently - the search bar and this pill have collided
-   before, which is why that check exists. */
-.route-prompt {
+/* The route button: one round control, bottom right, where a thumb reaches it.
+   It is the only entry point to routing now that the half-planned "prompt"
+   strip is gone - that strip existed because there was no visible surface
+   showing both ends of a plan, and the planner is that surface. Sits above the
+   snow control's corner and clear of the bottom sheets, which slide up over
+   it. */
+.route-fab {
   position: fixed;
-  z-index: 5;
-  top: calc(env(safe-area-inset-top) + 7.5rem);
-  left: 50%;
-  transform: translateX(-50%);
-  width: min(92vw, 24rem);
+  z-index: 6;
+  right: calc(env(safe-area-inset-right) + 0.75rem);
+  /* The 2.25rem base is not decorative: it is the same offset the bottom
+     sheets themselves sit at, so `--bottom-sheet-height` (the sheet's height,
+     not the distance to its top edge) lands this exactly on the sheet's top
+     edge. Using a smaller base put the button 20px behind the open panel -
+     the height variable alone is not enough to clear a sheet, you have to add
+     the sheet's own offset back. The extra 0.5rem is visible breathing room.
+     `npm run check-mobile-layout` asserts the clearance. */
+  bottom: calc(
+    env(safe-area-inset-bottom) + 2.25rem + var(--bottom-sheet-height, 0px) + 0.5rem
+  );
+  width: 3.25rem;
+  height: 3.25rem;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.4375rem 0.5rem 0.4375rem 0.75rem;
+  justify-content: center;
+  border: 0;
+  border-radius: 1rem;
+  background: var(--accent-strong);
+  color: #fff;
+  box-shadow: var(--panel-shadow);
+  cursor: pointer;
+  /* Follows the sheet rather than being covered by it, matching the way the
+     other floating controls move. */
+  transition: bottom 160ms ease;
+}
+
+.route-fab:hover {
+  filter: brightness(1.06);
+}
+
+.route-fab:focus-visible {
+  outline: 2px solid var(--accent-strong);
+  outline-offset: 3px;
+}
+
+/* The planner sits where the search bar is, covering it: while you are filling
+   in two fields, a third search field is noise. */
+.route-planner {
+  position: fixed;
+  z-index: 7;
+  top: calc(env(safe-area-inset-top) + 0.625rem);
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(92vw, 26rem);
+  padding: 0.5rem;
   background: var(--panel-bg);
   backdrop-filter: blur(var(--panel-blur)) saturate(180%);
   -webkit-backdrop-filter: blur(var(--panel-blur)) saturate(180%);
   border: 1px solid var(--panel-border);
-  border-radius: var(--panel-radius-sm);
+  border-radius: var(--panel-radius);
   box-shadow: var(--panel-shadow);
   font:
-    500 0.75rem/1.3 system-ui,
+    500 0.8125rem/1.3 system-ui,
     -apple-system,
     sans-serif;
   color: var(--text-primary);
 }
 
-.route-prompt[hidden] {
+.route-planner[hidden] {
   display: none;
 }
 
-.route-prompt__message {
-  flex: 1;
-  min-width: 0;
-  overflow-wrap: anywhere;
+/* The same collision the search bar documents above, and the same fix: a
+   centred 92vw card runs under MapLibre's fixed top-right control column, so
+   on a phone anchor to the safe left edge and reserve that column. The planner
+   sits exactly where the search bar does and must line up with it. */
+@media (max-width: 34rem) {
+  .route-planner {
+    left: max(0.625rem, env(safe-area-inset-left));
+    right: calc(env(safe-area-inset-right) + 3.25rem);
+    width: auto;
+    transform: none;
+  }
 }
 
-.route-prompt__cancel {
-  flex: none;
-  min-height: 1.75rem;
-  padding: 0 0.625rem;
-  border: 1px solid rgba(15, 23, 42, 0.12);
+.route-planner__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 0.25rem 0.375rem;
+}
+
+.route-planner__title {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.route-planner__close,
+.route-planner__swap,
+.route-planner__pick {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
   border-radius: 0.5rem;
-  background: rgba(255, 255, 255, 0.5);
-  font:
-    600 0.75rem/1 system-ui,
-    -apple-system,
-    sans-serif;
-  color: var(--text-primary);
   cursor: pointer;
 }
 
-.route-prompt__cancel:hover {
-  background: rgba(255, 255, 255, 0.85);
+.route-planner__close {
+  width: 2rem;
+  height: 2rem;
 }
 
-.route-prompt__cancel:focus-visible {
+.route-planner__close svg,
+.route-planner__swap svg,
+.route-planner__pick svg {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+.route-planner__body {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.route-planner__fields {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.route-planner__swap {
+  flex: none;
+  width: 2.25rem;
+  height: 2.25rem;
+}
+
+.route-planner__row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 0.375rem 0 0.5rem;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: 0.625rem;
+}
+
+.route-planner__row:focus-within {
+  border-color: var(--accent-strong);
+}
+
+/* A and B, so the two fields are distinguishable at a glance and the map's own
+   endpoint markers have something to correspond to. */
+.route-planner__badge {
+  flex: none;
+  width: 1.125rem;
+  height: 1.125rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 0.625rem;
+  font-weight: 700;
+  color: #fff;
+  background: var(--text-secondary);
+}
+
+.route-planner__badge--destination {
+  background: var(--accent-strong);
+}
+
+.route-planner__input {
+  flex: 1;
+  min-width: 0;
+  min-height: 2.5rem;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+}
+
+.route-planner__input:focus {
+  outline: none;
+}
+
+.route-planner__pick {
+  flex: none;
+  width: 2rem;
+  height: 2rem;
+}
+
+.route-planner__pick--active {
+  background: var(--accent-strong);
+  color: #fff;
+}
+
+.route-planner__close:focus-visible,
+.route-planner__swap:focus-visible,
+.route-planner__pick:focus-visible,
+.route-planner__suggestion:focus-visible {
   outline: 2px solid var(--accent-strong);
   outline-offset: 2px;
+}
+
+.route-planner__suggestions {
+  list-style: none;
+  margin: 0.25rem 0 0;
+  padding: 0;
+  max-height: 12rem;
+  overflow-y: auto;
+}
+
+.route-planner__suggestions[hidden] {
+  display: none;
+}
+
+.route-planner__suggestion {
+  display: block;
+  width: 100%;
+  min-height: 2.5rem;
+  padding: 0.375rem 0.5rem;
+  border: 0;
+  border-radius: 0.5rem;
+  background: transparent;
+  font: inherit;
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.route-planner__suggestion:hover {
+  background: rgba(15, 23, 42, 0.06);
+}
+
+.route-planner__suggestion--message {
+  color: var(--text-secondary);
+  cursor: default;
+}
+
+/* While a pick is armed the planner steps out of the way: the point being
+   chosen is on the map, and a card covering the top of it is the one thing
+   that makes picking harder. */
+.route-planner--picking {
+  opacity: 0.32;
+}
+
+.route-planner--picking:hover,
+.route-planner--picking:focus-within {
+  opacity: 1;
 }
 
 .route-panel {

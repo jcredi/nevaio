@@ -11,7 +11,7 @@ import { describe, it } from "node:test";
 
 import type { ObjectRecord } from "./objectIndexSchema.ts";
 import {
-  AMBIGUITY_RATIO,
+  AMBIGUITY_PIXELS,
   SELECTION_MAX_METERS_PER_PIXEL,
   TAP_RADIUS_PIXELS,
   distanceMeters,
@@ -126,26 +126,48 @@ describe("resolveSelection", () => {
     assert.equal(result.status === "selected" && result.record.id, DUFOURSPITZE.id);
   });
 
-  it("brackets the ambiguity ratio: just inside is ambiguous, just outside is not", () => {
-    // Both records sit due north of the tap, at 10 m and at 10 m x <ratio>.
-    const rivalAt = (metres: number): ObjectRecord[] => [
-      { ...DUFOURSPITZE, id: "node/1", name: "Near", latitude: tapAt(DUFOURSPITZE, 10).latitude },
-      {
-        ...DUFOURSPITZE,
-        id: "node/2",
-        name: "Far",
-        latitude: tapAt(DUFOURSPITZE, metres).latitude,
-      },
-    ];
+  /** Two records due north of the tap: one at 10 m, one at `metres`. */
+  const rivalAt = (metres: number): ObjectRecord[] => [
+    { ...DUFOURSPITZE, id: "node/1", name: "Near", latitude: tapAt(DUFOURSPITZE, 10).latitude },
+    {
+      ...DUFOURSPITZE,
+      id: "node/2",
+      name: "Far",
+      latitude: tapAt(DUFOURSPITZE, metres).latitude,
+    },
+  ];
+
+  it("brackets the pixel margin at a fine scale", () => {
     const tap = tapAt(DUFOURSPITZE);
-    assert.equal(
-      resolveSelection(rivalAt(10 * (AMBIGUITY_RATIO - 0.01)), tap, FINE).status,
-      "ambiguous",
-    );
-    assert.equal(
-      resolveSelection(rivalAt(10 * (AMBIGUITY_RATIO + 0.01)), tap, FINE).status,
-      "selected",
-    );
+    const margin = AMBIGUITY_PIXELS * FINE;
+    assert.equal(resolveSelection(rivalAt(10 + margin - 1), tap, FINE).status, "ambiguous");
+    assert.equal(resolveSelection(rivalAt(10 + margin + 1), tap, FINE).status, "selected");
+  });
+
+  it("brackets the pixel margin at a coarse scale, in the same pixels", () => {
+    // The point of a screen-space rule: the *pixel* threshold is identical at
+    // both scales even though the metre threshold differs by an order of
+    // magnitude. Two objects 12 px apart are indistinguishable either way.
+    const tap = tapAt(DUFOURSPITZE);
+    const coarse = 40;
+    const margin = AMBIGUITY_PIXELS * coarse;
+    assert.equal(resolveSelection(rivalAt(10 + margin - 1), tap, coarse).status, "ambiguous");
+    assert.equal(resolveSelection(rivalAt(10 + margin + 1), tap, coarse).status, "selected");
+  });
+
+  it("offers the cluster rather than choosing from it at a coarse scale", () => {
+    // The behaviour the raised floor depends on. Four summits spread over a
+    // few hundred metres, tapped from far out: every one of them is within a
+    // fingertip, so all of them reach the panel.
+    const cluster = [200, 400, 600, 800].map((metres, i) => ({
+      ...DUFOURSPITZE,
+      id: `node/${i}`,
+      name: `Summit ${i}`,
+      latitude: tapAt(DUFOURSPITZE, metres).latitude,
+    }));
+    const result = resolveSelection(cluster, tapAt(DUFOURSPITZE), 60);
+    assert.equal(result.status, "ambiguous");
+    assert.equal(result.status === "ambiguous" && result.candidates.length, 4);
   });
 
   it("caps how many candidates it offers", () => {

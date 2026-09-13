@@ -6,8 +6,8 @@
  * **Index-first proximity, with an explicit ambiguity result and a scale
  * floor.** A tap gives a geographic point. We take the nearest index record
  * within a tap radius of `TAP_RADIUS_PIXELS` converted to metres at the
- * current map scale. If a second record is nearly as close
- * (`AMBIGUITY_RATIO`), we refuse to choose and hand back the candidates.
+ * current map scale. If a second record is within `AMBIGUITY_PIXELS` of it on
+ * screen, we refuse to choose and hand back the candidates.
  * Below the scale floor (`SELECTION_MAX_METERS_PER_PIXEL`) we select nothing
  * and say so.
  *
@@ -31,14 +31,16 @@
  *    hazard this rule exists to avoid.
  * 2. **Proximity is not intent.** The nearest record can still be the wrong
  *    one, most plausibly a subsidiary summit next to the main one, or a
- *    parking area next to the hut it serves. `AMBIGUITY_RATIO` catches the
+ *    parking area next to the hut it serves. `AMBIGUITY_PIXELS` catches the
  *    close cases; a genuinely isolated wrong answer (index coordinate placed
  *    at a hut's building centroid rather than its door, say) is not caught.
- * 3. **The scale floor trades reach for safety.** Around 20 m/px the tap
- *    radius is already 440 m; below that, peaks in the Alps are packed several
- *    to a tap and every choice would be a guess, so we make none. The cost is
- *    that the app's own initial view is below the floor and objects are not
- *    selectable until the user zooms in.
+ * 3. **The scale floor trades reach for safety**, and was retuned on
+ *    2026-09-13. It now sits at 80 m/px (~zoom 9.4) rather than 20 (~11.4),
+ *    because requiring that much zoom to select anything was the app's most
+ *    complained-about behaviour. Safety is preserved by answering with a
+ *    *list* instead of a guess: `AMBIGUITY_PIXELS` makes ambiguity a
+ *    screen-space question, so a coarse tap hands back the several summits
+ *    under the finger rather than choosing one of them.
  * 4. **Index coordinates are representative points.** For ways and relations
  *    the pipeline normalises geometry to one point, so a large parking area or
  *    a spread-out hamlet is matched from its centre; a tap on its edge can
@@ -57,21 +59,51 @@ export const TAP_RADIUS_PIXELS = 22;
 /**
  * Coarsest map scale at which a tap is allowed to select anything.
  *
- * At 20 m/px the tap radius is 440 m; that is already generous in Alpine
- * terrain. Any coarser and a single fingertip covers a whole ridge of named
- * summits, so the honest answer is to ask for more zoom rather than to pick
- * one. Roughly MapLibre zoom 11.4 at 45 degrees north.
+ * **Raised from 20 to 80 m/px on 2026-09-13**, on the owner's report that
+ * selecting a landmark "requires zooming on the map a LOT". 20 m/px is roughly
+ * MapLibre zoom 11.4 at 45 degrees north; 80 is roughly zoom 9.4, so a whole
+ * valley is selectable where before you had to close in on one cirque.
+ *
+ * The original floor existed for a real reason - at a coarse scale one
+ * fingertip covers a ridge of named summits, and picking one of them silently
+ * is a guess presented as an answer. That reason has not gone away; what
+ * changed is the response to it. Ambiguity is now measured in *screen*
+ * distance (`AMBIGUITY_PIXELS`), so a coarse tap returns the candidates it
+ * genuinely cannot distinguish and the panel offers them as a list. Refusing
+ * to answer is the right behaviour only when there is nothing useful to say -
+ * and "here are the five summits under your finger" is useful.
+ *
+ * A floor is still needed, because the tap radius grows with the scale and at
+ * some point "nearest" stops meaning anything: at 80 m/px the radius is
+ * already 1.8 km. It also bounds shard loading - `shardsAreWorthLoading` in
+ * `main.ts` shares this constant, and at this scale a desktop viewport spans
+ * at most a few MGRS shards.
  */
-export const SELECTION_MAX_METERS_PER_PIXEL = 20;
+export const SELECTION_MAX_METERS_PER_PIXEL = 80;
 
 /**
- * A runner-up this close to the nearest candidate makes the tap ambiguous.
+ * A runner-up within this many screen pixels of the nearest is also ambiguous.
  *
- * 1.5 is a judgement call, not a measurement: it is loose enough that a clear
- * tap on an isolated summit still resolves, and tight enough that two summits
- * on the same ridge both reach the panel instead of one being chosen silently.
+ * **This replaced a scale-free `AMBIGUITY_RATIO` of 1.5 on 2026-09-13**, when
+ * the selection floor was raised and the ratio turned out to be the wrong shape
+ * for the question. At a coarse scale the nearest candidate can be 400 m away
+ * with six more inside the next 200 m; 1.5x on 400 m keeps only some of them,
+ * so the tap resolves to one summit out of a cluster no fingertip could have
+ * distinguished. What actually decides whether two objects were
+ * distinguishable is how far apart they were *on screen*, so that is what this
+ * measures.
+ *
+ * The ratio was not kept alongside it as a second rule. It could never fire:
+ * the nearest candidate is by definition within `TAP_RADIUS_PIXELS` (22), so
+ * `nearest x 1.5` never exceeds `nearest + 12 px` in any reachable case, and a
+ * constant that cannot change an outcome is worse than no constant - it reads
+ * like a safeguard while doing nothing.
+ *
+ * 12 px against a 22 px radius: tap squarely on an isolated summit and it still
+ * resolves, because a rival must then be inside 12 px to compete. Tap loosely
+ * between two and both come back.
  */
-export const AMBIGUITY_RATIO = 1.5;
+export const AMBIGUITY_PIXELS = 12;
 
 /** Most candidates ever offered for disambiguation. */
 export const MAX_CANDIDATES = 5;
@@ -147,9 +179,11 @@ export function resolveSelection(
   );
 
   const nearest = within[0];
-  const rivals = within.filter(
-    (candidate) => candidate.distanceMeters <= nearest.distanceMeters * AMBIGUITY_RATIO,
-  );
+  // Screen distance, not a ratio - see `AMBIGUITY_PIXELS`. This is what lets a
+  // coarse tap hand back the cluster it could not distinguish instead of
+  // picking one member of it.
+  const margin = nearest.distanceMeters + AMBIGUITY_PIXELS * metersPerPixel;
+  const rivals = within.filter((candidate) => candidate.distanceMeters <= margin);
   if (rivals.length > 1) {
     return { status: "ambiguous", candidates: rivals.slice(0, MAX_CANDIDATES) };
   }

@@ -26,7 +26,7 @@ import { routingIsConfigured } from "./features/route/directions";
 import { RouteController } from "./features/route/routeController";
 import { RouteLayer } from "./features/route/routeLayer";
 import { RoutePanel } from "./features/route/routePanel";
-import { RoutePrompt } from "./features/route/routePrompt";
+import { RoutePlanner, createRouteButton } from "./features/route/routePlanner";
 import "./style.css";
 
 /**
@@ -90,10 +90,62 @@ document.body.append(objectPanel.element);
 // built inside the map's `load` handler below; everything here is inert until
 // then.
 const routePanel = routingIsConfigured() ? new RoutePanel() : null;
-const routePrompt = routingIsConfigured() ? new RoutePrompt() : null;
+/**
+ * The planner and the button that opens it, both gated on a configured
+ * provider exactly as the panel is: with no key there is no route button at
+ * all, rather than a button that fails when pressed.
+ */
+const routePlanner = routingIsConfigured()
+  ? new RoutePlanner({
+      onSet: (role, point) => routeController?.setEndpoint(role, point),
+      onPickOnMap: (role) => {
+        pickingRole = role;
+        // A crosshair is the only affordance telling the user the next tap
+        // means something different from every other tap on this map.
+        map.getCanvas().style.cursor = role === null ? "" : "crosshair";
+      },
+      onClose: () => routeController?.clear(),
+    })
+  : null;
+
+/**
+ * Which end of the route the next map tap fills, if any. Held here rather than
+ * in the planner because the tap arrives on the map, and `main.ts` is where
+ * the map's own handlers live.
+ */
+let pickingRole: "start" | "destination" | null = null;
 let routeController: RouteController | null = null;
 if (routePanel) document.body.append(routePanel.element);
-if (routePrompt) document.body.append(routePrompt.element);
+/**
+ * Held so it can be enabled once the controller behind it exists.
+ *
+ * The button is built at module scope but the `RouteController` is not created
+ * until the map's `load` fires, and every planner hook goes through
+ * `routeController?.`, so a press before that moment did nothing at all -
+ * silently. This app's own rule is that an absent or disabled control is
+ * honest where one that fails when pressed is not, so it starts disabled.
+ */
+const routeButton = routePlanner
+  ? createRouteButton(() => {
+      if (routePlanner.isOpen()) {
+        routePlanner.close();
+        return;
+      }
+      // Opening the planner takes the bottom of the screen back from whatever
+      // was there: the object panel is a picking surface, not something to
+      // read while filling in a form.
+      objectPanel.close();
+      highlight?.clear();
+      routePlanner.open();
+    })
+  : null;
+
+if (routePlanner && routeButton) {
+  document.body.append(routePlanner.element);
+  routeButton.disabled = true;
+  routeButton.title = "Preparing the map\u2026";
+  document.body.append(routeButton);
+}
 
 const objectIndex = new ObjectIndexStore(objectIndexUrl, window.location.href);
 let indexLoaded = false;
@@ -171,13 +223,26 @@ map.on("load", async () => {
   // Added last so the selection marker sits above the snow raster.
   highlight = new SelectionHighlight(map);
 
-  if (routePanel && routePrompt) {
-    routeController = new RouteController(new RouteLayer(map), routePanel, routePrompt, {
+  if (routePanel && routePlanner) {
+    // Everything below hangs off the controller, so it is built before the
+    // button that reaches it is allowed to be pressed.
+    routeController = new RouteController(new RouteLayer(map), routePanel, {
       closeObjectPanel: () => {
         objectPanel.close();
         highlight?.clear();
       },
-      setRouteLabels: (labels) => objectPanel.setRouteLabels(labels),
+      setRouteLabels: (labels: { start: string; destination: string }) =>
+        objectPanel.setRouteLabels(labels),
+      // The planner mirrors the controller rather than holding its own copy,
+      // so an endpoint set from the object panel shows up in the fields.
+      onEndpointsChanged: (start, destination) => {
+        routePlanner.setEndpoint("start", start);
+        routePlanner.setEndpoint("destination", destination);
+        // A plan begun from the object panel opens the planner, so the user
+        // can always see both ends and edit either. Without this, choosing
+        // "Start here" left no visible sign of what was still needed.
+        if ((start || destination) && !routePlanner.isOpen()) routePlanner.open();
+      },
       // Read fresh on every route: the AS-OF date can change, and a run that
       // predates the data pyramid genuinely publishes none.
       snowDataSource: () => {
@@ -206,6 +271,10 @@ map.on("load", async () => {
       (record, role) => routeController?.choose(record, role),
       { start: "Start here", destination: "End here" },
     );
+    if (routeButton) {
+      routeButton.disabled = false;
+      routeButton.title = "Plan a route";
+    }
   }
 
   refreshShards();
@@ -237,18 +306,57 @@ function presentSelection(selection: Selection, status: IndexStatus): void {
   }
 }
 
+/**
+ * Name a tapped point for the planner.
+ *
+ * Runs the same `resolveSelection` a normal tap does, so picking on the map
+ * near an indexed object gives that object - its real name, and the only kind
+ * of endpoint with snow history behind it. Anywhere else the point is kept as
+ * coordinates rather than being snapped to a distant "nearest" object, because
+ * the whole reason to pick on the map is to reach ground the index does not
+ * name. An ambiguous tap is not resolved either: choosing one of several
+ * candidates silently is the thing `selection.ts` exists to avoid, and a
+ * coordinate is an honest answer where a guessed summit is not.
+ */
+function endpointAt(point: { longitude: number; latitude: number }): {
+  id: string;
+  name: string;
+  longitude: number;
+  latitude: number;
+} {
+  const selection = resolveSelection(objectIndex.records(), point, metersPerPixel(map));
+  if (selection.status === "selected") return selection.record;
+  return {
+    id: `map:${point.latitude.toFixed(5)},${point.longitude.toFixed(5)}`,
+    name: `${point.latitude.toFixed(5)}, ${point.longitude.toFixed(5)}`,
+    longitude: point.longitude,
+    latitude: point.latitude,
+  };
+}
+
 map.on("click", async (event) => {
+  const point = { longitude: event.lngLat.lng, latitude: event.lngLat.lat };
+
+  // A tap in picking mode fills a route field and does nothing else - it must
+  // not also open the object panel underneath the planner.
+  if (pickingRole !== null && routePlanner) {
+    const viewport = viewportBounds();
+    if (indexLoaded && shardsAreWorthLoading()) await objectIndex.ensureLoaded(viewport);
+    const role = pickingRole;
+    pickingRole = null;
+    map.getCanvas().style.cursor = "";
+    routePlanner.setPicking(null);
+    routeController?.setEndpoint(role, endpointAt(point));
+    return;
+  }
+
   const viewport = viewportBounds();
   // A tap is also a request for the objects here: a user who taps before the
   // shard has arrived should get the answer, not a permanent "loading".
   if (indexLoaded && shardsAreWorthLoading()) await objectIndex.ensureLoaded(viewport);
 
   const status = indexStatusFor(viewport);
-  const selection = resolveSelection(
-    objectIndex.records(),
-    { longitude: event.lngLat.lng, latitude: event.lngLat.lat },
-    metersPerPixel(map),
-  );
+  const selection = resolveSelection(objectIndex.records(), point, metersPerPixel(map));
   presentSelection(selection, status);
 });
 

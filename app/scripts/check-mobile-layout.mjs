@@ -202,50 +202,85 @@ try {
         `snow control clears it at ${Math.round(withPanel.snowBottom)}px`,
     );
 
-    // The route planner's half-planned strip (spec section 8.2) sits at the
-    // top, and everything at the top of this app has collided with something
-    // else at least once. It only exists when a routing provider is
-    // configured, so its absence is a state to skip - the same treatment the
-    // AS-OF date pill gets above. Run this leg with a VITE_GEOAPIFY_API_KEY set
-    // (any non-empty value: the strip appears on selection, before any
-    // request is made) to exercise it.
+    // The route planner (spec section 8.1) sits at the top, and everything at
+    // the top of this app has collided with something else at least once. It
+    // only exists when a routing provider is configured, so its absence is a
+    // state to skip - the same treatment the AS-OF date pill gets above. Run
+    // this leg with a VITE_GEOAPIFY_API_KEY set (any non-empty value: the
+    // planner opens on selection, before any request is made) to exercise it.
     const startButton = page.locator(".object-panel__action--start");
     if (await startButton.count()) {
       await startButton.first().click();
-      await page.waitForSelector(".route-prompt:not([hidden])", { timeout: 5_000 });
-      const withPrompt = await page.evaluate(() => {
-        const prompt = document.querySelector(".route-prompt")?.getBoundingClientRect();
-        const dateElement = document.querySelector(".snow-date");
-        const date = dateElement?.hidden ? null : dateElement?.getBoundingClientRect();
-        const search = document.querySelector(".search-bar")?.getBoundingClientRect();
-        if (!prompt || !search) throw new Error("Expected the route prompt to be open");
+      await page.waitForSelector(".route-planner:not([hidden])", { timeout: 5_000 });
+      const withPlanner = await page.evaluate(() => {
+        const planner = document.querySelector(".route-planner")?.getBoundingClientRect();
+        const fab = document.querySelector(".route-fab")?.getBoundingClientRect();
+        const inputs = [...document.querySelectorAll(".route-planner__input")].map(
+          (node) => node.getBoundingClientRect().height,
+        );
+        const sheet = document.querySelector(".object-panel");
+        const controls = document.querySelector(".maplibregl-ctrl-top-right");
+        if (!planner) throw new Error("Expected the route planner to be open");
         return {
-          prompt: { top: prompt.top, bottom: prompt.bottom, left: prompt.left, right: prompt.right },
-          blockerBottom: Math.max(search.bottom, date ? date.bottom : 0),
-          blocker: date ? "AS-OF date" : "search bar",
+          controlsLeft: controls ? controls.getBoundingClientRect().left : null,
+          panelTop: sheet && !sheet.hidden ? sheet.getBoundingClientRect().top : null,
+          planner: { top: planner.top, bottom: planner.bottom, left: planner.left, right: planner.right },
+          fab: fab ? { top: fab.top, bottom: fab.bottom, right: fab.right } : null,
+          inputs,
           viewportWidth: window.innerWidth,
+          viewportHeight: window.innerHeight,
           documentWidth: document.documentElement.scrollWidth,
         };
       });
-      if (withPrompt.prompt.top < withPrompt.blockerBottom) {
+      if (withPlanner.planner.left < 0 || withPlanner.planner.right > withPlanner.viewportWidth) {
         throw new Error(
-          `${name}: the route prompt (top ${withPrompt.prompt.top}px) is under the ` +
-            `${withPrompt.blocker} (bottom ${withPrompt.blockerBottom}px)`,
+          `${name}: the route planner (${withPlanner.planner.left}-${withPlanner.planner.right}px) ` +
+            `leaves a ${withPlanner.viewportWidth}px screen`,
         );
       }
-      if (withPrompt.prompt.left < 0 || withPrompt.prompt.right > withPrompt.viewportWidth) {
+      if (withPlanner.documentWidth > withPlanner.viewportWidth) {
+        throw new Error(`${name}: horizontal overflow with the route planner open`);
+      }
+      // The planner occupies the search bar's slot, so it inherits the search
+      // bar's collision with MapLibre's fixed top-right control column - the
+      // one this whole check was originally written for.
+      if (withPlanner.controlsLeft !== null && withPlanner.planner.right > withPlanner.controlsLeft + 0.5) {
         throw new Error(
-          `${name}: the route prompt (${withPrompt.prompt.left}-${withPrompt.prompt.right}px) ` +
-            `leaves a ${withPrompt.viewportWidth}px screen`,
+          `${name}: the route planner (right ${Math.round(withPlanner.planner.right)}px) runs under ` +
+            `the map controls (left ${Math.round(withPlanner.controlsLeft)}px)`,
         );
       }
-      if (withPrompt.documentWidth > withPrompt.viewportWidth) {
-        throw new Error(`${name}: horizontal overflow with the route prompt open`);
+      // Both endpoint fields must stay a real touch target (spec section 10).
+      // They are the only text inputs in the app that sit inside a row with
+      // two other controls, which is exactly where height gets squeezed out.
+      for (const height of withPlanner.inputs) {
+        if (height < 36) {
+          throw new Error(`${name}: a route planner field is only ${height}px tall`);
+        }
+      }
+      if (withPlanner.fab && withPlanner.fab.bottom > withPlanner.viewportHeight) {
+        throw new Error(
+          `${name}: the route button (bottom ${withPlanner.fab.bottom}px) is off a ` +
+            `${withPlanner.viewportHeight}px screen`,
+        );
+      }
+      // The collision this app keeps having. The route button rides above the
+      // open sheet on --bottom-sheet-height, and that variable carries the
+      // sheet's *height*, not the distance to its top edge - so a button
+      // positioned with a smaller base offset than the sheet's own sits
+      // silently behind it. That is exactly what happened when this button was
+      // first added.
+      if (withPlanner.fab && withPlanner.panelTop !== null && withPlanner.fab.bottom > withPlanner.panelTop + 0.5) {
+        throw new Error(
+          `${name}: the route button (bottom ${Math.round(withPlanner.fab.bottom)}px) is behind ` +
+            `the object panel (top ${Math.round(withPlanner.panelTop)}px)`,
+        );
       }
       console.log(
-        `${name}: route prompt ${Math.round(withPrompt.prompt.top)}-` +
-          `${Math.round(withPrompt.prompt.bottom)}px, clears the ${withPrompt.blocker} ` +
-          `at ${Math.round(withPrompt.blockerBottom)}px`,
+        `${name}: route planner ${Math.round(withPlanner.planner.top)}-` +
+          `${Math.round(withPlanner.planner.bottom)}px, fields ` +
+          withPlanner.inputs.map((h) => `${Math.round(h)}px`).join("/") +
+          (withPlanner.fab ? `, route button bottom ${Math.round(withPlanner.fab.bottom)}px` : ""),
       );
       // Finish the route and measure the panel it opens. The route panel
       // carries an elevation chart and so is taller than the object panel -

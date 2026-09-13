@@ -92,6 +92,28 @@ export async function fetchWalkingRoute(
   const url = new URL(ENDPOINT);
   url.searchParams.set("waypoints", `${formatWaypoint(start)}|${formatWaypoint(destination)}`);
   url.searchParams.set("mode", "hike");
+  // `type=short` alongside `hike`, measured 2026-09-13 against seven real
+  // Alpine and Apennine approaches, with BRouter's `hiking-beta` profile as the
+  // reference for what a hiker would actually walk.
+  //
+  // The default (`balanced`) optimises time, and a road is faster than a trail,
+  // so it routed onto tarmac wherever tarmac existed: Les Praz to Lac Blanc came
+  // back 11.1 km with **4.2 km paved**, against the real 7.8 km trail. `short`
+  // returned 7.6 km with 97 m paved. Across the set, paved distance collapsed
+  // (1,601 m -> 67 m, 389 m -> 0 m) and totals landed within a few percent of
+  // the reference.
+  //
+  // **It is a proxy, not a preference.** Geoapify exposes no way to favour
+  // unpaved ways - its `avoid` parameter covers only tolls, ferries and
+  // highways, and only for motorized modes - so this works because a trail is
+  // usually the shorter line, not because the router understands trails. Where
+  // that coincidence fails it can pick a shorter, harder line: on Corno Grande
+  // it returned 4.0 km where the reference walks 5.3 km, and Geoapify reports
+  // no surface at all for 2.3 km of it, while the reference shows that ground
+  // reaching `demanding_alpine_hiking`. The provider carries no difficulty
+  // grade in any form, so the app cannot warn about it - which is part of why
+  // spec section 8.6's disclaimer is not decorative.
+  url.searchParams.set("type", "short");
   // Metres, explicitly. `directionsSchema.ts` then *verifies* that the reply
   // says metres rather than assuming it: asking and checking are two different
   // things, and a miles figure read as metres is plausible on screen.

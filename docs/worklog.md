@@ -1,5 +1,93 @@
 # Working session log
 
+## 2026-09-13 (night) - a plainer UI, and trail routing that actually routes on trails
+
+Five things from the owner, four of them UI and one a real defect.
+
+**The routing bug was real, and `mode=hike` was not the problem.** The report
+was that routes ran along roads rather than trails. `hike` was already set, so
+the question was empirical: I measured seven real Alpine and Apennine
+approaches against BRouter's `hiking-beta` profile as a reference for what a
+hiker actually walks. Geoapify's default `type=balanced` optimises *time*, and
+a road is faster than a path, so it took tarmac wherever tarmac existed - Les
+Praz to Lac Blanc came back 11.1 km with **4.2 km paved**, against the real
+7.8 km trail. `type=short` returns 7.6 km with 97 m paved. Across the set paved
+distance collapsed (1,601 m to 67 m; 389 m to 0 m) and totals landed within a
+few percent of the reference.
+
+**It is a proxy and the docstring says so.** Geoapify has no "prefer unpaved"
+knob - `avoid` covers tolls, ferries and highways, and only for motorized
+modes - so `short` works because a trail is usually the shorter line, not
+because the router understands trails. Where that coincidence fails it picks a
+shorter, harder line: on Corno Grande it returned 4.0 km where the reference
+walks 5.3 km, and reported *no surface at all* for 2.3 km of it, while the
+reference shows that ground reaching `demanding_alpine_hiking`. The provider
+carries no difficulty grade in any form, so the app cannot warn about it. That
+is a limit worth knowing, not a bug to hide.
+
+**I did not switch providers to BRouter**, although it is plainly better at
+this. Its public server publishes no third-party-use terms and its own docs
+describe concurrency as "one session killing the other"; pointing a public app
+at a volunteer service on those terms is free-riding, and unreliable besides.
+It is MIT and self-hosting is its documented deployment, which needs a backend
+this app does not have.
+
+**Object selection: the floor moved from 20 to 80 m/px**, about zoom 11.4 to
+9.4, so a whole valley is selectable where before you had to close in on one
+cirque. The old floor existed for a good reason - at a coarse scale one
+fingertip covers a ridge of summits - and that reason has not gone away; what
+changed is the answer to it. Ambiguity is now measured in *screen* distance, so
+a coarse tap hands back the five summits under the finger and the panel offers
+them as a list. Refusing to answer is right only when there is nothing useful
+to say.
+
+**That deleted a constant rather than adding one.** `AMBIGUITY_RATIO` (1.5) and
+the new pixel margin were briefly both in place, combined with `max()`. Writing
+the bracketing test made it obvious the ratio could never fire again: the
+nearest candidate is by definition inside the 22 px tap radius, so `nearest x
+1.5` never exceeds `nearest + 12 px`. A constant that cannot change an outcome
+reads like a safeguard while doing nothing, so it went.
+
+**The date picker is now `< 13 Sept 2026 >` with a calendar behind the date**,
+replacing the slider I argued for two entries ago. The owner was right and my
+reasoning had a hole in it: I chose a slider partly because a calendar was more
+code, but a slider gives no way to see that a day is *missing*, and the
+catalogue really does have holes when a run fails. The calendar shows them as
+disabled squares. Arrows step over *available* dates, so they can never walk
+into a gap. `calendarGrid.ts` is pure and tested, including the timezone case -
+the grid steps in UTC, and a local-time grid would drift a day for anyone west
+of Greenwich, with the symptom being a user tapping one date and loading
+another.
+
+**Routing got a button and a two-field planner, and lost a floating strip.**
+Routes could previously only join two *indexed* objects, found by tapping. Now
+there is one round button, and a card with A and B fields that take a typed
+place, a pasted coordinate, or a tap on the map. Picking on the map runs the
+same `resolveSelection` a tap does, so picking near an indexed object gives
+that object - and anywhere else keeps the coordinate rather than snapping to a
+distant "nearest", because reaching unnamed ground is the whole point of
+picking on a map. The half-planned prompt strip is deleted: it existed only
+because nothing showed both ends of a plan at once.
+
+**Two bugs found by driving the real UI, neither visible in the code.** The
+route button was live before the `RouteController` it calls into exists - it is
+created on the map's `load`, and every hook goes through `routeController?.`,
+so an early press did nothing at all, silently. It now starts disabled. And the
+button sat 20 px *behind* the open bottom sheet, because
+`--bottom-sheet-height` carries the sheet's height, not the distance to its top
+edge; anything riding above a sheet has to add the sheet's own 2.25 rem offset
+back. Both are asserted in `check-mobile-layout` now, and I mutated the CSS
+both ways to confirm the assertions actually fail.
+
+**A false red worth recording.** My first mutation test of the workflow guard
+"failed" in both the mutated and the restored state - I was running unittest
+from the repo root instead of `pipeline/`, so it was an import error wearing a
+failure's clothes. A failing mutation proves nothing until the unmutated case
+is seen to pass.
+
+Tests: 252 frontend, 326 pipeline, build, CSP and mobile layout at 320/390 px
+all clean.
+
 ## 2026-09-13 (late evening) - snow along the route, enabled
 
 The owner confirmed the open decision from the entry below: **latest date only,
