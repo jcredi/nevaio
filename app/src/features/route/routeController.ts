@@ -84,6 +84,15 @@ export class RouteController {
     if (start && destination) {
       this.prompt.hide();
       this.hooks.closeObjectPanel();
+      if (start.id === destination.id) {
+        // Refused here rather than sent: the provider returns a valid
+        // zero-length route for this, which renders as "0 m" and an empty
+        // chart. Spending a request to display nothing useful helps nobody.
+        this.coordinates = [];
+        this.layer.clearRoute();
+        this.panel.showSamePoint(start.name);
+        return;
+      }
       void this.calculate(start, destination);
       return;
     }

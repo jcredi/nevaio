@@ -255,8 +255,37 @@ try {
       await page.route(/api\.geoapify\.com/, (route) =>
         route.fulfill({ status: 200, contentType: "application/json", body: ROUTE_FIXTURE }),
       );
-      await page.mouse.click(viewport.width / 2, viewport.height / 2);
+      // A *different* object for the far end: routing an object to itself is
+      // refused before any request is made (routeController.ts), so reusing
+      // Dufourspitze here would measure the refusal notice rather than a real
+      // route panel. Zumsteinspitze is 640 m away and in the same shard.
+      //
+      // The tap point is computed rather than assumed to be the screen centre:
+      // with the object panel already open, the centre of a 320x568 viewport is
+      // *inside the panel*, so a centre click lands on the sheet and selects
+      // nothing. Pan the target into the upper part of the map and click where
+      // MapLibre says it actually is.
+      const DESTINATION = [7.871408, 45.932166];
+      const target = await page.evaluate((center) => {
+        window.map.jumpTo({ center, zoom: 15 });
+        // Push the target up out of the bottom sheet's half of the screen.
+        window.map.panBy([0, window.innerHeight * 0.2], { duration: 0 });
+        const point = window.map.project(center);
+        return { x: point.x, y: point.y };
+      }, DESTINATION);
+      await page.waitForTimeout(900);
+      const panelTop = await page.evaluate(
+        () => document.querySelector(".object-panel")?.getBoundingClientRect().top ?? Infinity,
+      );
+      if (target.y >= panelTop) {
+        throw new Error(
+          `${name}: the destination object sits at y=${Math.round(target.y)}, under the object ` +
+            `panel (top ${Math.round(panelTop)}px) - this check cannot tap it`,
+        );
+      }
+      await page.mouse.click(target.x, target.y);
       await page.waitForSelector(".object-panel:not([hidden])", { timeout: 5_000 });
+      await page.waitForTimeout(400);
       await page.locator(".object-panel__action--destination").first().click();
       await page.waitForSelector(".route-panel:not([hidden])", { timeout: 10_000 });
       await page.waitForSelector(".route-elevation__svg", { timeout: 10_000 });

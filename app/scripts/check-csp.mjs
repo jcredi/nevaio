@@ -129,6 +129,11 @@ page.on("response", (r) => responses.push({ url: r.url(), status: r.status() }))
 // glyphs from MapTiler, plus the snow manifest, PNG tiles and the OSM object
 // index from R2. Anything the CSP blocks simply never appears here.
 //
+// The routing origin is checked separately, below, by a direct fetch rather
+// than an EXPECTED entry: routing only fires once a user has picked two map
+// objects, which this script cannot drive in a bundle that exposes no map
+// handle.
+//
 // The object index leg is deployed-only for the same reason the snow legs are,
 // but by a subtler route: the bucket's CORS policy does allow the fixed local
 // Vite origins (`npm run dev` on :5173 fetches the index fine), yet this
@@ -163,6 +168,32 @@ try {
   await page.fill(".search-bar__input", "Bolzano");
   await page.waitForTimeout(2500);
 
+  // The routing origin (spec section 8). Driving the real UI to a route needs
+  // two selected objects, and the production bundle deliberately exposes no map
+  // handle to steer the camera with - so this asks the question directly
+  // instead: can the page reach api.geoapify.com at all under the deployed CSP?
+  // A 401 is a perfectly good answer. It proves the request left the page and
+  // came back, which is the only thing connect-src decides; whether the key is
+  // valid is not this script's business, and deliberately sending no key keeps
+  // a credential out of a check that runs against arbitrary origins.
+  const routingProbe = await page.evaluate(async () => {
+    try {
+      const response = await fetch(
+        "https://api.geoapify.com/v1/routing?waypoints=46.0207,7.7492%7C46.0078,7.7534&mode=hike",
+        { method: "GET" },
+      );
+      return { reached: true, status: response.status };
+    } catch (error) {
+      return { reached: false, status: String(error) };
+    }
+  });
+  if (routingProbe.reached) {
+    console.log(`  ok   routing origin reachable (HTTP ${routingProbe.status})`);
+  } else {
+    console.error(`  FAIL routing origin blocked under the deployed CSP: ${routingProbe.status}`);
+    failed = true;
+  }
+
   const reported = await page.evaluate(() => window.__cspViolations);
   for (const v of reported) violations.push(`${v.directive} blocked ${v.blocked}`);
 
@@ -188,8 +219,13 @@ if (violations.length) {
   console.log("no CSP violations");
 }
 // Locally, an R2 request blocked by the bucket's production-only CORS policy is
-// the expected outcome, not a finding; anything else still gets surfaced.
-const noisy = DEPLOYED ? pageErrors : pageErrors.filter((e) => !/CORS policy|net::ERR_FAILED/.test(e));
+// the expected outcome, not a finding; anything else still gets surfaced. The
+// routing probe's own 401 is expected in both modes - it sends no key on
+// purpose - so it is not a page error either.
+const EXPECTED_NOISE = /status of 401/;
+const noisy = (DEPLOYED ? pageErrors : pageErrors.filter((e) => !/CORS policy|net::ERR_FAILED/.test(e))).filter(
+  (e) => !EXPECTED_NOISE.test(e),
+);
 if (noisy.length) {
   console.error("page errors (review, not all are CSP):");
   for (const e of new Set(noisy)) console.error("  ", e.slice(0, 300));

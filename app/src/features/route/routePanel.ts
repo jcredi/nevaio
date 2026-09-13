@@ -111,6 +111,25 @@ export class RoutePanel {
     this.onScrub = handler;
   }
 
+  /**
+   * Both ends are the same object. Refused before any request is made: the
+   * provider answers it perfectly happily with a valid zero-length route, which
+   * renders as "0 m" and an empty chart - technically correct and useless. It
+   * is almost always a mis-tap, so the panel says which object it is and leaves
+   * the plan in place for the user to change one end.
+   */
+  showSamePoint(name: string): void {
+    this.renderHeader({ start: name, destination: name });
+    this.body.replaceChildren(
+      element(
+        "p",
+        "route-panel__note",
+        `Start and destination are both ${name}. Pick a different object for one end.`,
+      ),
+    );
+    this.reveal();
+  }
+
   showCalculating(names: RouteEndpointNames): void {
     this.renderHeader(names);
     this.body.replaceChildren(element("p", "route-panel__note", "Calculating a walking route…"));

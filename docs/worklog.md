@@ -1,5 +1,61 @@
 # Working session log
 
+## 2026-09-13 (later still again) - the elevation profile, and spec 8.5 linked
+
+Spec section 8 is now complete apart from its snow half: the route panel draws
+an elevation profile, reports ascent and descent, and dragging along the profile
+moves a cursor along the route on the map (section 8.5, which the spec calls a
+core MVP requirement rather than a nicety).
+
+**Ascent got the most care, because it is the one number a measured DEM gets
+badly wrong.** Net gain is two elevations subtracted and errors cancel; ascent
+sums every upward step, so noise accumulates into it and *sampling more finely
+inflates it without adding information*. The provider returns ~14 m spacing
+against a ~30 m DEM - oversampled, carrying interpolation rather than
+measurement between real cells. So the profile is resampled to 60 m and steps
+under 2 m are ignored before summing, and the result is rounded to 10 m because
+the underlying figure moves ~3% across sampling choices. A test asserts that
+reading the same terrain twice as finely does not report more climbing, which is
+the regression that would otherwise arrive silently.
+
+The threshold's boundary is written into the test rather than hidden: steps at
+exactly 2 m *are* counted, because a filter aggressive enough to remove them
+would start eating real micro-terrain. Someone seeing an inflated ascent on
+unusually noisy ground should be able to find where the line is.
+
+**One honesty bug was caught by looking at the rendered output, not the code.**
+The chart's y-axis rounds outward to land on tidy gridlines, and the resting
+readout was showing those rounded bounds - telling the user a route reached
+3,500 m when it tops out at 3,275 m. The axis may round; a number presented as a
+fact may not. The readout now uses the profile's real minimum and maximum, and
+so does the chart's `aria-label`.
+
+`touch-action: none` on the profile SVG is load-bearing, not tidiness: without
+it a drag along the chart scrolls the panel instead of scrubbing, which makes
+section 8.5's interaction unusable on a phone rather than merely awkward.
+
+**Both small gaps from this morning are closed.** Routing an object to itself is
+now refused before any request - the provider answers it happily with a valid
+zero-length route that renders as "0 m" and an empty chart, which is technically
+correct and useless. And `npm run check-csp` has a routing leg: rather than
+driving a two-object selection in a production bundle that exposes no map
+handle, it asks the question `connect-src` actually decides - can the page reach
+`api.geoapify.com` at all - with a deliberately keyless request, where a 401 is
+a perfectly good answer.
+
+*`check-mobile-layout` now drives a whole route*, because the route panel is the
+taller of the two bottom sheets and therefore the one that decides whether the
+snow control gets covered. Writing it surfaced two traps worth keeping: the
+same-object guard means the check has to pick a genuinely different object, and
+with a sheet already open **the centre of a 320px viewport is inside it**, so a
+centre tap selects the panel rather than the map. The destination tap point is
+computed from `map.project` now. Verified at 320 and 390 px: route panel
+276-532 and 443-808 px, snow control clearing both.
+
+Verified against a real recorded response: 6.6 km, 180 m ascent / 870 m descent,
+profile 2427-3275 m, and scrubbing at 15/50/85% along the chart moved the map
+cursor to three distinct, correctly-ordered points along the route.
+
 ## 2026-09-13 (later still) - the DEM extract is cancelled: measured, not assumed
 
 Geoapify was chosen partly because it returns elevation with the route, with an

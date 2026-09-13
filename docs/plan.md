@@ -64,24 +64,9 @@ key, then a smoke test of that provider's elevation data.**
      below). No card required. Until it exists and is set as a Netlify env var,
      the whole feature is invisible on production by design, and nothing else
      here can be verified against a real route.
-   - **Build the elevation profile** (spec sections 8.3-8.5). The data is
-     cleared: Geoapify's elevation was measured on 2026-09-13 against 200
-     indexed objects and 8 real hut-to-hut routes and is accurate to about a
-     metre on path-level terrain (median +0.6 m at route endpoints) - see the
-     MEASURED section in
-     [`research/routing-and-dem-options.md`](research/routing-and-dem-options.md).
-     The request must now add `details=elevation`, which returns an
-     `elevation_range` array of `[distance, height]` pairs at ~14 m spacing.
-     Two rules the measurement imposes:
-     **never take a summit or hut elevation from the DEM** (it reads a median
-     49 m low above 3,000 m, and up to 849 m low on a sharp peak - that is what
-     the object index's OSM `ele` is for), and **compute ascent after
-     resampling to the 60 m spacing `routeProfile.ts` already uses**, then round
-     it, because the raw array is oversampled relative to the DEM's own ~30 m
-     resolution.
    - **The Copernicus GLO-30 extract is not needed for section 8** (decided
-     2026-09-13 on the measurement above): no pipeline job, no R2 storage claim,
-     no sizing exercise. It stays documented as the fallback if Geoapify is ever
+     2026-09-13 on measurement): no pipeline job, no R2 storage claim, no
+     sizing exercise. It stays documented as the fallback if Geoapify is ever
      dropped, and the 2026-09-12 analysis behind it is unchanged.
    - **Snow along the route**, and this needs a data source the frontend does
      not have. The published PNG tiles encode freshness as five discrete
@@ -97,14 +82,9 @@ key, then a smoke test of that provider's elevation data.**
      bounded sample count, default 60 m = GFSC's native pixel), but the
      spacing value and the definition of "route snow-covered percentage" are
      not closed by that.
-   - The linked map/profile interaction (section 8.5) has its map side ready -
-     `RouteLayer.setCursor` - and no profile to drive it yet.
-   - Two small known gaps, neither urgent: choosing the same object as both
-     start and destination spends a request and renders a valid 0 m route
-     instead of being refused up front; and `npm run check-csp` has no routing
-     leg, because driving one needs object selection in a production bundle
-     that deliberately exposes no map handle. The deployed route was verified
-     by hand on 2026-09-13 instead.
+   - **What is left of section 8 is the snow half, and only that.** Distance,
+     the elevation profile, ascent/descent, the linked map/profile interaction
+     (8.5) and the 8.6 disclaimer all shipped 2026-09-13.
 
 3. **Repository structure refactor, stage 4**
    ([`../REFACTOR.md`](../REFACTOR.md)). Stages 1 (dissolve `recon/`) and 2
