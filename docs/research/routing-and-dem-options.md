@@ -268,6 +268,88 @@ custom one, so it triggers a CORS preflight on every request - check that the
 demo server answers `OPTIONS` before building on it. Keep it as the fallback if
 Geoapify's free plan ever changes.
 
+### MEASURED, 2026-09-13: Geoapify's elevation is good enough for the route profile
+
+The amendment above chose Geoapify partly because it returns elevation with the
+route, and flagged that its global DEM source is unnamed and therefore untested.
+That test has now run, against the live API with the owner's key. **It passes for
+the use spec section 8 actually needs, and fails in a way that does not matter.**
+
+**Method.** 200 objects sampled from Nevaio's own published OSM object index
+(shards 31TGM, 32TLS, 32TMS, 32TNS, 32TPS - the high Alps), stratified by kind
+and elevation band, queried in one batch against Geoapify's Elevation API and
+compared with each object's OSM `ele` tag. Then 8 real hut-to-hut routes were
+requested with `details=elevation` and their profile endpoints compared with the
+same OSM values. Note what this is: agreement between two independent and
+imperfect sources, not a comparison against ground truth. OSM `ele` is
+crowd-sourced. Agreement to within a metre is still meaningful; disagreement
+needs a reason before it is read as the DEM being wrong.
+
+| class (n=40 each) | median err | mean err | p90 abs | max abs |
+|---|---|---|---|---|
+| settlement / parking / saddle | -1.5 m | +2.0 m | 21 m | 192 m |
+| hut / shelter | -1.0 m | -6.1 m | 28 m | 80 m |
+| peak < 2,000 m | -15.5 m | -23.8 m | 35 m | 213 m |
+| peak 2,000-3,000 m | -33.5 m | -61.2 m | 80 m | 536 m |
+| peak > 3,000 m | -49.0 m | -74.3 m | 110 m | 849 m |
+
+**The pattern is textbook and expected: a ~30 m DEM truncates sharp summits.**
+The bias is one-directional and grows with altitude and steepness, because a
+30 m cell averages away the last few metres of a pyramid. The worst case, Grand
+Muveran at -849 m, is a near-vertical summit where the sampled cell is evidently
+partway down the face.
+
+**Why that failure does not matter here.** Nevaio never needs a DEM to tell it
+how high a summit is - the object index already carries OSM's own `ele` for
+every peak and hut, and that is what the object panel shows. The DEM is only
+ever asked about points *along a path*, and on that terrain it is excellent:
+
+- **Route profile endpoints vs OSM hut elevations, 16 endpoints across 8 routes:
+  median error +0.6 m, mean +0.9 m, worst 26.3 m.**
+- Gentle-ground classes above (huts, saddles, parking, settlements) sit at
+  roughly +/-1 m median, which is the same answer from the other direction.
+
+**The profile shape is usable as returned.** `details=elevation` gives, per leg,
+an `elevation` array and an `elevation_range` array of `[distance, height]`
+pairs - already the exact shape a profile chart wants, at roughly 14 m spacing.
+Two things to know before consuming it:
+
+- **There is no `ascent`/`descent` field.** Those must be computed from the
+  array, and cumulative ascent is the number most vulnerable to DEM noise, since
+  noise accumulates while net gain does not. Measured on a steady 3.8 km climb
+  out of Zermatt (net +412.8 m): raw 441 m, ignoring sub-2 m steps 430 m,
+  resampled to 30 m 437 m, resampled to 60 m 429 m. A ~3% spread across every
+  reasonable choice - stable enough to report as a rounded figure.
+- **The noise floor is low.** On a near-pure descent (Refuge Albert 1er to
+  Chalet alpin du Tour, net -1,226 m) the profile reported only 32 m of spurious
+  ascent over 4.4 km, about 7 m/km. That is the honest measure of DEM noise,
+  because on a monotonic descent every metre of "ascent" is error.
+- The 14 m native spacing is **finer than the DEM's own ~30 m resolution**, so it
+  is oversampled. Resampling to this app's 60 m GFSC-native spacing
+  (`routeProfile.ts`) is both cheaper and more honest than consuming it raw.
+
+### CONCLUSION on decision B (spec section 15 item 7): no Copernicus GLO-30 extract is needed for section 8
+
+The elevation that comes free with each route is accurate to about a metre on
+the terrain routes actually cross. Building, storing and maintaining a GLO-30
+extract in R2 to do the same job better by a margin no hiker could act on would
+be effort spent against no user-visible gain, and it would claim the single
+largest unknown block of the R2 free tier.
+
+**Two rules that come with this, both of which are easy to violate by accident:**
+
+1. **Never take a summit or hut elevation from the DEM.** That is what the OSM
+   object index is for, and the table above is why: at 3,000 m and above the DEM
+   reads a median 49 m low, and can be hundreds of metres low on a sharp peak.
+2. **Compute ascent after resampling, and round what is shown.** Reporting
+   "441 m" implies a precision the measurement does not have; "440 m" is the
+   honest form of the same number.
+
+GLO-30 stays documented as the fallback if Geoapify is ever dropped, and the
+2026-09-12 analysis behind it stands unchanged - it is simply not needed now.
+
+---
+
 ### RECOMMENDATION (2026-09-13, supersedes the Mapbox decision): Geoapify Routing API, `hike` mode
 
 It is the only candidate that clears both hard filters - no card at signup, and

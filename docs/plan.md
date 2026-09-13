@@ -64,18 +64,25 @@ key, then a smoke test of that provider's elevation data.**
      below). No card required. Until it exists and is set as a Netlify env var,
      the whole feature is invisible on production by design, and nothing else
      here can be verified against a real route.
-   - **Smoke-test Geoapify's elevation before building anything on it.** Its
-     `details=elevation` returns per-point heights plus ascent/descent with the
-     route, which is why it was chosen - but Geoapify does not name its global
-     DEM source, and 30 m global data is at its worst in exactly the steep
-     terrain this app is about. Check a handful of summits and huts against the
-     object index's own elevations first. The request deliberately does not ask
-     for elevation until that passes.
-   - **The Copernicus GLO-30 extract is deferred, not cancelled.** If the smoke
-     test passes, the elevation profile comes from the routing response and the
-     DEM extract is not needed for section 8 at all - no pipeline job, no R2
-     storage claim, no sizing exercise. If it fails, GLO-30 is the fallback and
-     the decision of 2026-09-12 stands unchanged.
+   - **Build the elevation profile** (spec sections 8.3-8.5). The data is
+     cleared: Geoapify's elevation was measured on 2026-09-13 against 200
+     indexed objects and 8 real hut-to-hut routes and is accurate to about a
+     metre on path-level terrain (median +0.6 m at route endpoints) - see the
+     MEASURED section in
+     [`research/routing-and-dem-options.md`](research/routing-and-dem-options.md).
+     The request must now add `details=elevation`, which returns an
+     `elevation_range` array of `[distance, height]` pairs at ~14 m spacing.
+     Two rules the measurement imposes:
+     **never take a summit or hut elevation from the DEM** (it reads a median
+     49 m low above 3,000 m, and up to 849 m low on a sharp peak - that is what
+     the object index's OSM `ele` is for), and **compute ascent after
+     resampling to the 60 m spacing `routeProfile.ts` already uses**, then round
+     it, because the raw array is oversampled relative to the DEM's own ~30 m
+     resolution.
+   - **The Copernicus GLO-30 extract is not needed for section 8** (decided
+     2026-09-13 on the measurement above): no pipeline job, no R2 storage claim,
+     no sizing exercise. It stays documented as the fallback if Geoapify is ever
+     dropped, and the 2026-09-12 analysis behind it is unchanged.
    - **Snow along the route**, and this needs a data source the frontend does
      not have. The published PNG tiles encode freshness as five discrete
      colours and coverage as alpha, so reading FSC back out of them loses the
@@ -122,11 +129,11 @@ key, then a smoke test of that provider's elevation data.**
   reversals and the reasoning are in
   [`research/routing-and-dem-options.md`](research/routing-and-dem-options.md)
   - read the 2026-09-13 amendment before reopening this.
-  **Item 7 (elevation/DEM source) is open again**, and deliberately: a
-  precomputed Copernicus GLO-30 extract into R2 remains the decided fallback,
-  but Geoapify returns a per-point elevation profile with the route, which
-  would make the extract unnecessary. Which one is used depends on a smoke test
-  that has not run (item 2 above).
+  **Item 7 (elevation/DEM source) was settled 2026-09-13: the routing
+  provider's own elevation**, measured accurate to about a metre on the terrain
+  routes actually cross. A precomputed Copernicus GLO-30 extract into R2 stays
+  documented as the fallback if Geoapify is ever dropped, but is not being
+  built.
 - **Create the free Geoapify API key** (owner console work, 2026-09-13; routing
   is built and waiting on it). No credit card. Restrict it to the Netlify
   origin in the Geoapify console - the key ships inside a public bundle, and
@@ -158,11 +165,11 @@ key, then a smoke test of that provider's elevation data.**
   archive is roughly 4.0 GB and ~109,000 objects. Against that, the object
   index (28.6 MB), the per-object series (~26 MB at the two-month depth
   amendment v1.13 leaves) and a Copernicus GLO-30 extract are the other
-  claimants. The first two are rounding errors; **the DEM extract was the one
-  worth sizing before it is built** - and since 2026-09-13 it may never be
-  built at all, if Geoapify's own elevation proves good enough (item 2), which
-  would take the largest single unknown out of this projection. They
-  have to fit in the remaining
+  claimants. The first two are rounding errors, and **the DEM extract - which
+  was the one worth sizing before building - is no longer being built at all**
+  (measured 2026-09-13: the routing provider's own elevation is good enough),
+  which takes the largest single unknown out of this projection. What is left
+  has to fit in the remaining
   ~6 GB, or the date window shortens - `config.ASOF_CATALOGUE_DATES` is the
   one dial. Re-measure in midwinter, when the number means something - the
   September reading above cannot tell us whether the DEM fits.

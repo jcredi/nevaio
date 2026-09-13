@@ -1,5 +1,51 @@
 # Working session log
 
+## 2026-09-13 (later still) - the DEM extract is cancelled: measured, not assumed
+
+Geoapify was chosen partly because it returns elevation with the route, with an
+explicit note that its global DEM source is unnamed and untested. The test has
+now run against the live API, and **the Copernicus GLO-30 extract is not being
+built** (spec section 15 item 7, settled). Full numbers and method are in
+`docs/research/routing-and-dem-options.md`.
+
+**What was measured.** 200 objects from Nevaio's own published object index
+across five high-Alpine shards, stratified by kind and elevation band, compared
+with their OSM `ele` tags; then 8 real hut-to-hut routes requested with
+`details=elevation`, their profile endpoints compared with the same values.
+
+**It fails on summits, exactly as a 30 m DEM should, and that turns out not to
+matter.** The error is one-directional and grows with steepness: peaks below
+2,000 m read a median 15 m low, 2,000-3,000 m a median 34 m low, above 3,000 m a
+median 49 m low, with a worst case of -849 m on Grand Muveran, a near-vertical
+summit where the sampled cell is partway down the face. That is cell averaging
+truncating a pyramid, not a broken dataset. It does not matter because Nevaio
+never asks a DEM how high a summit is - the object index carries OSM's own `ele`
+for every peak and hut, and that is what the panel shows.
+
+**It is excellent on the terrain that routes actually cross**, which is the only
+thing section 8 needs: **median +0.6 m error across 16 route-profile endpoints**,
+mean +0.9 m, worst 26.3 m. The gentle-ground classes agree from the other
+direction at about +/-1 m median.
+
+**Ascent needs care, and was measured rather than trusted.** There is no
+`ascent`/`descent` field - those must be computed from the array, and cumulative
+ascent is the figure most exposed to DEM noise, because noise accumulates while
+net gain does not. On a steady 3.8 km climb out of Zermatt (net +412.8 m): raw
+441 m, sub-2 m steps ignored 430 m, resampled to 30 m 437 m, to 60 m 429 m - a
+~3% spread across every reasonable choice. The noise floor was measured on a
+near-pure descent, where every metre of reported ascent is by definition error:
+32 m over 4.4 km, about 7 m/km. Both are comfortably good enough to report a
+rounded figure.
+
+The returned profile is oversampled - ~14 m spacing against a ~30 m DEM - so it
+should be resampled to the 60 m GFSC-native spacing `routeProfile.ts` already
+implements before ascent is computed or a chart is drawn.
+
+**What this buys.** No pipeline job, no R2 storage claim, and the single largest
+unknown in the free-tier projection removed. The whole elevation half of spec
+section 8 now arrives in the response we were already making. GLO-30 stays
+written down as the fallback if Geoapify is ever dropped.
+
 ## 2026-09-13 (later) - Mapbox wanted a credit card, so the routing provider is Geoapify
 
 The owner went to create the Mapbox token and was asked for payment details.
